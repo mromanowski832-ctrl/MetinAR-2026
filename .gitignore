@@ -107,3 +107,6 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Independent .NET test project. Unity-generated csproj files stay ignored.
+!tests/GeoCore.Tests/GeoCore.Tests.csproj
