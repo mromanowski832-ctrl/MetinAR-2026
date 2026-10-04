@@ -10,9 +10,9 @@ namespace MetinAR.Location
     public static class GeoMath
     {
         /// <summary>
-        /// IUGG mean Earth radius (authalic / volumetric mean), in meters.
-        /// Commonly cited value 6371008.8 m. Distance and offset formulas treat Earth as a
-        /// sphere of this radius, not an ellipsoid.
+        /// IUGG mean Earth radius in meters, commonly used for spherical distance approximations.
+        /// Value: 6371008.8 m. Distance and offset formulas treat Earth as a sphere of this
+        /// radius, not an ellipsoid.
         /// </summary>
         public const double EarthRadiusMeters = 6371008.8;
 
@@ -57,6 +57,16 @@ namespace MetinAR.Location
                 + Math.Cos(lat1Radians) * Math.Cos(lat2Radians)
                   * sinHalfDeltaLon * sinHalfDeltaLon;
 
+            // Floating-point error can push the haversine value slightly outside [0, 1].
+            if (haversineCentralAngle < 0.0)
+            {
+                haversineCentralAngle = 0.0;
+            }
+            else if (haversineCentralAngle > 1.0)
+            {
+                haversineCentralAngle = 1.0;
+            }
+
             double centralAngleRadians =
                 2.0 * Math.Atan2(Math.Sqrt(haversineCentralAngle), Math.Sqrt(1.0 - haversineCentralAngle));
 
@@ -74,15 +84,31 @@ namespace MetinAR.Location
         /// <param name="eastMeters">Eastward displacement in meters (negative = west).</param>
         /// <returns>New coordinate after offset; longitude normalized to [-180, 180].</returns>
         /// <exception cref="ArgumentOutOfRangeException">
-        /// Thrown when the origin is too close to a pole (|cos(latitude)| below
-        /// <see cref="MinimumCosLatitudeForOffset"/>), or when the resulting latitude
-        /// would fall outside [-90, 90].
+        /// Thrown when northMeters or eastMeters is NaN or infinite, when the origin is too
+        /// close to a pole for an east/west offset, or when the resulting latitude would
+        /// fall outside [-90, 90].
         /// </exception>
         public static GeoCoordinate OffsetMeters(
             GeoCoordinate origin,
             double northMeters,
             double eastMeters)
         {
+            if (double.IsNaN(northMeters) || double.IsInfinity(northMeters))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(northMeters),
+                    northMeters,
+                    "northMeters must be a finite value in meters.");
+            }
+
+            if (double.IsNaN(eastMeters) || double.IsInfinity(eastMeters))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(eastMeters),
+                    eastMeters,
+                    "eastMeters must be a finite value in meters.");
+            }
+
             double latitudeRadians = DegreesToRadians(origin.Latitude);
             double cosLatitude = Math.Cos(latitudeRadians);
 
@@ -118,13 +144,12 @@ namespace MetinAR.Location
         }
 
         /// <summary>
-        /// Normalizes longitude into the closed-open range used by <see cref="GeoCoordinate"/>:
-        /// [-180, 180]. Values of exactly ±180 are left as-is when already in range;
-        /// values outside are wrapped.
+        /// Wraps longitude into the closed range [-180, 180] used by <see cref="GeoCoordinate"/>.
+        /// Both -180 and +180 are valid and can occur.
         /// </summary>
         private static double NormalizeLongitudeDegrees(double longitudeDegrees)
         {
-            // Bring into (-180, 180] then clamp edge cases into [-180, 180].
+            // Wrap into [-180, 180]. Both endpoints are valid.
             double wrapped = longitudeDegrees % 360.0;
             if (wrapped > 180.0)
             {

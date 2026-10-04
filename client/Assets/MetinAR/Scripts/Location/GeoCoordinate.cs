@@ -27,25 +27,25 @@ namespace MetinAR.Location
         /// <param name="latitude">Latitude in decimal degrees, WGS84. Must be in [-90, 90].</param>
         /// <param name="longitude">Longitude in decimal degrees, WGS84. Must be in [-180, 180].</param>
         /// <exception cref="ArgumentOutOfRangeException">
-        /// Thrown when <paramref name="latitude"/> is outside [-90, 90] or
-        /// <paramref name="longitude"/> is outside [-180, 180].
+        /// Thrown when latitude or longitude is NaN, positive infinity, negative infinity,
+        /// or outside the valid range (latitude [-90, 90], longitude [-180, 180]).
         /// </exception>
         public GeoCoordinate(double latitude, double longitude)
         {
-            if (latitude < -90.0 || latitude > 90.0)
+            if (double.IsNaN(latitude) || double.IsInfinity(latitude) || latitude < -90.0 || latitude > 90.0)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(latitude),
                     latitude,
-                    "Latitude must be between -90 and 90 degrees inclusive.");
+                    "Latitude must be a finite value between -90 and 90 degrees inclusive.");
             }
 
-            if (longitude < -180.0 || longitude > 180.0)
+            if (double.IsNaN(longitude) || double.IsInfinity(longitude) || longitude < -180.0 || longitude > 180.0)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(longitude),
                     longitude,
-                    "Longitude must be between -180 and 180 degrees inclusive.");
+                    "Longitude must be a finite value between -180 and 180 degrees inclusive.");
             }
 
             Latitude = latitude;

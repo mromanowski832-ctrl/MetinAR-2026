@@ -19,6 +19,7 @@ Branch: `feat/001-geo-core` (from `main`). Main was not modified.
 - **Longitude:** \([-180, 180]\) inclusive (east positive)
 - **Altitude:** not modeled
 - Invalid constructor arguments throw `ArgumentOutOfRangeException`
+- **NaN, positive infinity, and negative infinity are rejected** for latitude and longitude
 
 ## Distance formula and Earth model
 
@@ -30,7 +31,9 @@ Named constant:
 EarthRadiusMeters = 6371008.8
 ```
 
-This is the IUGG mean Earth radius (authalic / volumetric mean, commonly cited). Appropriate for short real-world GPS separations (tens to thousands of meters). Return value is meters. Identical inputs return exactly `0`.
+This is the IUGG mean Earth radius commonly used for spherical distance approximations. It is not described here as both an authalic and a volumetric mean. Appropriate for short real-world GPS separations (tens to thousands of meters). Return value is meters. Identical inputs return exactly `0`.
+
+Before the square roots and `atan2`, the haversine intermediate value is clamped into `[0.0, 1.0]`. This is numeric robustness only. It uses plain C# comparisons, not `UnityEngine.Mathf`.
 
 Related named scale:
 
@@ -47,7 +50,8 @@ Local tangent-plane offset from an origin:
 - `northMeters` positive → north; `eastMeters` positive → east
 - `deltaLatitudeDegrees = northMeters / MetersPerDegreeLatitude`
 - `deltaLongitudeDegrees = eastMeters / (MetersPerDegreeLatitude * cos(latitudeRadians))`
-- Longitude is normalized into \([-180, 180]\)
+- Longitude is normalized into \([-180, 180]\). Both -180 and +180 are valid; the range is closed, not closed-open
+- `northMeters` and `eastMeters` must be finite. NaN and infinities are rejected before any calculation
 - Near the poles, if `|cos(latitude)| < 1e-10`, throws `ArgumentOutOfRangeException` (avoids dividing by ~0)
 - If the resulting latitude would leave \([-90, 90]\), throws `ArgumentOutOfRangeException`
 
@@ -62,13 +66,13 @@ Local tangent-plane offset from an origin:
 
 ## What has NOT been tested yet
 
-**Compilation and automated tests: UNVERIFIED.**
+**Compilation is still UNVERIFIED** because no C# compiler is available on the agent machine.
 
-No usable C# / .NET compiler was found on the agent host (`dotnet`, `csc`, and `mcs` were all absent). Therefore:
+No usable C# / .NET compiler was found (`dotnet`, `csc`, and `mcs` were all absent). Nothing was installed. Therefore:
 
 - Sources were **not** compiled
-- No test harness was added (a console/xUnit-free assert project would require a compiler)
-- Do **not** treat this work as green-build until a machine with the .NET SDK (or Mono `mcs` / `csc`) compiles the two `.cs` files and runs the planned checks below
+- Automated tests were **not** run
+- Do **not** treat this work as a green build
 
 ### Planned checks (not run)
 
