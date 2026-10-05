@@ -110,3 +110,17 @@ InitTestScene*.unity*
 
 # Independent .NET test project. Unity-generated csproj files stay ignored.
 !tests/GeoCore.Tests/GeoCore.Tests.csproj
+# MetinAR Unity project is under client/. Root-anchored Unity ignores above do not
+# cover that nested layout, so ignore generated folders there as well.
+/client/[Ll]ibrary/
+/client/[Tt]emp/
+/client/[Oo]bj/
+/client/[Bb]uild/
+/client/[Bb]uilds/
+/client/[Ll]ogs/
+/client/[Uu]ser[Ss]ettings/
+/client/.vs/
+
+# Generated Visual Studio / Rider solution files under client/ are covered by the
+# existing repo-wide *.csproj, *.sln, and *.slnx rules above. The independent
+# test project exception remains: !tests/GeoCore.Tests/GeoCore.Tests.csproj
