@@ -15,5 +15,9 @@
   <ItemGroup>
     <Compile Include="../../client/Assets/MetinAR/Scripts/Location/GeoCoordinate.cs" Link="Production/GeoCoordinate.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Location/GeoMath.cs" Link="Production/GeoMath.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Location/LocationFix.cs" Link="Production/LocationFix.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Location/LocationProviderState.cs" Link="Production/LocationProviderState.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Location/ILocationProvider.cs" Link="Production/ILocationProvider.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Location/MockLocationProvider.cs" Link="Production/MockLocationProvider.cs" />
   </ItemGroup>
 </Project>
