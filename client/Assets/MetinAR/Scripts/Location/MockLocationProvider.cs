@@ -101,7 +101,8 @@ namespace MetinAR.Location
         }
 
         /// <summary>
-        /// Sets the mock coordinate. When running, the next <see cref="TryGetLatestFix"/> reflects this position.
+        /// Sets the mock coordinate. When running, advances the mock timestamp by 1 s
+        /// and the next <see cref="TryGetLatestFix"/> reflects this position.
         /// </summary>
         public void SetCoordinate(GeoCoordinate coordinate)
         {
@@ -111,6 +112,7 @@ namespace MetinAR.Location
 
         /// <summary>
         /// Moves the mock position using <see cref="GeoMath.OffsetMeters"/>.
+        /// When running, advances the mock timestamp by 1 s.
         /// </summary>
         /// <param name="northMeters">Northward displacement in meters (negative = south).</param>
         /// <param name="eastMeters">Eastward displacement in meters (negative = west).</param>
@@ -121,7 +123,8 @@ namespace MetinAR.Location
         }
 
         /// <summary>
-        /// Sets a deterministic timestamp (seconds) used for subsequent fixes.
+        /// Sets the exact mock timestamp (seconds) used for subsequent fixes.
+        /// Does not increment the timestamp on this call (unlike movement / coordinate updates).
         /// </summary>
         public void SetTimestampSeconds(double timestampSeconds)
         {
@@ -134,9 +137,16 @@ namespace MetinAR.Location
             }
 
             _timestampSeconds = timestampSeconds;
-            RefreshFixIfRunning();
+            if (_state == LocationProviderState.Running)
+            {
+                _hasFix = true;
+            }
         }
 
+        /// <summary>
+        /// When running, marks a fresh fix and advances the mock clock by 1 second.
+        /// Used by coordinate / accuracy / movement updates — not by <see cref="SetTimestampSeconds"/>.
+        /// </summary>
         private void RefreshFixIfRunning()
         {
             if (_state == LocationProviderState.Running)

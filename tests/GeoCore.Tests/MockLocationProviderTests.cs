@@ -97,5 +97,35 @@ namespace GeoCore.Tests
             var provider = new MockLocationProvider();
             Assert.Throws<ArgumentOutOfRangeException>(() => provider.SetTimestampSeconds(double.NaN));
         }
+
+        [Fact]
+        public void SetTimestampSeconds_WhileRunning_SetsExactTimestampWithoutIncrement()
+        {
+            var provider = new MockLocationProvider(Warsaw);
+            provider.Start();
+            Assert.True(provider.TryGetLatestFix(out LocationFix before));
+
+            const double exact = 12345.678;
+            provider.SetTimestampSeconds(exact);
+
+            Assert.True(provider.TryGetLatestFix(out LocationFix after));
+            Assert.Equal(exact, after.TimestampSeconds);
+            Assert.NotEqual(before.TimestampSeconds + 1.0, after.TimestampSeconds);
+        }
+
+        [Fact]
+        public void MoveMeters_WhileRunning_AdvancesTimestamp()
+        {
+            var provider = new MockLocationProvider(Warsaw);
+            provider.Start();
+            provider.SetTimestampSeconds(100.0);
+            Assert.True(provider.TryGetLatestFix(out LocationFix before));
+            Assert.Equal(100.0, before.TimestampSeconds);
+
+            provider.MoveMeters(1.0, 0.0);
+
+            Assert.True(provider.TryGetLatestFix(out LocationFix after));
+            Assert.Equal(101.0, after.TimestampSeconds);
+        }
     }
 }

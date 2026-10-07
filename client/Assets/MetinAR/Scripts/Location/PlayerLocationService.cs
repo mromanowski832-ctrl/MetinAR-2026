@@ -4,20 +4,22 @@ namespace MetinAR.Location
 {
     /// <summary>
     /// Game-facing location façade. Owns a single <see cref="ILocationProvider"/> selected
-    /// explicitly for the current platform (mock in Editor, Unity GPS on device).
+    /// explicitly for the current platform (mock in Editor / non-mobile, Unity GPS on Android/iOS).
     /// Scene wiring via MonoBehaviour; not a global singleton with unrelated duties.
     /// </summary>
     public sealed class PlayerLocationService : MonoBehaviour
     {
         public enum ProviderKind
         {
-            /// <summary>Choose mock in the Editor; Unity GPS on player builds.</summary>
+            /// <summary>
+            /// Editor → Mock; Android/iOS player → Unity; other platforms → Mock.
+            /// </summary>
             Auto = 0,
 
             /// <summary>Force <see cref="MockLocationProvider"/> (Editor / tests).</summary>
             Mock = 1,
 
-            /// <summary>Force <see cref="UnityLocationProvider"/> (device GPS).</summary>
+            /// <summary>Force <see cref="UnityLocationProvider"/> (device GPS / diagnostics).</summary>
             Unity = 2
         }
 
@@ -154,8 +156,10 @@ namespace MetinAR.Location
 
 #if UNITY_EDITOR
             return ProviderKind.Mock;
-#else
+#elif UNITY_ANDROID || UNITY_IOS
             return ProviderKind.Unity;
+#else
+            return ProviderKind.Mock;
 #endif
         }
 

@@ -23,8 +23,12 @@ namespace MetinAR.Location
         private LocationFix _latestFix;
         private bool _hasFix;
         private float _startRealtime;
+        private bool _initTimeoutArmed;
+
 #if UNITY_ANDROID && !UNITY_EDITOR
         private bool _permissionRequestIssued;
+        // Kept as a field so the callbacks object is not GC'd while the OS dialog is open.
+        private PermissionCallbacks _pendingPermissionCallbacks;
 #endif
 
         public UnityLocationProvider()
@@ -59,29 +63,45 @@ namespace MetinAR.Location
             }
 
             _hasFix = false;
+            _initTimeoutArmed = false;
 #if UNITY_ANDROID && !UNITY_EDITOR
             _permissionRequestIssued = false;
-#endif
+            ClearPendingPermissionCallbacks();
 
-            if (!Input.location.isEnabledByUser)
+            // Android: check runtime permission BEFORE isEnabledByUser so first-time users
+            // get the system permission prompt instead of a premature LocationDisabled.
+            if (HasAndroidLocationPermission())
             {
-                _state = LocationProviderState.LocationDisabled;
+                if (!Input.location.isEnabledByUser)
+                {
+                    _state = LocationProviderState.LocationDisabled;
+                    return;
+                }
+
+                BeginUnityLocationService();
                 return;
             }
 
-#if UNITY_ANDROID && !UNITY_EDITOR
-            if (!EnsureAndroidLocationPermission())
-            {
-                return;
-            }
-#endif
-
+            RequestAndroidLocationPermissionOnce();
+#else
+            // iOS (and non-Android player): do NOT early-return on !isEnabledByUser before the
+            // first Input.location.Start — on iOS that flag stays false until the OS prompt is
+            // answered, so gating here would block the permission dialog forever.
+            // Denied vs global location-off may not be separable without native APIs; we poll
+            // LocationServiceStatus after Start and map Failed / timeout to Failed.
             BeginUnityLocationService();
+#endif
         }
 
         /// <inheritdoc />
         public void Stop()
         {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            ClearPendingPermissionCallbacks();
+            _permissionRequestIssued = false;
+#endif
+            _initTimeoutArmed = false;
+
             if (Input.location.status != LocationServiceStatus.Stopped)
             {
                 Input.location.Stop();
@@ -105,8 +125,9 @@ namespace MetinAR.Location
         }
 
         /// <summary>
-        /// Poll permission / LocationService status and refresh the latest fix.
+        /// Poll LocationService status and refresh the latest fix.
         /// Intended to be called once per frame from a MonoBehaviour.
+        /// Does not re-request Android permission (callbacks own that path).
         /// </summary>
         public void Tick()
         {
@@ -118,46 +139,16 @@ namespace MetinAR.Location
                 return;
             }
 
-#if UNITY_ANDROID && !UNITY_EDITOR
             if (_state == LocationProviderState.Starting)
             {
-                if (!Input.location.isEnabledByUser)
+#if UNITY_ANDROID && !UNITY_EDITOR
+                // Still waiting for the permission dialog — do NOT arm / apply the 20s init timeout.
+                if (!_initTimeoutArmed)
                 {
-                    _state = LocationProviderState.LocationDisabled;
                     return;
                 }
-
-                if (Input.location.status == LocationServiceStatus.Stopped)
-                {
-                    if (!HasAndroidLocationPermission())
-                    {
-                        if (_permissionRequestIssued)
-                        {
-                            if (Time.realtimeSinceStartup - _startRealtime >= _initTimeoutSeconds)
-                            {
-                                _state = LocationProviderState.PermissionDenied;
-                            }
-                        }
-                        else if (!EnsureAndroidLocationPermission())
-                        {
-                            return;
-                        }
-                        else
-                        {
-                            BeginUnityLocationService();
-                        }
-
-                        return;
-                    }
-
-                    BeginUnityLocationService();
-                    return;
-                }
-            }
 #endif
 
-            if (_state == LocationProviderState.Starting)
-            {
                 LocationServiceStatus status = Input.location.status;
 
                 if (status == LocationServiceStatus.Failed)
@@ -173,7 +164,8 @@ namespace MetinAR.Location
                     return;
                 }
 
-                if (Time.realtimeSinceStartup - _startRealtime >= _initTimeoutSeconds)
+                if (_initTimeoutArmed
+                    && Time.realtimeSinceStartup - _startRealtime >= _initTimeoutSeconds)
                 {
                     Input.location.Stop();
                     _state = LocationProviderState.Failed;
@@ -203,44 +195,88 @@ namespace MetinAR.Location
         }
 
         /// <summary>
-        /// Ensures Android fine location permission without spamming requests.
-        /// Requests at most once per <see cref="Start"/> attempt.
+        /// Issues at most one system permission request per <see cref="Start"/> attempt.
         /// </summary>
-        /// <returns>True when permission is already granted.</returns>
-        private bool EnsureAndroidLocationPermission()
+        private void RequestAndroidLocationPermissionOnce()
         {
-            if (HasAndroidLocationPermission())
-            {
-                return true;
-            }
-
-            if (!_permissionRequestIssued)
-            {
-                Permission.RequestUserPermission(Permission.FineLocation);
-                _permissionRequestIssued = true;
-                _state = LocationProviderState.Starting;
-                _startRealtime = Time.realtimeSinceStartup;
-            }
-            else
+            if (_permissionRequestIssued)
             {
                 _state = LocationProviderState.PermissionDenied;
+                return;
             }
 
-            return false;
-        }
-#endif
+            _permissionRequestIssued = true;
+            _state = LocationProviderState.Starting;
+            // Timeout stays disarmed until Input.location.Start is actually called.
 
-        private void BeginUnityLocationService()
+            _pendingPermissionCallbacks = new PermissionCallbacks();
+            _pendingPermissionCallbacks.PermissionGranted += OnAndroidPermissionGranted;
+            _pendingPermissionCallbacks.PermissionDenied += OnAndroidPermissionDenied;
+            _pendingPermissionCallbacks.PermissionDeniedAndDontAskAgain += OnAndroidPermissionDenied;
+            _pendingPermissionCallbacks.PermissionRequestDismissed += OnAndroidPermissionDenied;
+
+            Permission.RequestUserPermission(Permission.FineLocation, _pendingPermissionCallbacks);
+        }
+
+        private void OnAndroidPermissionGranted(string permissionName)
         {
+            ClearPendingPermissionCallbacks();
+
+            if (_state != LocationProviderState.Starting)
+            {
+                return;
+            }
+
+            if (!HasAndroidLocationPermission())
+            {
+                _state = LocationProviderState.PermissionDenied;
+                return;
+            }
+
             if (!Input.location.isEnabledByUser)
             {
                 _state = LocationProviderState.LocationDisabled;
                 return;
             }
 
+            BeginUnityLocationService();
+        }
+
+        private void OnAndroidPermissionDenied(string permissionName)
+        {
+            ClearPendingPermissionCallbacks();
+
+            if (_state == LocationProviderState.Starting)
+            {
+                _state = LocationProviderState.PermissionDenied;
+            }
+        }
+
+        private void ClearPendingPermissionCallbacks()
+        {
+            if (_pendingPermissionCallbacks == null)
+            {
+                return;
+            }
+
+            _pendingPermissionCallbacks.PermissionGranted -= OnAndroidPermissionGranted;
+            _pendingPermissionCallbacks.PermissionDenied -= OnAndroidPermissionDenied;
+            _pendingPermissionCallbacks.PermissionDeniedAndDontAskAgain -= OnAndroidPermissionDenied;
+            _pendingPermissionCallbacks.PermissionRequestDismissed -= OnAndroidPermissionDenied;
+            _pendingPermissionCallbacks = null;
+        }
+#endif
+
+        /// <summary>
+        /// Starts <see cref="Input.location"/> and arms the init timeout.
+        /// Caller must have already verified Android permission / availability where required.
+        /// </summary>
+        private void BeginUnityLocationService()
+        {
             Input.location.Start(DesiredAccuracyMeters, UpdateDistanceMeters);
             _state = LocationProviderState.Starting;
             _startRealtime = Time.realtimeSinceStartup;
+            _initTimeoutArmed = true;
         }
 
         private void CaptureLastData()
