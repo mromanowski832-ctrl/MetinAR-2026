@@ -55,12 +55,12 @@ namespace MetinAR.Editor
             // Systems
             var systems = new GameObject("Systems");
             var origin = systems.AddComponent<WorldMapOrigin>();
-            origin.CaptureOrigin(MockLocationProvider.DefaultSyntheticCoordinate);
+            // No origin is serialized: PrototypeWorldPlacement captures it from the first runtime fix.
 
             var locationGo = new GameObject("PlayerLocationService");
             locationGo.transform.SetParent(systems.transform, false);
             var locationService = locationGo.AddComponent<PlayerLocationService>();
-            SetPrivateField(locationService, "_providerKind", PlayerLocationService.ProviderKind.Mock);
+            SetPrivateField(locationService, "_providerKind", PlayerLocationService.ProviderKind.Auto);
 
             var controllerGo = new GameObject("WorldMapPrototypeController");
             controllerGo.transform.SetParent(systems.transform, false);
@@ -90,21 +90,25 @@ namespace MetinAR.Editor
             camGo.transform.position = new Vector3(0f, 15f, -13f);
 
             // Mob ~15 m north-east
-            GeoCoordinate mobGeo = origin.LocalToWorld(2f, 13f);
             GameObject mob = BuildMob(mats);
             var mobEntity = mob.AddComponent<WorldMapEntity>();
             TextMeshPro mobLabel = mob.transform.Find("Label").GetComponent<TextMeshPro>();
-            mobEntity.Configure(origin, mobGeo, "Trujący Pająk", mobLabel, player.transform, true);
+            mobEntity.Configure(origin, "Trujący Pająk", mobLabel, player.transform, true);
             var prototypeMob = mob.AddComponent<PrototypeMob>();
             mob.AddComponent<MobClickTarget>().Configure(prototypeMob);
 
             // NPC ~12 m west
-            GeoCoordinate npcGeo = origin.LocalToWorld(-2.5f, 4f);
             GameObject npc = BuildNpc(mats);
             var npcEntity = npc.AddComponent<WorldMapEntity>();
             TextMeshPro npcLabel = npc.transform.Find("Label").GetComponent<TextMeshPro>();
-            npcEntity.Configure(origin, npcGeo, "Wędrowny Handlarz", npcLabel, player.transform, false);
+            npcEntity.Configure(origin, "Wędrowny Handlarz", npcLabel, player.transform, false);
             npc.AddComponent<PrototypeNpc>().Configure("Wędrowny Handlarz");
+
+            // Mob/NPC stay inactive until the first fix places them (no premature (0,0) placement).
+            var placement = systems.AddComponent<PrototypeWorldPlacement>();
+            placement.Configure(locationService, origin, mobEntity, npcEntity);
+            mob.SetActive(false);
+            npc.SetActive(false);
 
             // EventSystem
             var es = new GameObject("EventSystem");
@@ -768,20 +772,25 @@ namespace MetinAR.Editor
             rt.offsetMax = new Vector2(-right, -top);
         }
 
+        /// <summary>
+        /// Makes <paramref name="scenePath"/> build index 0 (enabled). Other existing entries are kept
+        /// after it; SampleScene is kept in the list but disabled so it is never the startup scene.
+        /// </summary>
         private static void AddSceneToBuildSettings(string scenePath)
         {
-            var scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
-            foreach (EditorBuildSettingsScene s in scenes)
+            var scenes = new List<EditorBuildSettingsScene>();
+            scenes.Add(new EditorBuildSettingsScene(scenePath, true));
+            foreach (EditorBuildSettingsScene s in EditorBuildSettings.scenes)
             {
                 if (s.path == scenePath)
                 {
-                    s.enabled = true;
-                    EditorBuildSettings.scenes = scenes.ToArray();
-                    return;
+                    continue;
                 }
+
+                bool enabled = s.enabled && !s.path.EndsWith("/SampleScene.unity");
+                scenes.Add(new EditorBuildSettingsScene(s.path, enabled));
             }
 
-            scenes.Add(new EditorBuildSettingsScene(scenePath, true));
             EditorBuildSettings.scenes = scenes.ToArray();
         }
 

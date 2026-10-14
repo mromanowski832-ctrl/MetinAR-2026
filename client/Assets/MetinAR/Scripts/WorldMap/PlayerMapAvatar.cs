@@ -4,6 +4,8 @@ using UnityEngine;
 namespace MetinAR.WorldMap
 {
     /// <summary>
+    /// Origin capture is owned by <see cref="PrototypeWorldPlacement"/>; the avatar only follows
+    /// fixes once <see cref="WorldMapOrigin.HasOrigin"/> is true.
     /// Moves the player avatar from <see cref="PlayerLocationService"/> fixes
     /// relative to a fixed <see cref="WorldMapOrigin"/>. Rotates by heading (degrees, 0 = north).
     /// </summary>
@@ -43,35 +45,10 @@ namespace MetinAR.WorldMap
             }
         }
 
-        private void Start()
-        {
-            TryCaptureOrigin();
-            ApplyFromFix();
-        }
-
         private void Update()
         {
-            TryCaptureOrigin();
             ApplyFromFix();
             ApplyHeading();
-        }
-
-        private void TryCaptureOrigin()
-        {
-            if (_origin == null || _locationService == null)
-            {
-                return;
-            }
-
-            if (_origin.HasOrigin)
-            {
-                return;
-            }
-
-            if (_locationService.TryGetLatestFix(out LocationFix fix))
-            {
-                _origin.CaptureOrigin(fix.Coordinate);
-            }
         }
 
         private void ApplyFromFix()

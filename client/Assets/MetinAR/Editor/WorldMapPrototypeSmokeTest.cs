@@ -23,6 +23,8 @@ namespace MetinAR.Editor
     {
         private const string ScenePath = "Assets/MetinAR/Scenes/WorldMapPrototype.unity";
         private const string SessionKey = "MetinAR004A.SmokeResults";
+        private const string PreKey = "MetinAR004B.EditModeState";
+        private const string SampleScenePath = "Assets/Scenes/SampleScene.unity";
 
         public static void Run()
         {
@@ -32,7 +34,36 @@ namespace MetinAR.Editor
             Directory.CreateDirectory(Path.GetDirectoryName(resultsPath)!);
             SessionState.SetString(SessionKey, resultsPath);
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            SessionState.SetString(PreKey, CaptureEditModeState());
             EditorApplication.isPlaying = true;
+        }
+
+        /// <summary>
+        /// Saved-scene state before Play Mode: provider kind, origin/placement not initialized,
+        /// mob/NPC inactive. Format: key=value;...
+        /// </summary>
+        private static string CaptureEditModeState()
+        {
+            var sb = new StringBuilder();
+            PlayerLocationService service = UnityEngine.Object.FindFirstObjectByType<PlayerLocationService>(FindObjectsInactive.Include);
+            int kind = -1;
+            if (service != null)
+            {
+                kind = new SerializedObject(service).FindProperty("_providerKind").intValue;
+            }
+
+            WorldMapOrigin origin = UnityEngine.Object.FindFirstObjectByType<WorldMapOrigin>(FindObjectsInactive.Include);
+            PrototypeWorldPlacement placement = UnityEngine.Object.FindFirstObjectByType<PrototypeWorldPlacement>(FindObjectsInactive.Include);
+            PrototypeMob mob = UnityEngine.Object.FindFirstObjectByType<PrototypeMob>(FindObjectsInactive.Include);
+            PrototypeNpc npc = UnityEngine.Object.FindFirstObjectByType<PrototypeNpc>(FindObjectsInactive.Include);
+            sb.Append("kind=").Append(kind);
+            sb.Append(";originPresent=").Append(origin != null);
+            sb.Append(";originHas=").Append(origin != null && origin.HasOrigin);
+            sb.Append(";placementPresent=").Append(placement != null);
+            sb.Append(";placementInit=").Append(placement != null && placement.IsInitialized);
+            sb.Append(";mobActive=").Append(mob != null && mob.gameObject.activeSelf);
+            sb.Append(";npcActive=").Append(npc != null && npc.gameObject.activeSelf);
+            return sb.ToString();
         }
 
         [InitializeOnLoadMethod]
@@ -53,12 +84,16 @@ namespace MetinAR.Editor
             SessionState.EraseString(SessionKey);
             var go = new GameObject("SmokeTestRunner");
             UnityEngine.Object.DontDestroyOnLoad(go);
-            go.AddComponent<Runner>().ResultsPath = results;
+            Runner runner = go.AddComponent<Runner>();
+            runner.ResultsPath = results;
+            runner.EditModeState = SessionState.GetString(PreKey, string.Empty);
+            SessionState.EraseString(PreKey);
         }
 
         private sealed class Runner : MonoBehaviour
         {
             public string ResultsPath;
+            public string EditModeState;
 
             private readonly List<(string name, string failure)> _results = new List<(string, string)>();
             private string _current;
@@ -108,22 +143,32 @@ namespace MetinAR.Editor
                 IEnumerator[] tests =
                 {
                     A_SceneLoadsAndCoreObjectsExist(),
+                    H_SceneStoresAutoProvider(),
+                    I_EditorResolvesAutoToMock(),
+                    J_SceneOriginAndPlacementFromFirstFix(),
                     B_MovementPathMovesPlayerAndUpdatesDistance(),
                     C_TurnPathRotatesAvatarAndCamera(),
                     D_MobClickOpensInfoPanel(),
                     E_EnterArButtonEmitsEncounterRequest(),
                     F_AggroTriggersOnceInsideRange(),
                     G_HudButtonsOpenAndClosePanels(),
+                    K_OriginWaitsForFirstFixAndInitializesOnce(),
+                    L_WorldMapPrototypeIsStartupScene(),
                 };
                 string[] names =
                 {
                     "A_SceneLoadsAndCoreObjectsExist",
+                    "H_SceneStoresAutoProvider",
+                    "I_EditorResolvesAutoToMock",
+                    "J_SceneOriginAndPlacementFromFirstFix",
                     "B_MovementPathMovesPlayerAndUpdatesDistance",
                     "C_TurnPathRotatesAvatarAndCamera",
                     "D_MobClickOpensInfoPanel",
                     "E_EnterArButtonEmitsEncounterRequest",
                     "F_AggroTriggersOnceInsideRange",
                     "G_HudButtonsOpenAndClosePanels",
+                    "K_OriginWaitsForFirstFixAndInitializesOnce",
+                    "L_WorldMapPrototypeIsStartupScene",
                 };
 
                 for (int i = 0; i < tests.Length; i++)
@@ -199,6 +244,169 @@ namespace MetinAR.Editor
                 }
 
                 Check(missing == 0, "missing script components: " + missing);
+                yield break;
+            }
+
+            private bool EditState(string key, string expected)
+            {
+                foreach (string part in (EditModeState ?? string.Empty).Split(';'))
+                {
+                    if (part == key + "=" + expected)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private static bool Same(GeoCoordinate a, GeoCoordinate b)
+            {
+                return a.Latitude == b.Latitude && a.Longitude == b.Longitude;
+            }
+
+            private static string Fmt(GeoCoordinate c)
+            {
+                return "(" + c.Latitude.ToString("R") + ", " + c.Longitude.ToString("R") + ")";
+            }
+
+            private IEnumerator H_SceneStoresAutoProvider()
+            {
+                Check(EditState("kind", ((int)PlayerLocationService.ProviderKind.Auto).ToString()),
+                    "saved scene provider kind is not Auto: " + EditModeState);
+                int runtimeKind = new SerializedObject(_location).FindProperty("_providerKind").intValue;
+                Check(runtimeKind == (int)PlayerLocationService.ProviderKind.Auto, "runtime serialized provider kind " + runtimeKind);
+                yield break;
+            }
+
+            private IEnumerator I_EditorResolvesAutoToMock()
+            {
+                Check(_location.Provider is MockLocationProvider, "Auto resolved to " + (_location.Provider == null ? "null" : _location.Provider.GetType().Name));
+                Check(!(_location.Provider is UnityLocationProvider), "Auto resolved to UnityLocationProvider in Editor");
+                Check(_location.MockProvider != null && ReferenceEquals(_location.Provider, _location.MockProvider), "MockProvider not the active provider");
+                yield break;
+            }
+
+            private IEnumerator J_SceneOriginAndPlacementFromFirstFix()
+            {
+                Check(EditState("originPresent", "True"), "no WorldMapOrigin in saved scene");
+                Check(EditState("originHas", "False"), "origin already initialized in saved scene (before any fix): " + EditModeState);
+                Check(EditState("placementPresent", "True"), "no PrototypeWorldPlacement in saved scene");
+                Check(EditState("placementInit", "False"), "placement initialized before Play Mode");
+                Check(EditState("mobActive", "False") && EditState("npcActive", "False"), "mob/NPC active before first fix: " + EditModeState);
+
+                PrototypeWorldPlacement placement = FindFirstObjectByType<PrototypeWorldPlacement>();
+                WorldMapOrigin origin = FindFirstObjectByType<WorldMapOrigin>();
+                Check(placement != null && placement.IsInitialized, "placement not initialized in Play Mode");
+                Check(origin != null && origin.HasOrigin, "origin not captured in Play Mode");
+                if (placement == null || origin == null || !placement.IsInitialized || !origin.HasOrigin)
+                {
+                    yield break;
+                }
+
+                GeoCoordinate first = placement.FirstFixCoordinate;
+                Check(Same(origin.Origin, first), "origin " + Fmt(origin.Origin) + " != first fix " + Fmt(first));
+                // Mock has not moved yet, so the first fix equals the current mock coordinate.
+                Check(Same(first, _location.MockProvider.Coordinate), "first fix " + Fmt(first) + " != mock coordinate " + Fmt(_location.MockProvider.Coordinate));
+                GeoCoordinate expectedMob = GeoMath.OffsetMeters(first, 13.0, 2.0);
+                GeoCoordinate expectedNpc = GeoMath.OffsetMeters(first, 4.0, -2.5);
+                WorldMapEntity npcEntity = FindFirstObjectByType<PrototypeNpc>().GetComponent<WorldMapEntity>();
+                Check(Same(placement.MobCoordinate, expectedMob) && Same(_mobEntity.Coordinate, expectedMob), "mob coordinate not OffsetMeters(firstFix, 13 N, 2 E): " + Fmt(_mobEntity.Coordinate));
+                Check(Same(placement.NpcCoordinate, expectedNpc) && Same(npcEntity.Coordinate, expectedNpc), "NPC coordinate not OffsetMeters(firstFix, 4 N, -2.5 E): " + Fmt(npcEntity.Coordinate));
+                Check(_mobEntity.gameObject.activeSelf && npcEntity.gameObject.activeSelf, "mob/NPC not activated after placement");
+
+                Vector3 player = _avatar.transform.position;
+                Check(new Vector2(player.x, player.z).magnitude < 0.05f, "player local start not ~(0,0): " + player);
+                float mobDist = Vector3.Distance(_mob.transform.position, player);
+                float npcDist = Vector3.Distance(npcEntity.transform.position, player);
+                Check(Mathf.Abs(mobDist - 13.15f) < 0.1f, "mob distance " + mobDist);
+                Check(Mathf.Abs(npcDist - 4.72f) < 0.1f, "NPC distance " + npcDist);
+                Debug.Log("[SmokeTest] J firstFix=" + Fmt(first) + " mob=" + mobDist + " npc=" + npcDist + " player=" + player);
+            }
+
+            private IEnumerator K_OriginWaitsForFirstFixAndInitializesOnce()
+            {
+                var serviceGo = new GameObject("K_LocationService");
+                var service = serviceGo.AddComponent<PlayerLocationService>();
+                service.StopProvider(); // no fix available yet
+                var origin = new GameObject("K_Origin").AddComponent<WorldMapOrigin>();
+                var mobGo = new GameObject("K_Mob");
+                mobGo.SetActive(false);
+                var mob = mobGo.AddComponent<WorldMapEntity>();
+                mob.Configure(origin, "K mob");
+                var npcGo = new GameObject("K_Npc");
+                npcGo.SetActive(false);
+                var npc = npcGo.AddComponent<WorldMapEntity>();
+                npc.Configure(origin, "K npc");
+                var placement = new GameObject("K_Placement").AddComponent<PrototypeWorldPlacement>();
+                placement.Configure(service, origin, mob, npc);
+                int initEvents = 0;
+                placement.Initialized += _ => initEvents++;
+
+                yield return Frames(5);
+                Check(service.MockProvider != null, "K: Auto did not resolve to mock");
+                Check(!service.TryGetLatestFix(out _), "K: fix available while stopped");
+                Check(!origin.HasOrigin, "K: origin initialized before first fix");
+                Check(!placement.IsInitialized, "K: placement initialized before first fix");
+                Check(!mob.HasCoordinate && !npc.HasCoordinate, "K: entities got a coordinate before first fix");
+                Check(!mobGo.activeSelf && !npcGo.activeSelf, "K: entities activated before first fix");
+
+                var firstFix = new GeoCoordinate(10.0, 20.0); // synthetic test point, not a real address
+                service.MockProvider.SetCoordinate(firstFix);
+                service.StartProvider();
+                yield return Frames(3);
+                Check(placement.IsInitialized && initEvents == 1, "K: not initialized after first fix (events " + initEvents + ")");
+                Check(origin.HasOrigin && Same(origin.Origin, firstFix), "K: origin not equal to first fix");
+                Check(Same(placement.FirstFixCoordinate, firstFix), "K: FirstFixCoordinate wrong");
+                Check(Same(mob.Coordinate, GeoMath.OffsetMeters(firstFix, 13.0, 2.0)), "K: mob not relative to first fix " + Fmt(mob.Coordinate));
+                Check(Same(npc.Coordinate, GeoMath.OffsetMeters(firstFix, 4.0, -2.5)), "K: NPC not relative to first fix " + Fmt(npc.Coordinate));
+                Check(mobGo.activeSelf && npcGo.activeSelf, "K: entities not activated");
+
+                GeoCoordinate mobBefore = mob.Coordinate;
+                service.MockProvider.MoveMeters(50.0, 50.0);
+                yield return Frames(5);
+                Check(Same(origin.Origin, firstFix), "K: origin changed after later fix");
+                Check(Same(mob.Coordinate, mobBefore) && initEvents == 1, "K: placement re-initialized after later fix");
+                Check(!origin.CaptureOrigin(new GeoCoordinate(1.0, 1.0)) && Same(origin.Origin, firstFix), "K: origin capture not once-only");
+
+                Destroy(placement.gameObject);
+                Destroy(mobGo);
+                Destroy(npcGo);
+                Destroy(origin.gameObject);
+                Destroy(serviceGo);
+                yield return null;
+            }
+
+            private IEnumerator L_WorldMapPrototypeIsStartupScene()
+            {
+                EditorBuildSettingsScene[] scenes = EditorBuildSettings.scenes;
+                Check(scenes.Length > 0 && scenes[0].path == ScenePath && scenes[0].enabled, "build index 0 is not enabled WorldMapPrototype: " + (scenes.Length > 0 ? scenes[0].path : "none"));
+                string firstEnabled = null;
+                foreach (EditorBuildSettingsScene s in scenes)
+                {
+                    if (s.enabled)
+                    {
+                        firstEnabled = s.path;
+                        break;
+                    }
+
+                    if (s.path == SampleScenePath)
+                    {
+                        // disabled SampleScene before the first enabled scene is fine
+                    }
+                }
+
+                Check(firstEnabled == ScenePath, "startup (first enabled) scene is " + firstEnabled);
+                Check(firstEnabled != SampleScenePath, "SampleScene is the startup scene");
+                Check(UnityEngine.SceneManagement.SceneUtility.GetBuildIndexByScenePath(ScenePath) == 0, "SceneUtility build index of WorldMapPrototype != 0");
+                foreach (EditorBuildSettingsScene s in scenes)
+                {
+                    if (s.path == SampleScenePath)
+                    {
+                        Check(!s.enabled, "SampleScene still enabled in build scenes");
+                    }
+                }
+
                 yield break;
             }
 

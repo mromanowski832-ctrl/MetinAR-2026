@@ -11,7 +11,7 @@ Branch: `feat/004-world-map-hud`. Scene:
 
 ## What you see
 
-- Local meter world anchored at mock GPS start (Null Island by default): +Z north, +X east.
+- Local meter world anchored at the player's **first valid location fix** (see METINAR-004B): +Z north, +X east.
 - Player capsule placeholder driven by `PlayerLocationService` + `MockLocationProvider`.
 - One aggressive mob (“Trujący Pająk”) and one stationary NPC.
 - Portrait HUD (1080×1920 scaler): portrait/stats, radar placeholder, quest tracker,
@@ -68,9 +68,77 @@ It opens the scene, enters real Play Mode, runs tests A–G, writes
 ### EditorBuildSettings note
 
 METINAR-004 accidentally dropped `m_UseUCBPForAssetBundles: 0` when the scene was added. In 004A
-the line was restored and the scene builder (which re-assigns `EditorBuildSettings.scenes`) was run
-again in Unity 6000.6.4f1 batchmode: Unity kept the line. It stays restored; the only diff vs
-`main` is the new scene entry.
+the line was restored and Unity kept it on a re-save with an unchanged scene list. In 004B, Unity
+6000.6.4f1 dropped it again when the scene list order changed; it was restored by hand (it is the
+default value). The committed diff vs `main` touches only the scene list.
+
+## METINAR-004B — device-ready prototype
+
+### Provider selection
+
+The scene stores `PlayerLocationService.ProviderKind.Auto` (`_providerKind: 0`), no longer a forced
+`Mock`. Runtime resolution is unchanged (`PlayerLocationService.ResolveKind`):
+
+| Platform | Provider |
+|----------|----------|
+| `UNITY_EDITOR` | `MockLocationProvider` (WASD/arrows + Q/E via `EditorMockMovement`) |
+| Android / iOS player | `UnityLocationProvider` (foreground GPS only) |
+| other platforms | `MockLocationProvider` |
+
+### First-fix origin
+
+- `WorldMapOrigin` has no serialized/default origin. `HasOrigin` is false until `CaptureOrigin`
+  runs, which succeeds only once (`OriginCaptured` event).
+- `PrototypeWorldPlacement` (on `Systems`, `DefaultExecutionOrder(-100)`) waits for the first valid
+  `LocationFix`, captures the origin from that exact coordinate, then sets
+  mob = `GeoMath.OffsetMeters(firstFix, 13 N, 2 E)` and NPC = `GeoMath.OffsetMeters(firstFix, 4 N, -2.5 E)`,
+  activates them, and sets `IsInitialized` (+ `Initialized` event). It initializes once only and works
+  with any provider. No real-world coordinate is hard-coded.
+- Mob and NPC are saved **inactive** and only placed/activated after the first fix.
+  `WorldMapEntity` has no serialized lat/lon and only positions itself when it has a coordinate and
+  `WorldMapOrigin.HasOrigin` is true. `PlayerMapAvatar` no longer captures the origin itself; it
+  follows fixes once the shared origin exists.
+- In the Editor the mock's first fix is Null Island (0, 0), so player starts at local (0, 0),
+  mob ≈ 13.15 m, NPC ≈ 4.72 m away (as accepted in 004A).
+
+### Build-scene order
+
+`EditorBuildSettings`: index 0 = `Assets/MetinAR/Scenes/WorldMapPrototype.unity` (enabled);
+`Assets/Scenes/SampleScene.unity` kept at index 1, **disabled**. The scene builder enforces this.
+
+### Smoke results (Unity 6000.6.4f1, LuzMen)
+
+`MetinAR.Editor.WorldMapPrototypeSmokeTest.Run`: **12 tests, 0 failures** (existing A–G plus):
+
+- `H_SceneStoresAutoProvider` — saved scene and runtime serialized `_providerKind` = Auto.
+- `I_EditorResolvesAutoToMock` — active provider is `MockLocationProvider`, not `UnityLocationProvider`.
+- `J_SceneOriginAndPlacementFromFirstFix` — saved scene: origin not captured, placement not
+  initialized, mob/NPC inactive; Play Mode: placement initialized, origin == first fix == mock
+  coordinate, mob/NPC coordinates exactly equal `OffsetMeters(firstFix, …)`, active, player ≈ (0,0),
+  mob ≈ 13.15 m, NPC ≈ 4.72 m.
+- `K_OriginWaitsForFirstFixAndInitializesOnce` — fresh service/origin/placement with the provider
+  stopped: no origin, no init, entities inactive; after a synthetic first fix (10, 20): origin and
+  offsets relative to it, init event once; later movement and a second capture do not change it.
+- `L_WorldMapPrototypeIsStartupScene` — build index 0 is enabled WorldMapPrototype
+  (`SceneUtility.GetBuildIndexByScenePath` = 0); SampleScene not startup and disabled.
+
+The runner exits 1 on any failure; this was proven once with a temporary forced failure
+(exit 1, `failures="1"`), which was then removed.
+
+### Android APK
+
+`-executeMethod MetinAR.Editor.MetinARAndroidDevBuild.BuildWorldMapDevelopmentApk` (fails if the first
+enabled scene is not WorldMapPrototype):
+
+- `client/Builds/Android/MetinAR-worldmap-dev.apk`, 69,049,082 bytes, exit 0
+- `native-code: 'arm64-v8a'`, `libil2cpp.so` + `global-metadata.dat` present (IL2CPP),
+  `application-debuggable` (development), signed only with the Android Debug certificate
+- scenes in build: `Assets/MetinAR/Scenes/WorldMapPrototype.unity`
+- merged manifest permissions: INTERNET, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, CAMERA
+  (+ the package's own dynamic-receiver permission); **no `ACCESS_BACKGROUND_LOCATION`**
+- not published anywhere
+
+**REAL GPS ON PHYSICAL PHONE: UNVERIFIED** (no device test was performed).
 
 ## Not included
 
@@ -83,6 +151,6 @@ payments, hand tracking, weapons.
 Unity -batchmode -nographics -quit -projectPath client
   -executeMethod MetinAR.Editor.WorldMapPrototypeSceneBuilder.BuildScene
 
-Unity -batchmode -nographics -quit -projectPath client
+Unity -batchmode -quit -projectPath client
   -executeMethod MetinAR.Editor.CaptureWorldMapPrototypeScreenshots.Capture
 ```

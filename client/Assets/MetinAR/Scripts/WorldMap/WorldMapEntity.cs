@@ -14,12 +14,6 @@ namespace MetinAR.WorldMap
         private WorldMapOrigin _origin;
 
         [SerializeField]
-        private double _latitude;
-
-        [SerializeField]
-        private double _longitude;
-
-        [SerializeField]
         private float _groundY;
 
         [SerializeField]
@@ -35,16 +29,15 @@ namespace MetinAR.WorldMap
         private Transform _distanceReference;
 
         private GeoCoordinate _coordinate;
-        private bool _coordinateReady;
+        private bool _hasCoordinate;
 
-        public GeoCoordinate Coordinate
-        {
-            get
-            {
-                EnsureCoordinate();
-                return _coordinate;
-            }
-        }
+        /// <summary>True once a geographic coordinate was assigned at runtime.</summary>
+        public bool HasCoordinate => _hasCoordinate;
+
+        /// <summary>True when both the coordinate and the shared origin are available.</summary>
+        public bool IsPlaced => _hasCoordinate && _origin != null && _origin.HasOrigin;
+
+        public GeoCoordinate Coordinate => _coordinate;
 
         public string LabelText => _worldLabel != null ? _worldLabel.text : null;
 
@@ -54,19 +47,18 @@ namespace MetinAR.WorldMap
             set => _displayName = value;
         }
 
+        /// <summary>
+        /// Wires references only. The coordinate is assigned later via <see cref="SetCoordinate"/>
+        /// (by <see cref="PrototypeWorldPlacement"/> after the first fix).
+        /// </summary>
         public void Configure(
             WorldMapOrigin origin,
-            GeoCoordinate coordinate,
             string displayName,
             TextMeshPro worldLabel = null,
             Transform distanceReference = null,
             bool showDistance = true)
         {
             _origin = origin;
-            _coordinate = coordinate;
-            _latitude = coordinate.Latitude;
-            _longitude = coordinate.Longitude;
-            _coordinateReady = true;
             _displayName = displayName;
             _worldLabel = worldLabel;
             _distanceReference = distanceReference;
@@ -78,16 +70,9 @@ namespace MetinAR.WorldMap
         public void SetCoordinate(GeoCoordinate coordinate)
         {
             _coordinate = coordinate;
-            _latitude = coordinate.Latitude;
-            _longitude = coordinate.Longitude;
-            _coordinateReady = true;
+            _hasCoordinate = true;
             ApplyTransform();
             RefreshLabel();
-        }
-
-        private void Awake()
-        {
-            EnsureCoordinate();
         }
 
         private void LateUpdate()
@@ -96,25 +81,13 @@ namespace MetinAR.WorldMap
             RefreshLabel();
         }
 
-        private void EnsureCoordinate()
-        {
-            if (_coordinateReady)
-            {
-                return;
-            }
-
-            _coordinate = new GeoCoordinate(_latitude, _longitude);
-            _coordinateReady = true;
-        }
-
         private void ApplyTransform()
         {
-            if (_origin == null)
+            if (!IsPlaced)
             {
                 return;
             }
 
-            EnsureCoordinate();
             Vector3 local = _origin.WorldToLocal(_coordinate, _groundY);
             transform.position = local;
         }

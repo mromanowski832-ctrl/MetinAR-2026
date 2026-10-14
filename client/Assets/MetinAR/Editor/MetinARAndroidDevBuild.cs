@@ -9,15 +9,31 @@ namespace MetinAR.Editor
     /// <summary>
     /// Batchmode helper: Android ARM64 IL2CPP development APK (no release signing).
     /// Usage: -executeMethod MetinAR.Editor.MetinARAndroidDevBuild.BuildDevelopmentApk
+    ///        -executeMethod MetinAR.Editor.MetinARAndroidDevBuild.BuildWorldMapDevelopmentApk
     /// </summary>
     public static class MetinARAndroidDevBuild
     {
         private const string ApkRelativePath = "Builds/Android/MetinAR-dev.apk";
+        private const string WorldMapApkRelativePath = "Builds/Android/MetinAR-worldmap-dev.apk";
+        private const string WorldMapScenePath = "Assets/MetinAR/Scenes/WorldMapPrototype.unity";
 
         public static void BuildDevelopmentApk()
         {
+            Build(ApkRelativePath, null);
+        }
+
+        /// <summary>
+        /// Development APK whose first (startup) scene must be WorldMapPrototype.
+        /// </summary>
+        public static void BuildWorldMapDevelopmentApk()
+        {
+            Build(WorldMapApkRelativePath, WorldMapScenePath);
+        }
+
+        private static void Build(string apkRelativePath, string requiredStartupScene)
+        {
             string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
-            string apkPath = Path.Combine(projectRoot, ApkRelativePath);
+            string apkPath = Path.Combine(projectRoot, apkRelativePath);
             string apkDir = Path.GetDirectoryName(apkPath)!;
             Directory.CreateDirectory(apkDir);
 
@@ -34,6 +50,15 @@ namespace MetinAR.Editor
             {
                 throw new InvalidOperationException("No enabled scenes in Build Settings.");
             }
+
+            if (requiredStartupScene != null && scenes[0] != requiredStartupScene)
+            {
+                Debug.LogError("[MetinARAndroidDevBuild] startup scene is " + scenes[0] + ", expected " + requiredStartupScene);
+                EditorApplication.Exit(1);
+                return;
+            }
+
+            Debug.Log("[MetinARAndroidDevBuild] scenes=" + string.Join(",", scenes));
 
             var options = new BuildPlayerOptions
             {

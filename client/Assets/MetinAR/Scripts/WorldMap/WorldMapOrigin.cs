@@ -1,95 +1,92 @@
+using System;
 using MetinAR.Location;
 using UnityEngine;
 
 namespace MetinAR.WorldMap
 {
     /// <summary>
-    /// Fixed geographic origin for the prototype world map.
+    /// Geographic origin for the prototype world map, captured once from the player's first valid fix.
     /// Maps geo ↔ local meters: +X = east, +Z = north (1 Unity unit = 1 meter).
+    /// There is no serialized/default origin: until <see cref="CaptureOrigin"/> runs,
+    /// <see cref="HasOrigin"/> is false and geographic placement must wait.
     /// </summary>
     public sealed class WorldMapOrigin : MonoBehaviour
     {
-        [SerializeField]
-        private double _originLatitude;
-
-        [SerializeField]
-        private double _originLongitude;
-
         private GeoCoordinate _origin;
         private bool _hasOrigin;
 
-        public GeoCoordinate Origin => _origin;
+        /// <summary>Raised once when the origin is captured.</summary>
+        public event Action<GeoCoordinate> OriginCaptured;
+
         public bool HasOrigin => _hasOrigin;
 
-        public void CaptureOrigin(GeoCoordinate coordinate)
+        /// <summary>Origin coordinate. Only meaningful when <see cref="HasOrigin"/> is true.</summary>
+        public GeoCoordinate Origin
         {
-            _origin = coordinate;
-            _originLatitude = coordinate.Latitude;
-            _originLongitude = coordinate.Longitude;
-            _hasOrigin = true;
-        }
-
-        public void EnsureOriginFromSerialized()
-        {
-            if (_hasOrigin)
+            get
             {
-                return;
-            }
+                if (!_hasOrigin)
+                {
+                    throw new InvalidOperationException("WorldMapOrigin has not been captured yet.");
+                }
 
-            _origin = new GeoCoordinate(_originLatitude, _originLongitude);
-            _hasOrigin = true;
+                return _origin;
+            }
         }
 
         /// <summary>
-        /// Converts a geo coordinate to local Unity position (X=east, Z=north, Y unchanged).
+        /// Captures the origin once. Later calls are ignored and return false.
+        /// </summary>
+        public bool CaptureOrigin(GeoCoordinate coordinate)
+        {
+            if (_hasOrigin)
+            {
+                return false;
+            }
+
+            _origin = coordinate;
+            _hasOrigin = true;
+            OriginCaptured?.Invoke(coordinate);
+            return true;
+        }
+
+        /// <summary>
+        /// Converts a geo coordinate to local Unity position (X=east, Z=north, Y given).
+        /// Requires <see cref="HasOrigin"/>.
         /// </summary>
         public Vector3 WorldToLocal(GeoCoordinate coordinate, float y = 0f)
         {
-            EnsureOriginFromSerialized();
-            double north = ApproximateNorthMeters(_origin, coordinate);
-            double east = ApproximateEastMeters(_origin, coordinate);
+            GetLocalMeters(coordinate, out double north, out double east);
             return new Vector3((float)east, y, (float)north);
         }
 
         /// <summary>
-        /// Converts local meters (east, north) to a geo coordinate from the fixed origin.
+        /// Converts local meters (east, north) to a geo coordinate from the origin. Requires <see cref="HasOrigin"/>.
         /// </summary>
         public GeoCoordinate LocalToWorld(float eastMeters, float northMeters)
         {
-            EnsureOriginFromSerialized();
-            return GeoMath.OffsetMeters(_origin, northMeters, eastMeters);
+            return GeoMath.OffsetMeters(Origin, northMeters, eastMeters);
         }
 
         public double DistanceMetersTo(GeoCoordinate coordinate)
         {
-            EnsureOriginFromSerialized();
-            return GeoMath.DistanceMeters(_origin, coordinate);
+            return GeoMath.DistanceMeters(Origin, coordinate);
         }
 
         /// <summary>
-        /// Local north/east offset of <paramref name="coordinate"/> relative to origin.
-        /// Uses OffsetMeters inverse via mid-point approximation suitable for prototype ranges.
+        /// Local north/east offset of <paramref name="coordinate"/> relative to origin
+        /// (signed distances along the meridian / parallel; adequate for prototype ranges).
         /// </summary>
         public void GetLocalMeters(GeoCoordinate coordinate, out double northMeters, out double eastMeters)
         {
-            EnsureOriginFromSerialized();
-            northMeters = ApproximateNorthMeters(_origin, coordinate);
-            eastMeters = ApproximateEastMeters(_origin, coordinate);
-        }
+            GeoCoordinate origin = Origin;
+            var sameLon = new GeoCoordinate(coordinate.Latitude, origin.Longitude);
+            double north = GeoMath.DistanceMeters(origin, sameLon);
+            northMeters = coordinate.Latitude >= origin.Latitude ? north : -north;
 
-        private static double ApproximateNorthMeters(GeoCoordinate origin, GeoCoordinate target)
-        {
-            // Same longitude strip: north = signed distance along latitude.
-            var sameLon = new GeoCoordinate(target.Latitude, origin.Longitude);
-            double distance = GeoMath.DistanceMeters(origin, sameLon);
-            return target.Latitude >= origin.Latitude ? distance : -distance;
-        }
-
-        private static double ApproximateEastMeters(GeoCoordinate origin, GeoCoordinate target)
-        {
-            var sameLat = new GeoCoordinate(origin.Latitude, target.Longitude);
-            double distance = GeoMath.DistanceMeters(origin, sameLat);
-            return target.Longitude >= origin.Longitude ? distance : -distance;
+            var sameLat = new GeoCoordinate(origin.Latitude, coordinate.Longitude);
+            double east = GeoMath.DistanceMeters(origin, sameLat);
+            eastMeters = coordinate.Longitude >= origin.Longitude ? east : -east;
         }
     }
 }
