@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using MetinAR.UI;
 using TMPro;
@@ -41,6 +42,18 @@ namespace MetinAR.WorldMap
         private float _toastSeconds = 2.5f;
 
         private Coroutine _toastRoutine;
+
+        /// <summary>Raised whenever an AR encounter is requested (reason string).</summary>
+        public event Action<string> EncounterRequested;
+
+        /// <summary>Raised whenever the player is attacked by an aggressive mob (mob name).</summary>
+        public event Action<string> PlayerAttacked;
+
+        public int EncounterRequestCount { get; private set; }
+        public int AttackedCount { get; private set; }
+        public string LastEncounterReason { get; private set; }
+        public string LastToastMessage { get; private set; }
+        public bool IsToastVisible => _toastRoot != null && _toastRoot.activeSelf;
         private GameObject _activePanel;
 
         public MobInfoPanel MobInfoPanel => _mobInfoPanel;
@@ -74,18 +87,33 @@ namespace MetinAR.WorldMap
 
         public void NotifyAttacked(string mobName)
         {
+            AttackedCount++;
             ShowToast("Zostałeś zaatakowany");
             Debug.Log("[WorldMapPrototype] Zostałeś zaatakowany by " + mobName);
+            PlayerAttacked?.Invoke(mobName);
         }
 
         public void RequestArEncounter(string reason)
         {
+            RequestArEncounter(reason, true);
+        }
+
+        public void RequestArEncounter(string reason, bool showToast)
+        {
+            EncounterRequestCount++;
+            LastEncounterReason = reason;
             Debug.Log("[WorldMapPrototype] AR ENCOUNTER REQUESTED (" + reason + ")");
-            ShowToast("AR ENCOUNTER REQUESTED");
+            if (showToast)
+            {
+                ShowToast("AR ENCOUNTER REQUESTED");
+            }
+
+            EncounterRequested?.Invoke(reason);
         }
 
         public void ShowToast(string message)
         {
+            LastToastMessage = message;
             if (_toastText != null)
             {
                 _toastText.text = message;

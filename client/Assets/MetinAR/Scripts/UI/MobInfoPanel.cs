@@ -36,6 +36,14 @@ namespace MetinAR.UI
 
         private PrototypeMob _mob;
 
+        public Button EnterArButton => _enterArButton;
+        public Button CloseButton => _closeButton;
+        public string NameLabel => _nameText != null ? _nameText.text : null;
+        public string LevelLabel => _levelText != null ? _levelText.text : null;
+        public string HpLabel => _hpText != null ? _hpText.text : null;
+        public string DistanceLabel => _distanceText != null ? _distanceText.text : null;
+        public string AggressiveLabel => _aggressiveText != null ? _aggressiveText.text : null;
+
         public void Configure(
             TextMeshProUGUI nameText,
             TextMeshProUGUI levelText,

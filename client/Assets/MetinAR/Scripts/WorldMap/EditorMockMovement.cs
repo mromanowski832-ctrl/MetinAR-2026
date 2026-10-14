@@ -37,49 +37,58 @@ namespace MetinAR.WorldMap
 #endif
         }
 
+        /// <summary>
+        /// Shared runtime path for keyboard and tests. input.x = strafe (right +), input.y = forward (+).
+        /// Moves the mock provider along current heading. No-op in release builds.
+        /// </summary>
+        public void ApplyMoveInput(Vector2 input, float deltaSeconds)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (_locationService == null || _locationService.MockProvider == null)
+            {
+                return;
+            }
+
+            if (Mathf.Abs(input.x) < 0.01f && Mathf.Abs(input.y) < 0.01f)
+            {
+                return;
+            }
+
+            float speed = _moveMetersPerSecond * deltaSeconds;
+            float headingRad = _playerAvatar != null ? _playerAvatar.HeadingDegrees * Mathf.Deg2Rad : 0f;
+            // Heading 0 = north (+Z), clockwise positive. Forward along heading; strafe to the right.
+            double north = (input.y * Mathf.Cos(headingRad) - input.x * Mathf.Sin(headingRad)) * speed;
+            double east = (input.y * Mathf.Sin(headingRad) + input.x * Mathf.Cos(headingRad)) * speed;
+            _locationService.MockProvider.MoveMeters(north, east);
+#endif
+        }
+
+        /// <summary>
+        /// Shared runtime path for Q/E and tests. turn: -1 left, +1 right. No-op in release builds.
+        /// </summary>
+        public void ApplyTurnInput(float turn, float deltaSeconds)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (_playerAvatar == null || Mathf.Abs(turn) < 0.01f)
+            {
+                return;
+            }
+
+            _playerAvatar.HeadingDegrees =
+                Mathf.Repeat(_playerAvatar.HeadingDegrees + turn * _turnDegreesPerSecond * deltaSeconds, 360f);
+#endif
+        }
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private void TickMockMovement()
         {
-            if (_locationService == null)
-            {
-                return;
-            }
-
-            MockLocationProvider mock = _locationService.MockProvider;
-            if (mock == null)
-            {
-                return;
-            }
-
-            float dt = Time.deltaTime;
-            float speed = _moveMetersPerSecond * dt;
-
             float forward = 0f;
             float strafe = 0f;
             float turn = 0f;
             ReadInput(ref forward, ref strafe, ref turn);
-
-            if (_playerAvatar != null && Mathf.Abs(turn) > 0.01f)
-            {
-                _playerAvatar.HeadingDegrees =
-                    Mathf.Repeat(_playerAvatar.HeadingDegrees + turn * _turnDegreesPerSecond * dt, 360f);
-            }
-
-            if (Mathf.Abs(forward) < 0.01f && Mathf.Abs(strafe) < 0.01f)
-            {
-                return;
-            }
-
-            float headingRad = 0f;
-            if (_playerAvatar != null)
-            {
-                headingRad = _playerAvatar.HeadingDegrees * Mathf.Deg2Rad;
-            }
-
-            // Heading 0 = north (+Z). Forward along heading; strafe to the right.
-            double north = forward * Mathf.Cos(headingRad) * speed + strafe * Mathf.Sin(headingRad) * speed;
-            double east = forward * Mathf.Sin(headingRad) * speed + strafe * Mathf.Cos(headingRad) * speed;
-            mock.MoveMeters(north, east);
+            float dt = Time.deltaTime;
+            ApplyTurnInput(turn, dt);
+            ApplyMoveInput(new Vector2(strafe, forward), dt);
         }
 
         private static void ReadInput(ref float forward, ref float strafe, ref float turn)

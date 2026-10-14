@@ -46,6 +46,8 @@ namespace MetinAR.WorldMap
             }
         }
 
+        public string LabelText => _worldLabel != null ? _worldLabel.text : null;
+
         public string DisplayName
         {
             get => _displayName;

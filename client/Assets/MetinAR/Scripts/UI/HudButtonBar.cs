@@ -27,6 +27,12 @@ namespace MetinAR.UI
         [SerializeField]
         private WorldMapPrototypeController _controller;
 
+        public Button EqButton => _eqButton;
+        public Button SkillsButton => _skillsButton;
+        public Button SettingsButton => _settingsButton;
+        public Button CharacterButton => _characterButton;
+        public Button HamburgerButton => _hamburgerButton;
+
         public void Configure(
             Button eqButton,
             Button skillsButton,

@@ -112,7 +112,7 @@ namespace MetinAR.WorldMap
             _aggroTriggered = true;
             _nextAggroAllowedTime = Time.unscaledTime + _aggroDebounceSeconds;
             _controller?.NotifyAttacked(_mobName);
-            _controller?.RequestArEncounter("aggro:" + _mobName);
+            _controller?.RequestArEncounter("aggro:" + _mobName, false);
         }
 
         /// <summary>

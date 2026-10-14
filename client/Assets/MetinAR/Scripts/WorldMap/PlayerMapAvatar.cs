@@ -92,8 +92,8 @@ namespace MetinAR.WorldMap
         private void ApplyHeading()
         {
             Transform target = _modelRoot != null ? _modelRoot : transform;
-            // Unity yaw: 0 looks +Z (north). Heading degrees clockwise from north → yaw = -heading.
-            target.rotation = Quaternion.Euler(0f, -_headingDegrees, 0f);
+            // Unity yaw: 0 looks +Z (north), positive yaw is clockwise seen from above = compass heading.
+            target.rotation = Quaternion.Euler(0f, _headingDegrees, 0f);
         }
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using MetinAR.Location;
 using MetinAR.UI;
 using MetinAR.WorldMap;
@@ -23,10 +24,13 @@ namespace MetinAR.Editor
         private const string ArtFolder = "Assets/MetinAR/Art/Prototype";
         private const string ScenesFolder = "Assets/MetinAR/Scenes";
 
+        private static Sprite _circleSprite;
+
         public static void BuildScene()
         {
             EnsureFolders();
             Dictionary<string, Material> mats = CreateMaterials();
+            _circleSprite = GetOrCreateCircleSprite();
 
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -45,7 +49,7 @@ namespace MetinAR.Editor
             // Ground
             GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
             ground.name = "Ground";
-            ground.transform.localScale = new Vector3(8f, 1f, 8f);
+            ground.transform.localScale = new Vector3(40f, 1f, 40f);
             ApplyMat(ground, mats["Ground"]);
 
             // Systems
@@ -76,17 +80,17 @@ namespace MetinAR.Editor
             cam.tag = "MainCamera";
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.45f, 0.7f, 0.95f);
-            cam.fieldOfView = 50f;
+            cam.fieldOfView = 60f;
             cam.nearClipPlane = 0.3f;
             cam.farClipPlane = 200f;
             camGo.AddComponent<AudioListener>();
             camGo.AddComponent<UnityEngine.EventSystems.PhysicsRaycaster>();
             var follow = camGo.AddComponent<MapCameraFollow>();
             follow.Configure(player.transform, playerAvatar);
-            camGo.transform.position = new Vector3(0f, 11f, -9f);
+            camGo.transform.position = new Vector3(0f, 15f, -13f);
 
             // Mob ~15 m north-east
-            GeoCoordinate mobGeo = origin.LocalToWorld(3f, 14f);
+            GeoCoordinate mobGeo = origin.LocalToWorld(2f, 13f);
             GameObject mob = BuildMob(mats);
             var mobEntity = mob.AddComponent<WorldMapEntity>();
             TextMeshPro mobLabel = mob.transform.Find("Label").GetComponent<TextMeshPro>();
@@ -95,7 +99,7 @@ namespace MetinAR.Editor
             mob.AddComponent<MobClickTarget>().Configure(prototypeMob);
 
             // NPC ~12 m west
-            GeoCoordinate npcGeo = origin.LocalToWorld(-4f, 6f);
+            GeoCoordinate npcGeo = origin.LocalToWorld(-2.5f, 4f);
             GameObject npc = BuildNpc(mats);
             var npcEntity = npc.AddComponent<WorldMapEntity>();
             TextMeshPro npcLabel = npc.transform.Find("Label").GetComponent<TextMeshPro>();
@@ -243,6 +247,45 @@ namespace MetinAR.Editor
             return mat;
         }
 
+        private static Sprite GetOrCreateCircleSprite()
+        {
+            string path = ArtFolder + "/UI_Circle.png";
+            if (!File.Exists(path))
+            {
+                const int size = 128;
+                var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+                float r = size * 0.5f;
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        float dx = x + 0.5f - r;
+                        float dy = y + 0.5f - r;
+                        float d = Mathf.Sqrt(dx * dx + dy * dy);
+                        float a = Mathf.Clamp01(r - d);
+                        tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                    }
+                }
+
+                tex.Apply();
+                File.WriteAllBytes(path, tex.EncodeToPNG());
+                Object.DestroyImmediate(tex);
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            }
+
+            var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            if (importer != null && importer.textureType != TextureImporterType.Sprite)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.alphaIsTransparency = true;
+                importer.mipmapEnabled = false;
+                importer.SaveAndReimport();
+            }
+
+            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        }
+
         private static void ApplyMat(GameObject go, Material mat)
         {
             var renderer = go.GetComponent<Renderer>();
@@ -335,13 +378,15 @@ namespace MetinAR.Editor
 
             GameObject labelGo = new GameObject("Label");
             labelGo.transform.SetParent(root.transform, false);
-            labelGo.transform.localPosition = new Vector3(0f, 1.8f, 0f);
+            labelGo.transform.localPosition = new Vector3(0f, 2.2f, 0f);
             var tmp = labelGo.AddComponent<TextMeshPro>();
             tmp.text = "Trujący Pająk";
-            tmp.fontSize = 3.5f;
+            tmp.fontSize = 5f;
+            tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = Color.white;
-            tmp.rectTransform.sizeDelta = new Vector2(4f, 1.5f);
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
+            tmp.rectTransform.sizeDelta = new Vector2(6f, 1.6f);
 
             // Keep abdomen collider for OnMouseDown
             return root;
@@ -371,10 +416,12 @@ namespace MetinAR.Editor
             labelGo.transform.localPosition = new Vector3(0f, 2.6f, 0f);
             var tmp = labelGo.AddComponent<TextMeshPro>();
             tmp.text = "Wędrowny Handlarz";
-            tmp.fontSize = 3f;
+            tmp.fontSize = 4.5f;
+            tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = new Color(0.85f, 0.95f, 1f);
-            tmp.rectTransform.sizeDelta = new Vector2(5f, 1.2f);
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
+            tmp.rectTransform.sizeDelta = new Vector2(6f, 1f);
 
             return root;
         }
@@ -423,17 +470,27 @@ namespace MetinAR.Editor
             var mpText = CreateTmp("MpText", playerCard, "MP 180/200", 22, FontStyles.Normal, TextAlignmentOptions.Left);
             SetTopBand(mpText.rectTransform, 134f, 128f, 16f, 22f);
 
-            // Top-right radar
-            var radar = CreatePanel("Radar", safe, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(180f, 180f));
-            var radarBg = radar.GetComponent<Image>();
-            radarBg.color = new Color(0.05f, 0.12f, 0.08f, 0.85f);
-            // Make circular-ish with mask not required for prototype — add ring label
-            var radarLabel = CreateTmp("RadarLabel", radar, "RADAR", 24, FontStyles.Bold, TextAlignmentOptions.Center);
-            SetTopBand(radarLabel.rectTransform, 0f, 8f, 0f, 30f);
-            var radarDot = CreateImage("PlayerDot", radar, new Color(0.3f, 0.9f, 0.4f));
-            SetRect(radarDot.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(16f, 16f));
-            var mobDot = CreateImage("MobDot", radar, new Color(0.9f, 0.2f, 0.7f));
-            SetRect(mobDot.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(28f, 40f), new Vector2(12f, 12f));
+            // Top-right circular radar (ring + disc + dots)
+            var radarRing = CreateImage("Radar", safe, new Color(0.85f, 0.75f, 0.35f, 1f));
+            radarRing.sprite = _circleSprite;
+            SetRect(radarRing.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(200f, 200f));
+            var radarDisc = CreateImage("RadarDisc", radarRing.rectTransform, new Color(0.05f, 0.16f, 0.1f, 0.95f));
+            radarDisc.sprite = _circleSprite;
+            SetRect(radarDisc.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(184f, 184f));
+            var radarInner = CreateImage("RadarRange", radarDisc.rectTransform, new Color(0.3f, 0.8f, 0.4f, 0.18f));
+            radarInner.sprite = _circleSprite;
+            SetRect(radarInner.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(100f, 100f));
+            var radarLabel = CreateTmp("RadarLabel", radarDisc.rectTransform, "N", 22, FontStyles.Bold, TextAlignmentOptions.Center);
+            SetTopBand(radarLabel.rectTransform, 0f, 6f, 0f, 26f);
+            var radarDot = CreateImage("PlayerDot", radarDisc.rectTransform, new Color(0.3f, 0.95f, 0.4f));
+            radarDot.sprite = _circleSprite;
+            SetRect(radarDot.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(18f, 18f));
+            var mobDot = CreateImage("MobDot", radarDisc.rectTransform, new Color(0.95f, 0.25f, 0.75f));
+            mobDot.sprite = _circleSprite;
+            SetRect(mobDot.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(12f, 55f), new Vector2(14f, 14f));
+            var npcDot = CreateImage("NpcDot", radarDisc.rectTransform, new Color(0.3f, 0.75f, 1f));
+            npcDot.sprite = _circleSprite;
+            SetRect(npcDot.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-15f, 22f), new Vector2(14f, 14f));
 
             // Quest tracker right-middle
             var quest = CreatePanel("QuestTracker", safe, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-16f, 80f), new Vector2(420f, 100f));
@@ -441,24 +498,31 @@ namespace MetinAR.Editor
             StretchFull(questText.rectTransform);
             questText.margin = new Vector4(12, 8, 12, 8);
 
-            // Bottom-left coin + EXP
+            // Bottom-left circular coin (with off-center mark so rotation is visible) + 4 circular EXP orbs
             var coinPanel = CreateUiObject("CoinExp", safe);
-            SetRect(coinPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(24f, 200f), new Vector2(360f, 100f));
-            var coin = CreateImage("Coin", coinPanel, new Color(0.95f, 0.75f, 0.15f));
-            SetRect(coin.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(40f, 0f), new Vector2(72f, 72f));
+            SetRect(coinPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(24f, 190f), new Vector2(420f, 100f));
+            var coinRim = CreateImage("CoinRim", coinPanel, new Color(0.65f, 0.45f, 0.08f));
+            coinRim.sprite = _circleSprite;
+            SetRect(coinRim.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(8f, 0f), new Vector2(84f, 84f));
+            var coin = CreateImage("Coin", coinRim.rectTransform, new Color(0.98f, 0.8f, 0.2f));
+            coin.sprite = _circleSprite;
+            SetRect(coin.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(70f, 70f));
+            var coinMark = CreateImage("CoinMark", coin.rectTransform, new Color(0.65f, 0.45f, 0.08f));
+            SetRect(coinMark.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 16f), new Vector2(12f, 30f));
             var expRoot = CreateUiObject("ExpSegments", coinPanel);
-            SetRect(expRoot, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(100f, 0f), new Vector2(-8f, 48f));
+            SetRect(expRoot, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(110f, 0f), new Vector2(280f, 64f));
             var expImages = new Image[4];
             for (int i = 0; i < 4; i++)
             {
-                var seg = CreateImage("Exp" + i, expRoot, new Color(0.3f, 0.75f, 1f, i < 2 ? 1f : 0.25f));
-                float x0 = i / 4f;
-                float x1 = (i + 1) / 4f;
-                seg.rectTransform.anchorMin = new Vector2(x0, 0f);
-                seg.rectTransform.anchorMax = new Vector2(x1, 1f);
-                seg.rectTransform.offsetMin = new Vector2(4f, 4f);
-                seg.rectTransform.offsetMax = new Vector2(-4f, -4f);
-                expImages[i] = seg;
+                var ring = CreateImage("ExpRing" + i, expRoot, new Color(0.08f, 0.12f, 0.2f, 0.95f));
+                ring.sprite = _circleSprite;
+                SetRect(ring.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(i * 70f, 0f), new Vector2(60f, 60f));
+                var orb = CreateImage("Exp" + i, ring.rectTransform, new Color(0.3f, 0.8f, 1f, i < 2 ? 1f : 0.25f));
+                orb.sprite = _circleSprite;
+                SetRect(orb.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(46f, 46f));
+                var pct = CreateTmp("Pct" + i, ring.rectTransform, "25%", 16, FontStyles.Bold, TextAlignmentOptions.Center);
+                StretchFull(pct.rectTransform);
+                expImages[i] = orb;
             }
 
             // Bottom button bar
