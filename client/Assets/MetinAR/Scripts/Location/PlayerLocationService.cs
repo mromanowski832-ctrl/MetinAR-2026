@@ -6,6 +6,8 @@ namespace MetinAR.Location
     /// Game-facing location façade. Owns a single <see cref="ILocationProvider"/> selected
     /// explicitly for the current platform (mock in Editor / non-mobile, Unity GPS on Android/iOS).
     /// Scene wiring via MonoBehaviour; not a global singleton with unrelated duties.
+    /// Foreground-only: <see cref="ForegroundLocationLifecycle"/> suspends acquisition on application
+    /// pause and restarts it on resume only when it was requested and is still permitted.
     /// </summary>
     public sealed class PlayerLocationService : MonoBehaviour
     {
@@ -39,6 +41,7 @@ namespace MetinAR.Location
         private UnityLocationProvider _unityProvider;
         private MockLocationProvider _mockProvider;
         private float _nextDiagnosticLogTime;
+        private readonly ForegroundLocationLifecycle _lifecycle = new ForegroundLocationLifecycle();
 
         /// <summary>
         /// Active provider state (never exposes Unity LocationServiceStatus).
@@ -56,6 +59,22 @@ namespace MetinAR.Location
         /// </summary>
         public MockLocationProvider MockProvider => _mockProvider;
 
+        /// <summary>
+        /// True between a start request (start-on-enable / <see cref="StartProvider"/>) and an explicit
+        /// stop / disable. Pause/resume does not change it.
+        /// </summary>
+        public bool AcquisitionRequested => _lifecycle.AcquisitionRequested;
+
+        /// <summary>True while the application is paused (last OnApplicationPause(true)).</summary>
+        public bool IsApplicationPaused => _lifecycle.ApplicationPaused;
+
+        /// <summary>
+        /// Granted device permission level (Unity provider on Android); Unknown otherwise.
+        /// Approximate means fixes are not expected to meet the requested 5 m accuracy.
+        /// </summary>
+        public LocationPermissionLevel PermissionLevel =>
+            _unityProvider != null ? _unityProvider.PermissionLevel : LocationPermissionLevel.Unknown;
+
         private void Awake()
         {
             SelectAndCreateProvider(_providerKind);
@@ -63,20 +82,30 @@ namespace MetinAR.Location
 
         private void OnEnable()
         {
+            _lifecycle.SetComponentEnabled(true);
             if (_startOnEnable && _provider != null)
             {
-                _provider.Start();
+                _lifecycle.RequestStart();
             }
         }
 
         private void OnDisable()
         {
-            _provider?.Stop();
+            _lifecycle.SetComponentEnabled(false);
+        }
+
+        private void OnApplicationPause(bool pauseStatus)
+        {
+            _lifecycle.SetApplicationPaused(pauseStatus);
         }
 
         private void Update()
         {
-            _unityProvider?.Tick();
+            if (!_lifecycle.ApplicationPaused)
+            {
+                _unityProvider?.Tick();
+            }
+
             LogDiagnosticsOccasionally();
         }
 
@@ -85,26 +114,26 @@ namespace MetinAR.Location
         /// </summary>
         public void SelectProvider(ProviderKind kind)
         {
-            _provider?.Stop();
+            _lifecycle.RequestStop();
             _providerKind = kind;
             SelectAndCreateProvider(kind);
         }
 
         /// <summary>
-        /// Starts the active provider.
+        /// Starts the active provider (deferred to resume while the application is paused).
         /// </summary>
         public void StartProvider()
         {
             EnsureProvider();
-            _provider.Start();
+            _lifecycle.RequestStart();
         }
 
         /// <summary>
-        /// Stops the active provider.
+        /// Stops the active provider. It is not restarted by application resume.
         /// </summary>
         public void StopProvider()
         {
-            _provider?.Stop();
+            _lifecycle.RequestStop();
         }
 
         /// <summary>
@@ -145,6 +174,8 @@ namespace MetinAR.Location
                 _unityProvider = new UnityLocationProvider(_unityInitTimeoutSeconds);
                 _provider = _unityProvider;
             }
+
+            _lifecycle.AttachProvider(_provider);
         }
 
         private static ProviderKind ResolveKind(ProviderKind kind)
@@ -183,6 +214,8 @@ namespace MetinAR.Location
                 Debug.Log(
                     "[PlayerLocationService] state="
                     + _provider.State
+                    + " perm="
+                    + PermissionLevel
                     + " lat="
                     + fix.Coordinate.Latitude.ToString("F6")
                     + " lon="
@@ -192,7 +225,13 @@ namespace MetinAR.Location
             }
             else
             {
-                Debug.Log("[PlayerLocationService] state=" + _provider.State + " (no fix)");
+                Debug.Log(
+                    "[PlayerLocationService] state="
+                    + _provider.State
+                    + " perm="
+                    + PermissionLevel
+                    + (_lifecycle.ApplicationPaused ? " paused" : string.Empty)
+                    + " (no fix)");
             }
 #endif
         }

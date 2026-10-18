@@ -19,5 +19,11 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/Location/LocationProviderState.cs" Link="Production/LocationProviderState.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Location/ILocationProvider.cs" Link="Production/ILocationProvider.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Location/MockLocationProvider.cs" Link="Production/MockLocationProvider.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Location/LocationPermissionLevel.cs" Link="Production/LocationPermissionLevel.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Location/LocationPermissionRequest.cs" Link="Production/LocationPermissionRequest.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Location/IDeviceLocationPlatform.cs" Link="Production/IDeviceLocationPlatform.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Location/ISuspendableLocationProvider.cs" Link="Production/ISuspendableLocationProvider.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Location/DeviceLocationProviderCore.cs" Link="Production/DeviceLocationProviderCore.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Location/ForegroundLocationLifecycle.cs" Link="Production/ForegroundLocationLifecycle.cs" />
   </ItemGroup>
 </Project>

@@ -152,6 +152,9 @@ namespace MetinAR.Editor
                     E_EnterArButtonEmitsEncounterRequest(),
                     F_AggroTriggersOnceInsideRange(),
                     G_HudButtonsOpenAndClosePanels(),
+                    M_AppPauseSuspendsAndResumeRestoresWithoutOriginReset(),
+                    N_ManualStopIsNotRestartedByResume(),
+                    O_DisabledServiceIsNotRestartedByResume(),
                     K_OriginWaitsForFirstFixAndInitializesOnce(),
                     L_WorldMapPrototypeIsStartupScene(),
                 };
@@ -167,6 +170,9 @@ namespace MetinAR.Editor
                     "E_EnterArButtonEmitsEncounterRequest",
                     "F_AggroTriggersOnceInsideRange",
                     "G_HudButtonsOpenAndClosePanels",
+                    "M_AppPauseSuspendsAndResumeRestoresWithoutOriginReset",
+                    "N_ManualStopIsNotRestartedByResume",
+                    "O_DisabledServiceIsNotRestartedByResume",
                     "K_OriginWaitsForFirstFixAndInitializesOnce",
                     "L_WorldMapPrototypeIsStartupScene",
                 };
@@ -375,6 +381,104 @@ namespace MetinAR.Editor
                 Destroy(origin.gameObject);
                 Destroy(serviceGo);
                 yield return null;
+            }
+
+            /// <summary>
+            /// Delivers the real Unity application-pause message to the scene's PlayerLocationService
+            /// (same entry point Unity calls on Android/iOS pause/resume).
+            /// </summary>
+            private void SendAppPause(bool paused)
+            {
+                _location.SendMessage("OnApplicationPause", paused, SendMessageOptions.RequireReceiver);
+            }
+
+            private IEnumerator M_AppPauseSuspendsAndResumeRestoresWithoutOriginReset()
+            {
+                PrototypeWorldPlacement placement = FindFirstObjectByType<PrototypeWorldPlacement>();
+                WorldMapOrigin origin = FindFirstObjectByType<WorldMapOrigin>();
+                Check(_location.State == LocationProviderState.Running && _location.AcquisitionRequested, "precondition: provider not running/requested");
+                Check(placement != null && placement.IsInitialized && origin != null && origin.HasOrigin, "precondition: placement/origin not initialized");
+                if (placement == null || origin == null || !origin.HasOrigin)
+                {
+                    yield break;
+                }
+
+                int initEvents = 0;
+                int originEvents = 0;
+                Action<PrototypeWorldPlacement> onInit = _ => initEvents++;
+                placement.Initialized += onInit;
+                Action<GeoCoordinate> onOrigin = _ => originEvents++;
+                origin.OriginCaptured += onOrigin;
+
+                GeoCoordinate originBefore = origin.Origin;
+                GeoCoordinate mockBefore = _location.MockProvider.Coordinate;
+                GeoCoordinate mobBefore = _mobEntity.Coordinate;
+                Vector3 avatarBefore = _avatar.transform.position;
+
+                SendAppPause(true);
+                yield return Frames(3);
+                Check(_location.IsApplicationPaused, "M: service did not observe the pause");
+                Check(_location.State == LocationProviderState.Stopped, "M: provider still active while paused: " + _location.State);
+                Check(!_location.TryGetLatestFix(out _), "M: cached fix still usable while paused");
+                Check(_location.AcquisitionRequested, "M: pause cleared the acquisition request");
+                Check(Same(origin.Origin, originBefore), "M: origin changed while paused");
+
+                SendAppPause(true); // repeated notification is ignored
+                SendAppPause(false);
+                yield return Frames(3);
+                Check(!_location.IsApplicationPaused, "M: service did not observe the resume");
+                Check(_location.State == LocationProviderState.Running, "M: provider not resumed: " + _location.State);
+                Check(_location.TryGetLatestFix(out LocationFix fix) && Same(fix.Coordinate, mockBefore), "M: resumed fix differs from pre-pause position");
+                Check(Same(origin.Origin, originBefore), "M: origin reset on resume " + Fmt(origin.Origin));
+                Check(placement.IsInitialized && initEvents == 0 && originEvents == 0, "M: placement/origin re-initialized (init " + initEvents + ", origin " + originEvents + ")");
+                Check(Same(_mobEntity.Coordinate, mobBefore), "M: mob coordinate changed on resume");
+                Check(Vector3.Distance(_avatar.transform.position, avatarBefore) < 0.05f, "M: avatar moved across pause/resume: " + avatarBefore + " -> " + _avatar.transform.position);
+
+                placement.Initialized -= onInit;
+                origin.OriginCaptured -= onOrigin;
+            }
+
+            private IEnumerator N_ManualStopIsNotRestartedByResume()
+            {
+                WorldMapOrigin origin = FindFirstObjectByType<WorldMapOrigin>();
+                GeoCoordinate originBefore = origin.Origin;
+
+                _location.StopProvider();
+                yield return Frames(2);
+                SendAppPause(true);
+                yield return Frames(2);
+                SendAppPause(false);
+                yield return Frames(3);
+                Check(_location.State == LocationProviderState.Stopped, "N: manual stop restarted by resume: " + _location.State);
+                Check(!_location.AcquisitionRequested, "N: acquisition still requested after manual stop");
+                Check(!_location.TryGetLatestFix(out _), "N: fix available after manual stop + resume");
+
+                // Explicit start restores the scene for the following tests.
+                _location.StartProvider();
+                yield return Frames(3);
+                Check(_location.State == LocationProviderState.Running, "N: explicit StartProvider did not restart");
+                Check(Same(origin.Origin, originBefore), "N: origin changed");
+            }
+
+            private IEnumerator O_DisabledServiceIsNotRestartedByResume()
+            {
+                WorldMapOrigin origin = FindFirstObjectByType<WorldMapOrigin>();
+                GeoCoordinate originBefore = origin.Origin;
+
+                _location.enabled = false;
+                yield return Frames(2);
+                Check(_location.State == LocationProviderState.Stopped, "O: disabling did not stop the provider");
+                SendAppPause(true);
+                yield return Frames(2);
+                SendAppPause(false);
+                yield return Frames(3);
+                Check(_location.State == LocationProviderState.Stopped, "O: disabled service restarted by resume: " + _location.State);
+                Check(!_location.TryGetLatestFix(out _), "O: fix available while disabled");
+
+                _location.enabled = true; // start-on-enable restores the scene
+                yield return Frames(3);
+                Check(_location.State == LocationProviderState.Running, "O: re-enable did not restart");
+                Check(Same(origin.Origin, originBefore), "O: origin changed");
             }
 
             private IEnumerator L_WorldMapPrototypeIsStartupScene()
