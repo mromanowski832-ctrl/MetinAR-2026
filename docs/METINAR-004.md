@@ -140,6 +140,69 @@ enabled scene is not WorldMapPrototype):
 
 **REAL GPS ON PHYSICAL PHONE: UNVERIFIED** (no device test was performed).
 
+## METINAR-004B corrections — foreground GPS permission + lifecycle (PR #11 review 5565064786)
+
+Inherited location-subsystem defects found in review; fixed narrowly in `UnityLocationProvider.cs`,
+`PlayerLocationService.cs` and new pure helpers (`DeviceLocationProviderCore`, `IDeviceLocationPlatform`,
+`LocationPermissionRequest`, `LocationPermissionLevel`, `ISuspendableLocationProvider`,
+`ForegroundLocationLifecycle`). Full flow: `docs/METINAR-003.md` → "Corrected Android permission +
+lifecycle flow". `GeoCoordinate.cs` / `GeoMath.cs` unchanged; no visual/UI changes.
+
+- **R1:** one `Permission.RequestUserPermissions([FINE, COARSE])`; callbacks retained until the aggregate
+  resolves; first grant (either order) starts `Input.location` once; fine denial never cancels a coarse
+  grant; denial final only when neither is granted (incl. dismissal); `Stop()` + late callback never
+  starts; re-`Start()` during an open dialog does not prompt twice; init timeout disarmed while the
+  decision is pending; coarse reported as `PermissionLevel.Approximate`, not as 5 m accuracy.
+- **R2:** `PlayerLocationService.OnApplicationPause` → `ForegroundLocationLifecycle`: pause suspends
+  acquisition and invalidates cached fixes; resume restarts only a requested, still-permitted attempt;
+  explicit stop / disabled component / denied permission are never restarted; the permission dialog's
+  own pause/resume keeps the in-flight request (no re-prompt, no background start); the world origin is
+  not reset on resume. No background permission/service, no native iOS plugin.
+
+### Verification (corrections) — layers kept separate
+
+Tested code commit: `76158b40d6e6f8bf29fecc51e38c9c8ba68a8435` (this docs section was committed on top;
+docs-only difference).
+
+1. **Logic tests (.NET 8, no Unity)** — `dotnet test tests/GeoCore.Tests -c Release`: **81 passed,
+   0 failed** (34 existing + 47 new) on the Grok cloud box. New tests drive the production
+   `DeviceLocationProviderCore` / `ForegroundLocationLifecycle` through a fake of the project's own
+   `IDeviceLocationPlatform` seam (no fake UnityEngine, no copied logic):
+   - precise grant → one FINE+COARSE request, one start, `Precise`;
+   - coarse-only grant, fine-denied-first and coarse-granted-first (and both callbacks before a tick) →
+     one start, `Approximate`, fine denial does not cancel;
+   - both denied (incl. don't-ask-again) → `PermissionDenied`, no start, no re-prompt on tick/resume;
+   - dismissed with nothing granted → `PermissionDenied` (not stuck `Starting`); dismissed after coarse
+     grant → keeps the grant;
+   - already granted (fine / coarse-only / location off) → no prompt; one start / `Approximate` /
+     `LocationDisabled`;
+   - `Stop()` then late grant or late denial → stays `Stopped`, no start; `Stop()`+`Start()` while the
+     dialog is open → no second request, one start; resolved result of a cancelled attempt not reused;
+   - pending permission keeps the init timeout disarmed; timeout armed only after service start;
+   - pause/resume of an active provider → hardware stopped, fix invalidated, no polling/timeout while
+     paused, restart on resume without prompt;
+   - manual stop / disabled component then pause/resume → stays stopped (mock and device core);
+   - permission-dialog transitions: grant or denial while paused, resume before callback, repeated
+     pause/resume cycles → exactly one request and at most one start; start while paused deferred.
+2. **Editor tests (Unity 6000.6.4f1, LuzMen)**
+   - batch compile (`-batchmode -nographics -quit`): **exit 0, 0 `error CS`**, no blocking package
+     errors (licensing-token / curl messages only). Log: `C:\Users\mroma\MetinAR-2026\Builds\metinar-004b-r-compile.log`.
+   - Play Mode smoke runner `MetinAR.Editor.WorldMapPrototypeSmokeTest.Run`: **15 tests, 0 failures,
+     exit 0** — all 12 existing sections (A–L) plus new regression cases (Editor uses the mock provider):
+     - `M_AppPauseSuspendsAndResumeRestoresWithoutOriginReset` — real `OnApplicationPause` message:
+       paused → provider stopped, no usable fix, request kept; resume → running at the same position,
+       origin/placement/mob unchanged, no re-initialization events;
+     - `N_ManualStopIsNotRestartedByResume`;
+     - `O_DisabledServiceIsNotRestartedByResume`.
+     Log: `C:\Users\mroma\MetinAR-2026\Builds\metinar-004b-r-smoke.log`. Missing-script count 0 (test A).
+   - exit-1 proof: a temporary forced failure gave **exit 1** (`failures="1"`); it was reverted with
+     `git checkout`. Log: `Builds\metinar-004b-r-smoke-forced-failure.log`.
+3. **Android APK build** — **NOT YET RUN for the corrected commit** (LuzMen went offline before the
+   build). The Android-only `RequestUserPermissions` adapter path is compiled only by the Android player
+   build, so it is not yet compile-verified.
+4. **Physical device** — **REAL GPS ON PHYSICAL PHONE: UNVERIFIED** (permission dialog, approximate
+   choice and background/resume have not been observed on a phone).
+
 ## Not included
 
 Real map tiles/SDK, networking, auth, final RPG systems, AR encounter gameplay, loot,
