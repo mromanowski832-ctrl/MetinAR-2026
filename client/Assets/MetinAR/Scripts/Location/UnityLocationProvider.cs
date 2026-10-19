@@ -1,6 +1,6 @@
 using System;
 using UnityEngine;
-#if UNITY_ANDROID
+#if UNITY_ANDROID && !UNITY_EDITOR
 using UnityEngine.Android;
 #endif
 
@@ -8,28 +8,24 @@ namespace MetinAR.Location
 {
     /// <summary>
     /// Foreground-only <see cref="ILocationProvider"/> wrapping <see cref="Input.location"/>.
-    /// Desired accuracy ~5 m, distance filter ~1 m, with an init timeout.
-    /// Call <see cref="Tick"/> from a MonoBehaviour Update while starting/running.
-    /// Does not continuously log coordinates in release builds.
+    /// Requests a desired accuracy of ~5 m and a ~1 m distance filter, with an init timeout.
+    /// The desired accuracy is a request, not a guarantee: with approximate (coarse-only) permission
+    /// fixes are much less precise — see <see cref="PermissionLevel"/> and
+    /// <see cref="LocationFix.HorizontalAccuracyMeters"/>.
+    /// All permission/lifecycle decisions live in <see cref="DeviceLocationProviderCore"/>; this class only
+    /// adapts Unity APIs (Android: one <c>Permission.RequestUserPermissions</c> call for FINE + COARSE).
+    /// Call <see cref="Tick"/> from a MonoBehaviour Update; <see cref="Suspend"/>/<see cref="Resume"/> on
+    /// application pause/resume (done by <see cref="PlayerLocationService"/>).
+    /// Does not continuously log coordinates in release builds. No background location.
     /// </summary>
-    public sealed class UnityLocationProvider : ILocationProvider
+    public sealed class UnityLocationProvider : ILocationProvider, ISuspendableLocationProvider
     {
+        /// <summary>Desired (requested) accuracy passed to Input.location.Start. Not guaranteed.</summary>
         public const float DesiredAccuracyMeters = 5f;
         public const float UpdateDistanceMeters = 1f;
         public const float DefaultInitTimeoutSeconds = 20f;
 
-        private readonly float _initTimeoutSeconds;
-        private LocationProviderState _state = LocationProviderState.Stopped;
-        private LocationFix _latestFix;
-        private bool _hasFix;
-        private float _startRealtime;
-        private bool _initTimeoutArmed;
-
-#if UNITY_ANDROID && !UNITY_EDITOR
-        private bool _permissionRequestIssued;
-        // Kept as a field so the callbacks object is not GC'd while the OS dialog is open.
-        private PermissionCallbacks _pendingPermissionCallbacks;
-#endif
+        private readonly DeviceLocationProviderCore _core;
 
         public UnityLocationProvider()
             : this(DefaultInitTimeoutSeconds)
@@ -48,267 +44,144 @@ namespace MetinAR.Location
                     "Init timeout must be a finite value greater than 0 seconds.");
             }
 
-            _initTimeoutSeconds = initTimeoutSeconds;
+            _core = new DeviceLocationProviderCore(
+                new UnityDeviceLocationPlatform(),
+                initTimeoutSeconds,
+                DesiredAccuracyMeters,
+                UpdateDistanceMeters);
         }
 
         /// <inheritdoc />
-        public LocationProviderState State => _state;
+        public LocationProviderState State => _core.State;
+
+        /// <inheritdoc />
+        public bool IsSuspended => _core.IsSuspended;
+
+        /// <summary>Granted permission level (Android); Unknown on iOS/Editor. Approximate ≠ 5 m accuracy.</summary>
+        public LocationPermissionLevel PermissionLevel => _core.PermissionLevel;
+
+        /// <summary>True while the Android permission dialog result is outstanding.</summary>
+        public bool IsPermissionRequestPending => _core.IsPermissionRequestPending;
 
         /// <inheritdoc />
         public void Start()
         {
-            if (_state == LocationProviderState.Starting || _state == LocationProviderState.Running)
-            {
-                return;
-            }
-
-            _hasFix = false;
-            _initTimeoutArmed = false;
-#if UNITY_ANDROID && !UNITY_EDITOR
-            _permissionRequestIssued = false;
-            ClearPendingPermissionCallbacks();
-
-            // Android: check runtime permission BEFORE isEnabledByUser so first-time users
-            // get the system permission prompt instead of a premature LocationDisabled.
-            if (HasAndroidLocationPermission())
-            {
-                if (!Input.location.isEnabledByUser)
-                {
-                    _state = LocationProviderState.LocationDisabled;
-                    return;
-                }
-
-                BeginUnityLocationService();
-                return;
-            }
-
-            RequestAndroidLocationPermissionOnce();
-#else
-            // iOS (and non-Android player): do NOT early-return on !isEnabledByUser before the
-            // first Input.location.Start — on iOS that flag stays false until the OS prompt is
-            // answered, so gating here would block the permission dialog forever.
-            // Denied vs global location-off may not be separable without native APIs; we poll
-            // LocationServiceStatus after Start and map Failed / timeout to Failed.
-            BeginUnityLocationService();
-#endif
+            _core.Start();
         }
 
         /// <inheritdoc />
         public void Stop()
         {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            ClearPendingPermissionCallbacks();
-            _permissionRequestIssued = false;
-#endif
-            _initTimeoutArmed = false;
-
-            if (Input.location.status != LocationServiceStatus.Stopped)
-            {
-                Input.location.Stop();
-            }
-
-            _state = LocationProviderState.Stopped;
-            _hasFix = false;
+            _core.Stop();
         }
 
         /// <inheritdoc />
         public bool TryGetLatestFix(out LocationFix fix)
         {
-            if (!_hasFix || _state != LocationProviderState.Running)
-            {
-                fix = default;
-                return false;
-            }
+            return _core.TryGetLatestFix(out fix);
+        }
 
-            fix = _latestFix;
-            return true;
+        /// <inheritdoc />
+        public void Suspend()
+        {
+            _core.Suspend();
+        }
+
+        /// <inheritdoc />
+        public void Resume()
+        {
+            _core.Resume();
         }
 
         /// <summary>
-        /// Poll LocationService status and refresh the latest fix.
-        /// Intended to be called once per frame from a MonoBehaviour.
-        /// Does not re-request Android permission (callbacks own that path).
+        /// Evaluate permission results, poll LocationService status and refresh the latest fix.
+        /// Intended to be called once per frame from a MonoBehaviour. Never re-requests permission.
         /// </summary>
         public void Tick()
         {
-            if (_state == LocationProviderState.Stopped
-                || _state == LocationProviderState.Failed
-                || _state == LocationProviderState.PermissionDenied
-                || _state == LocationProviderState.LocationDisabled)
-            {
-                return;
-            }
-
-            if (_state == LocationProviderState.Starting)
-            {
-#if UNITY_ANDROID && !UNITY_EDITOR
-                // Still waiting for the permission dialog — do NOT arm / apply the 20s init timeout.
-                if (!_initTimeoutArmed)
-                {
-                    return;
-                }
-#endif
-
-                LocationServiceStatus status = Input.location.status;
-
-                if (status == LocationServiceStatus.Failed)
-                {
-                    _state = LocationProviderState.Failed;
-                    return;
-                }
-
-                if (status == LocationServiceStatus.Running)
-                {
-                    _state = LocationProviderState.Running;
-                    CaptureLastData();
-                    return;
-                }
-
-                if (_initTimeoutArmed
-                    && Time.realtimeSinceStartup - _startRealtime >= _initTimeoutSeconds)
-                {
-                    Input.location.Stop();
-                    _state = LocationProviderState.Failed;
-                    return;
-                }
-
-                return;
-            }
-
-            if (_state == LocationProviderState.Running)
-            {
-                if (Input.location.status != LocationServiceStatus.Running)
-                {
-                    _state = LocationProviderState.Failed;
-                    return;
-                }
-
-                CaptureLastData();
-            }
-        }
-
-#if UNITY_ANDROID && !UNITY_EDITOR
-        private static bool HasAndroidLocationPermission()
-        {
-            return Permission.HasUserAuthorizedPermission(Permission.FineLocation)
-                   || Permission.HasUserAuthorizedPermission(Permission.CoarseLocation);
+            _core.Tick();
         }
 
         /// <summary>
-        /// Issues at most one system permission request per <see cref="Start"/> attempt.
+        /// Unity API adapter. No decisions here — see <see cref="DeviceLocationProviderCore"/>.
         /// </summary>
-        private void RequestAndroidLocationPermissionOnce()
+        private sealed class UnityDeviceLocationPlatform : IDeviceLocationPlatform
         {
-            if (_permissionRequestIssued)
+#if UNITY_ANDROID && !UNITY_EDITOR
+            public bool RequiresRuntimePermission => true;
+
+            public bool HasFineLocationPermission => Permission.HasUserAuthorizedPermission(Permission.FineLocation);
+
+            public bool HasCoarseLocationPermission => Permission.HasUserAuthorizedPermission(Permission.CoarseLocation);
+
+            public void RequestLocationPermissions(LocationPermissionRequest request)
             {
-                _state = LocationProviderState.PermissionDenied;
-                return;
+                var callbacks = new PermissionCallbacks();
+                callbacks.PermissionGranted += request.ReportGranted;
+                callbacks.PermissionDenied += request.ReportDenied;
+                callbacks.PermissionDeniedAndDontAskAgain += request.ReportDenied;
+                callbacks.PermissionRequestDismissed += request.ReportDismissed;
+
+                // Retained (not GC'd) until the core resolves the aggregate result.
+                request.PlatformHandle = callbacks;
+
+                // ONE request for FINE + COARSE so the user can choose precise or approximate.
+                Permission.RequestUserPermissions(request.Permissions, callbacks);
             }
+#else
+            // iOS / Editor / other: Unity's Input.location path drives any OS prompt itself.
+            // Do NOT gate on isEnabledByUser before the first Input.location.Start (iOS keeps it false
+            // until the prompt is answered). Denied vs location-off is not separable without native code.
+            public bool RequiresRuntimePermission => false;
 
-            _permissionRequestIssued = true;
-            _state = LocationProviderState.Starting;
-            // Timeout stays disarmed until Input.location.Start is actually called.
+            public bool HasFineLocationPermission => false;
 
-            _pendingPermissionCallbacks = new PermissionCallbacks();
-            _pendingPermissionCallbacks.PermissionGranted += OnAndroidPermissionGranted;
-            _pendingPermissionCallbacks.PermissionDenied += OnAndroidPermissionDenied;
-            _pendingPermissionCallbacks.PermissionDeniedAndDontAskAgain += OnAndroidPermissionDenied;
-            _pendingPermissionCallbacks.PermissionRequestDismissed += OnAndroidPermissionDenied;
+            public bool HasCoarseLocationPermission => false;
 
-            Permission.RequestUserPermission(Permission.FineLocation, _pendingPermissionCallbacks);
-        }
-
-        private void OnAndroidPermissionGranted(string permissionName)
-        {
-            ClearPendingPermissionCallbacks();
-
-            if (_state != LocationProviderState.Starting)
+            public void RequestLocationPermissions(LocationPermissionRequest request)
             {
-                return;
+                throw new NotSupportedException("Runtime location permission requests are Android-only.");
             }
-
-            if (!HasAndroidLocationPermission())
-            {
-                _state = LocationProviderState.PermissionDenied;
-                return;
-            }
-
-            if (!Input.location.isEnabledByUser)
-            {
-                _state = LocationProviderState.LocationDisabled;
-                return;
-            }
-
-            BeginUnityLocationService();
-        }
-
-        private void OnAndroidPermissionDenied(string permissionName)
-        {
-            ClearPendingPermissionCallbacks();
-
-            if (_state == LocationProviderState.Starting)
-            {
-                _state = LocationProviderState.PermissionDenied;
-            }
-        }
-
-        private void ClearPendingPermissionCallbacks()
-        {
-            if (_pendingPermissionCallbacks == null)
-            {
-                return;
-            }
-
-            _pendingPermissionCallbacks.PermissionGranted -= OnAndroidPermissionGranted;
-            _pendingPermissionCallbacks.PermissionDenied -= OnAndroidPermissionDenied;
-            _pendingPermissionCallbacks.PermissionDeniedAndDontAskAgain -= OnAndroidPermissionDenied;
-            _pendingPermissionCallbacks.PermissionRequestDismissed -= OnAndroidPermissionDenied;
-            _pendingPermissionCallbacks = null;
-        }
 #endif
 
-        /// <summary>
-        /// Starts <see cref="Input.location"/> and arms the init timeout.
-        /// Caller must have already verified Android permission / availability where required.
-        /// </summary>
-        private void BeginUnityLocationService()
-        {
-            Input.location.Start(DesiredAccuracyMeters, UpdateDistanceMeters);
-            _state = LocationProviderState.Starting;
-            _startRealtime = Time.realtimeSinceStartup;
-            _initTimeoutArmed = true;
-        }
+            public bool IsLocationEnabledByUser => Input.location.isEnabledByUser;
 
-        private void CaptureLastData()
-        {
-            LocationInfo info = Input.location.lastData;
-
-            double accuracy = info.horizontalAccuracy;
-            if (double.IsNaN(accuracy) || double.IsInfinity(accuracy) || accuracy < 0.0)
+            public DeviceLocationServiceStatus ServiceStatus
             {
-                return;
+                get
+                {
+                    switch (Input.location.status)
+                    {
+                        case LocationServiceStatus.Initializing:
+                            return DeviceLocationServiceStatus.Initializing;
+                        case LocationServiceStatus.Running:
+                            return DeviceLocationServiceStatus.Running;
+                        case LocationServiceStatus.Failed:
+                            return DeviceLocationServiceStatus.Failed;
+                        default:
+                            return DeviceLocationServiceStatus.Stopped;
+                    }
+                }
             }
 
-            double latitude = info.latitude;
-            double longitude = info.longitude;
-            if (double.IsNaN(latitude) || double.IsInfinity(latitude)
-                || double.IsNaN(longitude) || double.IsInfinity(longitude)
-                || latitude < -90.0 || latitude > 90.0
-                || longitude < -180.0 || longitude > 180.0)
+            public void StartService(float desiredAccuracyMeters, float updateDistanceMeters)
             {
-                return;
+                Input.location.Start(desiredAccuracyMeters, updateDistanceMeters);
             }
 
-            try
+            public void StopService()
             {
-                var coordinate = new GeoCoordinate(latitude, longitude);
-                _latestFix = new LocationFix(coordinate, accuracy, info.timestamp);
-                _hasFix = true;
+                Input.location.Stop();
             }
-            catch (ArgumentOutOfRangeException)
+
+            public bool TryGetLastSample(out DeviceLocationSample sample)
             {
-                // Ignore transient invalid samples from the platform layer.
+                LocationInfo info = Input.location.lastData;
+                sample = new DeviceLocationSample(info.latitude, info.longitude, info.horizontalAccuracy, info.timestamp);
+                return true;
             }
+
+            public double RealtimeSeconds => Time.realtimeSinceStartupAsDouble;
         }
     }
 }
