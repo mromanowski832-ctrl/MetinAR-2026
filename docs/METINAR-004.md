@@ -197,11 +197,43 @@ docs-only difference).
      Log: `C:\Users\mroma\MetinAR-2026\Builds\metinar-004b-r-smoke.log`. Missing-script count 0 (test A).
    - exit-1 proof: a temporary forced failure gave **exit 1** (`failures="1"`); it was reverted with
      `git checkout`. Log: `Builds\metinar-004b-r-smoke-forced-failure.log`.
-3. **Android APK build** — **NOT YET RUN for the corrected commit** (LuzMen went offline before the
-   build). The Android-only `RequestUserPermissions` adapter path is compiled only by the Android player
-   build, so it is not yet compile-verified.
+3. **Android APK build** — see "minSdk 31 device-test fix" below (built from the minSdk commit, which
+   contains the R1/R2 code unchanged). This was the first Android player compile of the Android-only
+   `RequestUserPermissions` adapter path: **0 `error CS`**; one expected `warning CS0618` for the
+   obsolete `PermissionCallbacks.PermissionDeniedAndDontAskAgain` event (`UnityLocationProvider.cs:122`).
 4. **Physical device** — **REAL GPS ON PHYSICAL PHONE: UNVERIFIED** (permission dialog, approximate
    choice and background/resume have not been observed on a phone).
+
+## METINAR-004B — minSdk 31 device-test fix (PR #11 controller request 2026-10-19)
+
+Owner device test: the API 31 phone rejected the APK with
+`INSTALL_FAILED_OLDER_SDK: Requires newer sdk version #34 (current version is #31)`.
+
+Change: `client/ProjectSettings/ProjectSettings.asset` `AndroidMinSdkVersion: 34 → 31` only.
+`AndroidTargetSdkVersion` stays `0` (automatic = highest installed, 36). ARM64 (`AndroidTargetArchitectures: 2`),
+IL2CPP (`scriptingBackend Android: 1`), AR Foundation/ARCore 6.6.2 and the foreground-only GPS flow are
+unchanged; ARCore requires API ≥ 24, so 31 is accepted. There is no custom Gradle/manifest template
+(`Assets/Plugins/Android` does not exist), so nothing forces 34. No gameplay/HUD changes.
+
+Verification (Unity 6000.6.4f1, LuzMen; pure tests on the Grok cloud box):
+
+- Logic tests: `dotnet test tests/GeoCore.Tests -c Release` — **81 passed, 0 failed**.
+- Batch compile: **exit 0, 0 `error CS`** (`Builds\metinar-004b-minsdk-compile.log`).
+- Play Mode smoke: **15 tests, 0 failures, exit 0** (A–O), missing scripts 0 (`Builds\metinar-004b-minsdk-smoke.log`,
+  `Builds\metinar-004a-smoke-results.xml`).
+- Development APK: `client/Builds/Android/MetinAR-worldmap-dev.apk`, **51,098,142 bytes**, SHA256
+  `77F019AE1CDDE1B4DB1F981B869ADA464353E156965884C458C0222F453CB884`, exit 0 (`Builds\metinar-004b-minsdk-apk.log`).
+  - `aapt dump badging`: `sdkVersion:'31'`, `targetSdkVersion:'36'` (previous APK: `34` / `36`, so
+    target unchanged), `native-code: 'arm64-v8a'`, `libil2cpp.so` present, `application-debuggable`.
+  - merged manifest (`launcher/.../merged_manifest/debug/.../AndroidManifest.xml`):
+    `minSdkVersion="31"`, `targetSdkVersion="36"`; permissions INTERNET, ACCESS_FINE_LOCATION,
+    ACCESS_COARSE_LOCATION, CAMERA (+ the package's dynamic-receiver permission);
+    **no `ACCESS_BACKGROUND_LOCATION`**.
+- Device install: **NOT RUN** — at verification time `adb devices` on LuzMen listed no devices and no
+  Android USB device was present, so the phone must be reconnected (USB debugging authorized) before
+  `adb install -r`.
+
+**REAL GPS ON PHYSICAL PHONE: UNVERIFIED.**
 
 ## Not included
 
