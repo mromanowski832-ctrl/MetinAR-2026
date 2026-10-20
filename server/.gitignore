@@ -1,0 +1,17 @@
+# The repository root .gitignore ignores every *.csproj / *.sln (Unity-generated files).
+# The backend workspace owns its own hand-written project files, so re-include them here.
+!*.csproj
+!*.sln
+
+# Build outputs
+bin/
+obj/
+
+# Local SQLite development databases (never commit player/world runtime data)
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Test results
+TestResults/
