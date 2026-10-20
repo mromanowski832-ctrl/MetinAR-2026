@@ -185,11 +185,26 @@ namespace MetinAR.Editor.Characters
 
             group.ForceLOD(-1);
             var poses = new[] { ("Idle", 1.2f), ("Walk", 0.25f), ("Attack", 0.4f), ("Attack", 17f / 30f), ("Hit", 0.1f), ("Death", 2.0f) };
+            // Batch-mode Camera.Render does not re-skin after SampleAnimation, so each pose is baked into a
+            // temporary static mesh (same material, same world transform) and the skinned renderers are hidden.
+            SkinnedMeshRenderer[] skinned = inst.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            SkinnedMeshRenderer lod0 = skinned.First(r => AssetPipelineRules.LodIndex(r.name) == 0);
+            foreach (SkinnedMeshRenderer r in skinned) r.enabled = false;
             foreach (var (state, t) in poses)
             {
                 VenomousSpiderAssetBuilder.LoadClip(state).SampleAnimation(model, t);
+                var baked = new Mesh();
+                lod0.BakeMesh(baked, true);
+                var proxy = new GameObject("PoseProxy");
+                proxy.transform.SetPositionAndRotation(lod0.transform.position, lod0.transform.rotation);
+                proxy.AddComponent<MeshFilter>().sharedMesh = baked;
+                proxy.AddComponent<MeshRenderer>().sharedMaterial = lod0.sharedMaterial;
                 Shot(cam, new Vector3(1.9f, 1.2f, 2.1f), "unity_pose_" + state + "_" + Mathf.RoundToInt(t * 30f).ToString("00") + ".png");
+                UnityEngine.Object.DestroyImmediate(proxy);
+                UnityEngine.Object.DestroyImmediate(baked);
             }
+
+            foreach (SkinnedMeshRenderer r in skinned) r.enabled = true;
 
             ResetPose(model);
         }
