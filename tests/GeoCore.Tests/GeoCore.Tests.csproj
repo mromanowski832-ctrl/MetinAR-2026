@@ -43,5 +43,6 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/SyntheticHand.cs" Link="Production/HandTracking/SyntheticHand.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/HandPoseSmoother.cs" Link="Production/HandTracking/HandPoseSmoother.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/SwordHitGate.cs" Link="Production/HandTracking/SwordHitGate.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/HandInferenceBackendPolicy.cs" Link="Production/HandTracking/HandInferenceBackendPolicy.cs" />
   </ItemGroup>
 </Project>

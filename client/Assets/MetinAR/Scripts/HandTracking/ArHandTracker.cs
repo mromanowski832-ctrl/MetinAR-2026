@@ -5,6 +5,7 @@ using MetinAR.ArEncounter;
 using Unity.Collections;
 using Unity.InferenceEngine;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
 using Debug = UnityEngine.Debug;
@@ -49,6 +50,10 @@ namespace MetinAR.HandTracking
         private bool _preferGpu = true;
 
         [SerializeField]
+        [Tooltip("Allow Sentis GPUCompute on OpenGL ES devices. Off by default: on GLES (e.g. Mali A31) GPUCompute failed with a TypeInitializationException, so CPU is used.")]
+        private bool _allowGpuOnOpenGles;
+
+        [SerializeField]
         private bool _runMappingProbe = true;
 
         private readonly HandObservation _latest = new HandObservation();
@@ -64,6 +69,8 @@ namespace MetinAR.HandTracking
         private int _sequence;
         private bool _flipImageRows;
         private bool _probeStarted;
+        private HandInferenceBackendPolicy _backendPolicy;
+        private int _failureCount;
 
         /// <summary>Raised on the main thread for every published observation (with or without a hand).</summary>
         public event Action<HandObservation> ObservationUpdated;
@@ -79,6 +86,9 @@ namespace MetinAR.HandTracking
         public bool ModelsLoaded => _inference != null;
 
         public string BackendName => _inference != null ? _inference.Backend.ToString() : "none";
+
+        /// <summary>True when GPU inference failed this session and the tracker fell back to CPU.</summary>
+        public bool GpuFallbackUsed => _backendPolicy != null && _backendPolicy.GpuFailed;
 
         /// <summary>Last model/inference error (null when healthy).</summary>
         public string LastError { get; private set; }
@@ -151,19 +161,35 @@ namespace MetinAR.HandTracking
 
         private void Start()
         {
+            _backendPolicy = new HandInferenceBackendPolicy(_preferGpu, _allowGpuOnOpenGles);
+            bool isGles = SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES3;
+            HandInferenceBackend choice = _backendPolicy.Choose(SystemInfo.supportsComputeShaders, isGles);
+            Debug.Log("[HandTracking] backend choice=" + choice + " preferGpu=" + _preferGpu + " allowGpuOnGles=" + _allowGpuOnOpenGles
+                      + " graphics=" + SystemInfo.graphicsDeviceType + " computeShaders=" + SystemInfo.supportsComputeShaders);
+            if (!TryCreateInference(choice) && choice == HandInferenceBackend.GpuCompute && _backendPolicy.ReportFailure(choice))
+            {
+                TryCreateInference(HandInferenceBackend.Cpu);
+            }
+        }
+
+        private bool TryCreateInference(HandInferenceBackend backend)
+        {
             try
             {
-                _inference = new HandLandmarkInference(_palmDetectorModel, _handLandmarkModel, HandLandmarkInference.PreferredBackend(_preferGpu))
+                BackendType type = backend == HandInferenceBackend.GpuCompute ? BackendType.GPUCompute : BackendType.CPU;
+                _inference = new HandLandmarkInference(_palmDetectorModel, _handLandmarkModel, type)
                 {
                     PalmScoreThreshold = _palmScoreThreshold,
                 };
                 Debug.Log("[HandTracking] models loaded, backend=" + _inference.Backend + " computeShaders=" + SystemInfo.supportsComputeShaders);
+                return true;
             }
             catch (Exception ex)
             {
                 _inference = null;
-                LastError = "model load failed: " + ex.Message;
-                Debug.LogWarning("[HandTracking] " + LastError);
+                LastError = "model load failed (" + backend + "): " + HandInferenceBackendPolicy.DescribeChain(ex);
+                Debug.LogWarning("[HandTracking] " + LastError + "\n" + ex);
+                return false;
             }
         }
 
@@ -350,8 +376,7 @@ namespace MetinAR.HandTracking
             catch (Exception ex)
             {
                 _trackedRoi = null;
-                LastError = "inference failed: " + ex.GetType().Name + ": " + ex.Message;
-                Debug.LogWarning("[HandTracking] " + LastError);
+                HandleInferenceFailure(ex);
             }
             finally
             {
@@ -361,6 +386,32 @@ namespace MetinAR.HandTracking
                     DisposeInference();
                 }
             }
+        }
+
+        private void HandleInferenceFailure(Exception ex)
+        {
+            _failureCount++;
+            HandInferenceBackend failed = _inference != null && _inference.Backend == BackendType.GPUCompute
+                ? HandInferenceBackend.GpuCompute
+                : HandInferenceBackend.Cpu;
+            LastError = "inference failed (" + failed + "): " + HandInferenceBackendPolicy.DescribeChain(ex);
+            if (HandInferenceBackendPolicy.ShouldLogFailure(_failureCount))
+            {
+                // Full exception (inner chain + stack) only on the 1st and every 300th failure; never every frame.
+                Debug.LogWarning("[HandTracking] " + LastError + " (failure #" + _failureCount + ")\n" + ex);
+            }
+
+            if (_disposeRequested || _backendPolicy == null || !_backendPolicy.ReportFailure(failed))
+            {
+                return;
+            }
+
+            // First GPU failure: drop the GPU workers and continue on CPU; GPU is not retried this session.
+            Debug.LogWarning("[HandTracking] GPU inference failed, falling back to CPU backend");
+            _inference?.Dispose();
+            _inference = null;
+            _failureCount = 0;
+            TryCreateInference(HandInferenceBackend.Cpu);
         }
 
         private void FinishNoHand(Stopwatch watch, float palmScore)

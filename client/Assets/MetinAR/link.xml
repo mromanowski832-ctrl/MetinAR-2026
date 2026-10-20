@@ -1,0 +1,8 @@
+<!--
+  METINAR-007: keep Unity Sentis (com.unity.ai.inference) from managed code stripping.
+  Sentis creates its backend/op types via reflection and static initialisers; on the Android IL2CPP dev APK
+  GPUCompute failed with "TypeInitializationException: Unity.InferenceEngine.ComputeFunctions".
+-->
+<linker>
+  <assembly fullname="Unity.InferenceEngine" preserve="all" />
+</linker>
