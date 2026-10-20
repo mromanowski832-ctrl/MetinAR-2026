@@ -75,6 +75,21 @@ namespace MetinAR.QA.Tests
         }
 
         [Fact]
+        public void KnownSignatureInUnityDottedFrameFormatWithoutColonsIsRecognized()
+        {
+            string condition = "ArgumentOutOfRangeException: Index was out of range. Must be non-negative and less than the size of the collection.\nParameter name: index";
+            string stack =
+                "System.Collections.Generic.List`1[T].get_Item (System.Int32 index) (at <c5ae8a4eeb824526b5df2932bc2395e0>:0)\n"
+                + "UnityEditor.Search.SearchDatabase+<EnumerateAll>d__78.MoveNext () (at <76871fb05cc145ceba4a3eea6daeab4d>:0)\n"
+                + "System.Linq.Enumerable.First[TSource] (System.Collections.Generic.IEnumerable`1[T] source) (at <f1b392d8fe224ca2b1f9fab1000b77eb>:0)\n"
+                + "UnityEditor.Search.SearchDatabase.GetDefaultSearchDatabase () (at <76871fb05cc145ceba4a3eea6daeab4d>:0)\n"
+                + "UnityEditor.Search.SearchInit.IndexationOnStartup () (at <76871fb05cc145ceba4a3eea6daeab4d>:0)\n"
+                + "UnityEditor.EditorApplication.Internal_CallDelayFunctions () (at <b5e1ac9fdc894216a0eeb18353904190>:0)\n";
+            Assert.Equal(SmokeExceptionKind.KnownEditorInfrastructure, SmokeExceptionClassifier.Classify(condition, stack));
+            Assert.Equal(SmokeExceptionKind.Unknown, SmokeExceptionClassifier.Classify(condition, stack + "UnityEditor.AssetDatabase.Refresh () (at <x>:0)\n"));
+        }
+
+        [Fact]
         public void ArbitraryUnityRuntimeExceptionFails()
         {
             string condition = "NullReferenceException: Object reference not set to an instance of an object";

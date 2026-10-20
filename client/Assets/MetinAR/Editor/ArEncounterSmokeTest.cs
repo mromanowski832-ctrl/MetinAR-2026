@@ -117,6 +117,7 @@ namespace MetinAR.Editor
             private readonly List<(string name, string failure)> _results = new List<(string, string)>();
             private readonly List<string> _exceptions = new List<string>();
             private readonly List<string> _infrastructureNoise = new List<string>();
+            private readonly List<string> _exceptionDiagnostics = new List<string>();
             private readonly List<string> _errors = new List<string>();
             private string _currentFailure;
 
@@ -177,6 +178,9 @@ namespace MetinAR.Editor
                     else
                     {
                         _exceptions.Add(condition);
+                        _exceptionDiagnostics.Add(SmokeExceptionClassifier.Classify(condition, stackTrace) + " frames=["
+                            + string.Join(" < ", SmokeExceptionClassifier.ExtractFrames((condition ?? string.Empty) + "\n" + (stackTrace ?? string.Empty)))
+                            + "]");
                     }
                 }
                 else if (type == LogType.Error)
@@ -849,6 +853,11 @@ namespace MetinAR.Editor
                 {
                     Debug.Log("[ArSmoke] T15 ignored known editor-infrastructure exceptions (" + _infrastructureNoise.Count + ", "
                         + SmokeExceptionClassifier.SearchDatabaseSignatureId + "): " + FirstLines(_infrastructureNoise));
+                }
+
+                foreach (string d in _exceptionDiagnostics)
+                {
+                    Debug.Log("[ArSmoke] T15 failing exception classified " + d);
                 }
 
                 Check(_exceptions.Count == 0, "exceptions: " + string.Join(" | ", _exceptions));

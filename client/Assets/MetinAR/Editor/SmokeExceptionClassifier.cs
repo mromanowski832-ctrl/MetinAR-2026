@@ -199,11 +199,6 @@ namespace MetinAR.Editor
                     continue; // e.g. "ArgumentOutOfRangeException: Index was out of range. Must be ..." message text
                 }
 
-                if (!mono && name.IndexOf(':') < 0)
-                {
-                    continue; // Unity frames always use "Type:Method"
-                }
-
                 frames.Add(name.Replace(':', '.'));
             }
 
