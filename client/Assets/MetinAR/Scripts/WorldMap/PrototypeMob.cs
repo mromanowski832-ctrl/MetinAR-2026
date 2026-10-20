@@ -1,3 +1,4 @@
+using MetinAR.Location;
 using MetinAR.UI;
 using UnityEngine;
 
@@ -5,6 +6,8 @@ namespace MetinAR.WorldMap
 {
     /// <summary>
     /// Prototype aggressive mob with world label, click → MobInfoPanel, and one-shot aggro toast.
+    /// Aggro entry is decided by <see cref="AggroConfidenceGate"/> from the latest location fix
+    /// (accuracy-gated, stable streak, hysteresis), not by raw distance alone.
     /// </summary>
     public sealed class PrototypeMob : MonoBehaviour
     {
@@ -39,10 +42,10 @@ namespace MetinAR.WorldMap
         private WorldMapPrototypeController _controller;
 
         [SerializeField]
-        private float _aggroDebounceSeconds = 8f;
+        private AggroGateSettings _aggroGateSettings = AggroGateSettings.CreatePrototypeDefaults();
 
-        private bool _aggroTriggered;
-        private float _nextAggroAllowedTime;
+        private AggroConfidenceGate _aggroGate;
+        private PlayerMapAvatar _playerAvatar;
 
         public string MobName => _mobName;
         public int Level => _level;
@@ -50,6 +53,10 @@ namespace MetinAR.WorldMap
         public int CurrentHp => _currentHp;
         public bool Aggressive => _aggressive;
         public float AggroRangeMeters => _aggroRangeMeters;
+
+        /// <summary>Aggro decision state (exposed for smoke tests / diagnostics).</summary>
+        public AggroConfidenceGate AggroGate => _aggroGate ??= new AggroConfidenceGate(
+            _aggroGateSettings ?? AggroGateSettings.CreatePrototypeDefaults());
 
         public float DistanceToPlayerMeters
         {
@@ -98,19 +105,31 @@ namespace MetinAR.WorldMap
                 return;
             }
 
-            float distance = DistanceToPlayerMeters;
-            if (distance > _aggroRangeMeters)
+            if (_playerAvatar == null)
+            {
+                _playerAvatar = _player.GetComponent<PlayerMapAvatar>();
+                if (_playerAvatar == null)
+                {
+                    return;
+                }
+            }
+
+            PlayerLocationService service = _playerAvatar.LocationService;
+            WorldMapOrigin origin = _playerAvatar.Origin;
+            if (service == null || origin == null || !origin.HasOrigin
+                || !service.TryGetLatestFix(out LocationFix fix))
             {
                 return;
             }
 
-            if (_aggroTriggered && Time.unscaledTime < _nextAggroAllowedTime)
+            // Distance from the fix itself (same frame as its accuracy), horizontal plane only.
+            Vector3 playerPosition = origin.WorldToLocal(fix.Coordinate, transform.position.y);
+            float distance = Vector3.Distance(transform.position, playerPosition);
+            if (!AggroGate.Submit(distance, fix.HorizontalAccuracyMeters, fix.TimestampSeconds, _aggroRangeMeters))
             {
                 return;
             }
 
-            _aggroTriggered = true;
-            _nextAggroAllowedTime = Time.unscaledTime + _aggroDebounceSeconds;
             _controller?.NotifyAttacked(_mobName);
             _controller?.RequestArEncounter("aggro:" + _mobName, false);
         }

@@ -597,6 +597,13 @@ namespace MetinAR.Editor
             {
                 int encounterStart = _controller.EncounterRequestCount;
                 int attackStart = _controller.AttackedCount;
+                MockLocationProvider mock = _location.MockProvider;
+                double previousAccuracy = mock.HorizontalAccuracyMeters;
+                AggroGateSettings gate = _mob.AggroGate.Settings;
+                Check(_mob.AggroGate.IsArmed, "aggro gate not armed before approach");
+
+                // METINAR-005A: aggro needs accurate, stable fixes. Use a good outdoor accuracy for the approach.
+                mock.HorizontalAccuracyMeters = 2.0;
 
                 // Walk forward 0.5 s (4 m) -> back near origin, still > 12 m from mob.
                 _movement.ApplyMoveInput(new Vector2(0f, 1f), 0.5f);
@@ -606,19 +613,41 @@ namespace MetinAR.Editor
                 Check(_controller.AttackedCount == attackStart, "attacked while outside range");
                 Check(_controller.EncounterRequestCount == encounterStart, "encounter requested while outside range");
 
-                // Walk forward 0.75 s (6 m) -> inside 12 m.
+                // Walk forward 0.75 s (6 m) -> genuinely inside 12 m with the accuracy circle inside the range.
                 _movement.ApplyMoveInput(new Vector2(0f, 1f), 0.75f);
-                yield return Frames(3);
+                yield return Frames(10);
                 float inside = _mob.DistanceToPlayerMeters;
                 Check(inside <= _mob.AggroRangeMeters, "expected inside aggro range, got " + inside);
+                Check(inside + mock.HorizontalAccuracyMeters * gate.accuracyMarginFactor <= _mob.AggroRangeMeters,
+                    "approach is not confidently inside: " + inside);
+                // A single fix is not enough any more (raw distance alone must not trigger).
+                Check(_controller.AttackedCount == attackStart, "attacked on the first inside fix");
+
+                // The player stays there: further fixes (1 s apart) at the same position make the approach stable.
+                for (int i = 1; i < gate.requiredStableFixes; i++)
+                {
+                    mock.MoveMeters(0.0, 0.0);
+                    yield return Frames(3);
+                }
+
                 Check(_controller.AttackedCount == attackStart + 1, "attack count " + (_controller.AttackedCount - attackStart));
                 Check(_controller.EncounterRequestCount == encounterStart + 1, "encounter count " + (_controller.EncounterRequestCount - encounterStart));
                 Check(_controller.LastEncounterReason == "aggro:Trujący Pająk", "reason " + _controller.LastEncounterReason);
                 Check(_controller.IsToastVisible && _controller.LastToastMessage == "Zostałeś zaatakowany", "toast " + _controller.LastToastMessage);
+                Check(!_mob.AggroGate.IsArmed, "aggro gate still armed after attack");
 
+                // Staying inside (more frames and more fixes) must not attack again (hysteresis).
                 yield return Frames(60);
+                for (int i = 0; i < 5; i++)
+                {
+                    mock.MoveMeters(0.0, 0.0);
+                    yield return Frames(3);
+                }
+
                 Check(_controller.AttackedCount == attackStart + 1, "attack repeated over frames: " + (_controller.AttackedCount - attackStart));
                 Check(_controller.EncounterRequestCount == encounterStart + 1, "encounter repeated over frames: " + (_controller.EncounterRequestCount - encounterStart));
+                mock.HorizontalAccuracyMeters = previousAccuracy;
+                yield return Frames(2);
                 Debug.Log("[SmokeTest] F outside=" + outside + " inside=" + inside);
             }
 
