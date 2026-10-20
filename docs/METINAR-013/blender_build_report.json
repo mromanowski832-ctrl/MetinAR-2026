@@ -1,0 +1,91 @@
+{
+  "triangles": {
+    "SK_Mob_VenomousSpider_LOD0": 5182,
+    "SK_Mob_VenomousSpider_LOD1": 2590,
+    "SK_Mob_VenomousSpider_LOD2": 1292
+  },
+  "vertices": {
+    "SK_Mob_VenomousSpider_LOD0": 2685,
+    "SK_Mob_VenomousSpider_LOD1": 1389,
+    "SK_Mob_VenomousSpider_LOD2": 740
+  },
+  "deform_bones": 30,
+  "bone_names": [
+    "B_Root",
+    "B_Body",
+    "B_Abdomen",
+    "B_Head",
+    "B_Fang_L",
+    "B_Fang_R",
+    "B_LegL_01_Coxa",
+    "B_LegL_01_Upper",
+    "B_LegL_01_Lower",
+    "B_LegR_01_Coxa",
+    "B_LegR_01_Upper",
+    "B_LegR_01_Lower",
+    "B_LegL_02_Coxa",
+    "B_LegL_02_Upper",
+    "B_LegL_02_Lower",
+    "B_LegR_02_Coxa",
+    "B_LegR_02_Upper",
+    "B_LegR_02_Lower",
+    "B_LegL_03_Coxa",
+    "B_LegL_03_Upper",
+    "B_LegL_03_Lower",
+    "B_LegR_03_Coxa",
+    "B_LegR_03_Upper",
+    "B_LegR_03_Lower",
+    "B_LegL_04_Coxa",
+    "B_LegL_04_Upper",
+    "B_LegL_04_Lower",
+    "B_LegR_04_Coxa",
+    "B_LegR_04_Upper",
+    "B_LegR_04_Lower"
+  ],
+  "materials": 1,
+  "texture_size": 1024,
+  "clips": {
+    "A_VenomousSpider_Idle": {
+      "frames": 73,
+      "seconds": 2.4,
+      "loop": true,
+      "min_deformed_z_m": -0.0001
+    },
+    "A_VenomousSpider_Walk": {
+      "frames": 31,
+      "seconds": 1.0,
+      "loop": true,
+      "min_deformed_z_m": -0.0004
+    },
+    "A_VenomousSpider_Attack": {
+      "frames": 37,
+      "seconds": 1.2,
+      "loop": false,
+      "min_deformed_z_m": -0.0029
+    },
+    "A_VenomousSpider_Hit": {
+      "frames": 13,
+      "seconds": 0.4,
+      "loop": false,
+      "min_deformed_z_m": -0.0002
+    },
+    "A_VenomousSpider_Death": {
+      "frames": 61,
+      "seconds": 2.0,
+      "loop": false,
+      "min_deformed_z_m": -0.0002
+    }
+  },
+  "lod_ratios": {
+    "SK_Mob_VenomousSpider_LOD0": 1.0,
+    "SK_Mob_VenomousSpider_LOD1": 0.5,
+    "SK_Mob_VenomousSpider_LOD2": 0.249
+  },
+  "rest_bounds_m": {
+    "span_x": 1.298,
+    "length_y": 1.249,
+    "top_z": 0.634,
+    "min_z": 0.0
+  },
+  "attack_hit_frame": 18
+}

@@ -49,6 +49,7 @@ namespace MetinAR.Editor.Characters
             try
             {
                 Build();
+                Debug.Log("[METINAR-013] Built " + PrefabPath);
                 code = 0;
             }
             catch (System.Exception e)
@@ -64,11 +65,32 @@ namespace MetinAR.Editor.Characters
             Directory.CreateDirectory(Folder + "/Materials");
             Directory.CreateDirectory(Folder + "/Prefabs");
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+            EnsureRigImportSettings();
 
             Material material = BuildMaterial();
             AnimatorController controller = BuildController();
             BuildPrefab(material, controller);
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// The model FBX has several root nodes (Armature + 3 LOD meshes) but each clip FBX has only the Armature.
+        /// Without Preserve Hierarchy Unity collapses the clip file's single root node, so the clip's curve paths
+        /// would not match the model (B_Root/... vs Armature/B_Root/...) and the root curves would move the whole
+        /// model. The METINAR-009 postprocessor sets this on first import; this re-applies it to files that were
+        /// imported before that rule existed.
+        /// </summary>
+        public static void EnsureRigImportSettings()
+        {
+            foreach (string path in new[] { ModelPath }.Concat(States.Select(ClipPath)))
+            {
+                if (AssetImporter.GetAtPath(path) is ModelImporter mi && !mi.preserveHierarchy)
+                {
+                    mi.preserveHierarchy = true;
+                    mi.SaveAndReimport();
+                    Debug.Log("[METINAR-013] Preserve Hierarchy enabled on " + path);
+                }
+            }
         }
 
         public static AnimationClip LoadClip(string state)

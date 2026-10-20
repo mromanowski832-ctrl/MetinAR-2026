@@ -113,6 +113,9 @@ namespace MetinAR.Editor.Characters
             foreach (string state in VenomousSpiderAssetBuilder.States)
             {
                 AnimationClip clip = VenomousSpiderAssetBuilder.LoadClip(state);
+                EditorCurveBinding[] binds = AnimationUtility.GetCurveBindings(clip);
+                int bound = binds.Count(bd => modelT.Find(bd.path) != null || bd.path.Length == 0);
+                Info("clip " + state + ": " + binds.Length + " curves, " + bound + " bind to the model, root curves=" + binds.Count(bd => bd.path.Length == 0) + ", e.g. " + string.Join(" | ", binds.Select(bd => bd.path).Distinct().Take(3)));
                 float maxMove = 0f, minY = float.MaxValue;
                 for (int i = 0; i <= 10; i++)
                 {

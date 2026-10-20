@@ -67,6 +67,10 @@ namespace MetinAR.Editor.AssetPipeline
             {
                 bool humanoid = category == AssetCategory.Npc || category == AssetCategory.SharedAnimation;
                 importer.animationType = humanoid ? ModelImporterAnimationType.Human : ModelImporterAnimationType.Generic;
+
+                // Keep the FBX root node: clip files (armature only) must produce the same curve paths
+                // (Armature/B_Root/...) as the mesh file (armature + meshes), otherwise clips don't bind.
+                importer.preserveHierarchy = true;
             }
             else
             {

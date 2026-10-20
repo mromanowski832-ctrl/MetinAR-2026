@@ -107,7 +107,7 @@ def rest_pose(rig):
 
 FBX_COMMON = dict(
     use_selection=True, use_armature_deform_only=True, add_leaf_bones=False,
-    axis_forward="-Z", axis_up="Y", apply_unit_scale=True, apply_scale_options="FBX_SCALE_ALL",
+    axis_forward="Z", axis_up="Y", apply_unit_scale=True, apply_scale_options="FBX_SCALE_ALL",
     use_space_transform=True, primary_bone_axis="Y", secondary_bone_axis="X",
     path_mode="STRIP", embed_textures=False, use_custom_props=False,
 )
