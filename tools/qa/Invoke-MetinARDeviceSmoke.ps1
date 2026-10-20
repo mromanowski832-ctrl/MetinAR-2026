@@ -13,6 +13,7 @@
     Background     HOME -> process kept / not resumed -> location requests while backgrounded -> resume same pid
     Crash          crash / ANR / FATAL markers for the app in logcat
     Memory         dumpsys meminfo TOTAL PSS vs. prototype budget
+    Cpu            app CPU % from dumpsys cpuinfo (informational; GPU utilisation needs vendor tools)
     Frames         SurfaceFlinger present-time FPS (display side, approximate) + gfxinfo summary
     PerfBudget     [MetinARPerf] samples (development builds) vs. tools/qa/perf-budgets.json
     Thermal        thermal status + battery temperature
@@ -182,6 +183,7 @@ $gfxJank = ($gfx | Where-Object { $_ -match 'Janky frames' } | Select-Object -Fi
 $layer = (Adb shell dumpsys SurfaceFlinger '--list') | Where-Object { $_ -match [regex]::Escape($Package) -and $_ -match 'SurfaceView' -and $_ -notmatch 'Background' } | Select-Object -First 1
 $sf = $null
 if ($layer) { $sf = ConvertFrom-MetinARSurfaceFlingerLatency -Lines (Adb shell dumpsys SurfaceFlinger '--latency' ("'" + $layer.Trim() + "'")) }
+$cpu = ConvertFrom-MetinARCpuInfo -Lines (Adb shell dumpsys cpuinfo) -Package $Package
 $thermal = ConvertFrom-MetinARThermal -ThermalLines (Adb shell dumpsys thermalservice) -BatteryLines (Adb shell dumpsys battery)
 
 # --- Background / resume -------------------------------------------------------------------
@@ -232,6 +234,8 @@ Add-Result (New-MetinARGateResult -Name 'Memory' -Status $st -Detail ("TOTAL PSS
 
 $frameDetail = if ($sf -and $sf.Frames -gt 0) { "SurfaceFlinger: {0} frames, avg {1} fps, avg {2} ms, max {3} ms, janks(>2 vsync)={4}, refresh {5} ms" -f $sf.Frames, $sf.FpsAvg, $sf.FrameAvgMs, $sf.FrameMaxMs, $sf.Janks, $sf.RefreshMs } else { 'SurfaceFlinger latency unavailable for the Unity layer' }
 if ($gfxTotal) { $frameDetail += "; gfxinfo: $($gfxTotal.Trim()) $(if ($gfxJank) { $gfxJank.Trim() })" }
+$cpuDetail = if ($null -ne $cpu.CpuPercent) { "CPU {0}% (user {1}% + kernel {2}%, dumpsys cpuinfo recent window, 100% = one core)" -f $cpu.CpuPercent, $cpu.UserPercent, $cpu.KernelPercent } else { 'app not listed in dumpsys cpuinfo' }
+Add-Result (New-MetinARGateResult -Name 'Cpu' -Status $(if ($null -ne $cpu.CpuPercent) { 'PASS' } else { 'UNVERIFIED' }) -Detail ($cpuDetail + '; GPU utilisation is not exposed without root/vendor tools (UNVERIFIED)'))
 Add-Result (New-MetinARGateResult -Name 'Frames' -Status $(if ($sf -and $sf.Frames -gt 0) { 'PASS' } else { 'UNVERIFIED' }) -Detail ($frameDetail + ' (informational; budgets use [MetinARPerf])'))
 
 $budgetResults = @()

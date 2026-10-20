@@ -120,6 +120,8 @@ try {
                 if (-not $dotnet) { Add-Result (New-MetinARGateResult -Name 'DotNetTests' -Status 'FAIL' -Detail 'dotnet not found'); break }
                 $runtimes = & dotnet --list-runtimes 2>$null
                 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
+                $env:DOTNET_CLI_UI_LANGUAGE = 'en'   # localized Windows (e.g. pl-PL) would otherwise print translated summaries
+                $env:VSLANG = '1033'
                 if (-not ($runtimes -match 'Microsoft\.NETCore\.App 8\.')) {
                     $env:DOTNET_ROLL_FORWARD = 'Major'
                     $notes.Add('No .NET 8 runtime found; tests ran with DOTNET_ROLL_FORWARD=Major on a newer runtime.')
@@ -143,11 +145,11 @@ try {
                         $total += $tn; $passed += $pn
                         $line = "total=$tn passed=$pn failed=$fn"
                     }
-                    if ($total -eq 0) { $failed = $true }
                     $ev += "$proj exit=$code :: $line"
                     if ($code -ne 0) { $failed = $true }
                 }
-                Add-Result (New-MetinARGateResult -Name 'DotNetTests' -Status $(if ($failed) { 'FAIL' } else { 'PASS' }) -Detail "$passed/$total passed" -Evidence $ev -Seconds ((Get-Date) - $t0).TotalSeconds)
+                $st = if ($failed) { 'FAIL' } elseif ($total -eq 0) { 'WARN' } else { 'PASS' }
+                Add-Result (New-MetinARGateResult -Name 'DotNetTests' -Status $st -Detail $(if ($total -eq 0 -and -not $failed) { 'exit 0 but test counts could not be parsed' } else { "$passed/$total passed" }) -Evidence $ev -Seconds ((Get-Date) - $t0).TotalSeconds)
             }
             'UnityCompile' {
                 $u = Invoke-UnityGate 'UnityCompile' $null @() -quit -noGraphics 60

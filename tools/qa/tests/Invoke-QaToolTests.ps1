@@ -32,7 +32,7 @@ $p3 = Test-MetinARPermissionPolicy -Permissions (@($b.Permissions) + 'android.pe
 Assert 'perm.unexpected-warns' ($p3.Status -eq 'WARN' -and @($p3.Unexpected) -contains 'android.permission.BLUETOOTH_CONNECT')
 
 # --- Unity log summary
-$u = Get-MetinARUnityLogSummary -Lines (Lines 'unity-compile.log')
+$u = Get-MetinARUnityLogSummary -Lines (Lines 'unity-compile.log.txt')
 Assert 'unity.errors' ($u.CompilerErrors -eq 1)
 Assert 'unity.warnings-deduped' ($u.CompilerWarnings -eq 1)
 Assert 'unity.exceptions' ($u.Exceptions -eq 1)
@@ -92,6 +92,9 @@ Assert 'sf.frames' ($sf.Frames -eq 3 -and $sf.Janks -eq 1 -and $sf.RefreshMs -eq
 Assert 'sf.fps' ([math]::Abs($sf.FpsAvg - 36) -lt 0.5) "fps=$($sf.FpsAvg)"
 $gp = ConvertFrom-MetinARGrantedPermissions -Lines (Lines 'dumpsys-package.txt')
 Assert 'perm.runtime-state' ($gp.'android.permission.ACCESS_FINE_LOCATION' -eq $true -and $gp.'android.permission.CAMERA' -eq $false)
+$cpu = ConvertFrom-MetinARCpuInfo -Package 'com.metinar.game' -Lines @('Load: 7.1 / 6.9 / 6.5', '  112% 4242/com.metinar.game: 98% user + 14% kernel / faults: 10 minor', '  3.1% 1500/system_server: 2% user + 1.1% kernel')
+Assert 'cpu.parse' ($cpu.CpuPercent -eq 112 -and $cpu.UserPercent -eq 98 -and $cpu.KernelPercent -eq 14)
+Assert 'cpu.absent' ($null -eq (ConvertFrom-MetinARCpuInfo -Package 'x.y' -Lines @('  1% 1/init: 1% user')).CpuPercent)
 $th = ConvertFrom-MetinARThermal -ThermalLines @('IsStatusOverride: false', 'Thermal Status: 2') -BatteryLines @('  level: 81', '  temperature: 345')
 Assert 'thermal.parse' ($th.ThermalStatus -eq 2 -and $th.BatteryLevel -eq 81 -and $th.BatteryTempC -eq 34.5)
 

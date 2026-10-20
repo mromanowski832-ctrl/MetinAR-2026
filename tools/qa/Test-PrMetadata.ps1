@@ -23,7 +23,7 @@ if ($HeadRef -eq 'main') { $fail += 'head branch is main (work must happen on an
 if ($BaseRef -and $BaseRef -ne 'main') { $warn += "base branch is $BaseRef (expected main)" }
 if (-not $Body -or -not $Body.Trim()) { $fail += 'PR body is empty (use .github/pull_request_template.md)' } else {
     if ($Body -notmatch '#\d+') { $warn += 'no linked issue (#<n>) in the PR body' }
-    if ($Body -notmatch '(?i)verification') { $warn += 'no Verification section' }
+    if ($Body -notmatch '(?i)(merge gate|verification)') { $warn += 'no Merge gate / Verification section' }
     if ($Body -notmatch '(?i)known limitations') { $warn += 'no Known limitations section' }
     if ($Body -notmatch '(?i)(UNVERIFIED|VERIFIED|NOT REQUIRED)') { $warn += 'no explicit physical-device status (VERIFIED / UNVERIFIED / NOT REQUIRED)' }
     if ($Body -match '(?i)ACCESS_BACKGROUND_LOCATION\s*[:=]?\s*PRESENT') { $fail += 'PR body reports ACCESS_BACKGROUND_LOCATION PRESENT' }

@@ -153,7 +153,7 @@ function Invoke-MetinARUnityBatch {
     $null = $proc.Handle # Windows PowerShell 5.1: cache the handle so ExitCode is available later
     $finished = $proc.WaitForExit($TimeoutMinutes * 60 * 1000)
     if (-not $finished) {
-        try { $proc.Kill() } catch { }
+        try { $proc.Kill() } catch { Write-Verbose "Unity kill after timeout failed: $_" }
         return [pscustomobject]@{ ExitCode = -1; TimedOut = $true; Seconds = ($TimeoutMinutes * 60) }
     }
     $proc.WaitForExit()
@@ -525,6 +525,21 @@ function ConvertFrom-MetinARGrantedPermissions {
         }
     }
     return [pscustomobject]$map
+}
+
+function ConvertFrom-MetinARCpuInfo {
+    <# Parses the app's line from `dumpsys cpuinfo` (recent-window CPU %, may exceed 100 on multi-core). #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines, [Parameter(Mandatory = $true)][string]$Package)
+    foreach ($l in $Lines) {
+        if ($l -match ('^\s*([\d.]+)%\s+\d+/' + [regex]::Escape($Package) + ':\s*(.*)$')) {
+            $total = [double]::Parse($Matches[1], [System.Globalization.CultureInfo]::InvariantCulture)
+            $rest = $Matches[2]
+            $user = if ($rest -match '([\d.]+)% user') { [double]::Parse($Matches[1], [System.Globalization.CultureInfo]::InvariantCulture) } else { $null }
+            $kernel = if ($rest -match '([\d.]+)% kernel') { [double]::Parse($Matches[1], [System.Globalization.CultureInfo]::InvariantCulture) } else { $null }
+            return [pscustomobject]@{ CpuPercent = $total; UserPercent = $user; KernelPercent = $kernel }
+        }
+    }
+    return [pscustomobject]@{ CpuPercent = $null; UserPercent = $null; KernelPercent = $null }
 }
 
 function ConvertFrom-MetinARThermal {
