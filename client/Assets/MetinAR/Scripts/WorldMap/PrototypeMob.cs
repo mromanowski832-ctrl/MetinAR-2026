@@ -131,7 +131,7 @@ namespace MetinAR.WorldMap
             }
 
             _controller?.NotifyAttacked(_mobName);
-            _controller?.RequestArEncounter("aggro:" + _mobName, false);
+            _controller?.RequestArEncounter("aggro:" + _mobName, false, this);
         }
 
         /// <summary>

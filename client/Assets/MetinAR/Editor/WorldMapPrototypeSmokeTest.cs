@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using MetinAR.ArEncounter;
 using MetinAR.Location;
 using MetinAR.UI;
 using MetinAR.WorldMap;
@@ -107,6 +108,7 @@ namespace MetinAR.Editor
             private WorldMapEntity _mobEntity;
             private Camera _camera;
             private HudButtonBar _bar;
+            private ArEncounterLauncher _launcher;
 
             private void Check(bool condition, string message)
             {
@@ -236,6 +238,15 @@ namespace MetinAR.Editor
                 Check(_controller != null, "controller missing");
                 Check(_bar != null, "HudButtonBar missing");
                 Check(_camera != null, "main camera missing");
+
+                // METINAR-006: encounter requests open the AR scene; keep this runner on the world map
+                // (the AR transition itself is covered by ArEncounterSmokeTest).
+                _launcher = FindFirstObjectByType<ArEncounterLauncher>();
+                Check(_launcher != null, "ArEncounterLauncher missing");
+                if (_launcher != null)
+                {
+                    _launcher.OpenSceneOnRequest = false;
+                }
 
                 int missing = 0;
                 foreach (GameObject go in FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None))
@@ -587,6 +598,11 @@ namespace MetinAR.Editor
                 Check(_controller.EncounterRequestCount == before + 1, "counter not incremented");
                 Check(reason == "panel:Trujący Pająk", "reason " + reason);
                 Check(_controller.IsToastVisible && _controller.LastToastMessage == "AR ENCOUNTER REQUESTED", "toast " + _controller.LastToastMessage);
+                ArEncounterRequest handed = _launcher != null ? _launcher.LastSubmittedRequest : null;
+                Check(handed != null && handed.MobName == "Trujący Pająk" && handed.Level == 5 && handed.CurrentHp == 120 && handed.MaxHp == 120
+                      && handed.Reason == "panel:Trujący Pająk", "AR handoff request " + handed);
+                Check(ArEncounterHandoff.HasPending && ReferenceEquals(ArEncounterHandoff.Pending, handed), "AR handoff not pending");
+                Check(UnityEngine.SceneManagement.SceneManager.GetActiveScene().path == ScenePath, "scene changed although OpenSceneOnRequest=false");
 
                 _controller.MobInfoPanel.CloseButton.onClick.Invoke();
                 yield return Frames(2);
@@ -634,6 +650,8 @@ namespace MetinAR.Editor
                 Check(_controller.EncounterRequestCount == encounterStart + 1, "encounter count " + (_controller.EncounterRequestCount - encounterStart));
                 Check(_controller.LastEncounterReason == "aggro:Trujący Pająk", "reason " + _controller.LastEncounterReason);
                 Check(_controller.IsToastVisible && _controller.LastToastMessage == "Zostałeś zaatakowany", "toast " + _controller.LastToastMessage);
+                Check(_launcher != null && _launcher.LastSubmittedRequest != null && _launcher.LastSubmittedRequest.Reason == "aggro:Trujący Pająk"
+                      && _launcher.LastSubmittedRequest.Level == 5, "aggro AR handoff " + (_launcher != null ? _launcher.LastSubmittedRequest : null));
                 Check(!_mob.AggroGate.IsArmed, "aggro gate still armed after attack");
 
                 // Staying inside (more frames and more fixes) must not attack again (hysteresis).

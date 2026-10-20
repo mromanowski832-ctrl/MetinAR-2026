@@ -151,7 +151,7 @@ namespace MetinAR.UI
         private void OnEnterArClicked()
         {
             string reason = _mob != null ? "panel:" + _mob.MobName : "panel";
-            _controller?.RequestArEncounter(reason);
+            _controller?.RequestArEncounter(reason, true, _mob);
         }
     }
 }
