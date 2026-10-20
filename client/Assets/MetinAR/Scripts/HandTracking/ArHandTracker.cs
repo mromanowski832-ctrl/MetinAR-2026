@@ -257,7 +257,6 @@ namespace MetinAR.HandTracking
                     return;
                 }
 
-                _cameraFailureCount = 0;
             }
             catch (Exception ex)
             {
