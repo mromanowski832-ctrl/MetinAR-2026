@@ -190,7 +190,7 @@ def build_mesh(name="SK_Mob_VenomousSpider_LOD0"):
         z = l.z * (0.85 if l.z < 0 else 1.0) * taper + 0.10 * max(0.0, -l.y) * max(0.0, l.z)
         return Vector((l.x * taper, l.y * (1.0 + 0.06 * max(0.0, l.y)), z))
 
-    add_ellipsoid(bld, ABD_C, ABD_R, 28, 16, REG_ABDOMEN, abd_w, abd_shape)
+    add_ellipsoid(bld, ABD_C, ABD_R, 32, 18, REG_ABDOMEN, abd_w, abd_shape)
 
     # Dorsal spikes on the abdomen (threatening silhouette).
     for idx, (u, h) in enumerate(((-0.55, 0.06), (-0.25, 0.075), (0.05, 0.07), (0.35, 0.055))):
@@ -251,7 +251,7 @@ def build_mesh(name="SK_Mob_VenomousSpider_LOD0"):
 
             tip = foot + (foot - ankle).normalized() * 0.015
             tip.z = 0.0
-            add_tube(bld, pts, radii, 8, rings, REG_LEG, w_fn, a_fn, tip=tip)
+            add_tube(bld, pts, radii, 10, rings, REG_LEG, w_fn, a_fn, tip=tip)
             # one spike on the upper segment
             sp_base = coxa_end.lerp(knee, 0.55) + Vector((0, 0, 0.03))
             sp_tip = sp_base + Vector((0.02 * sx, 0.01, 0.07))
@@ -260,6 +260,8 @@ def build_mesh(name="SK_Mob_VenomousSpider_LOD0"):
 
     bm = bld.bm
     bm.verts.index_update()
+    # consistent outward winding for every part (ellipsoids are generated inside-out)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
     bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method="BEAUTY", ngon_method="BEAUTY")
     for f in bm.faces:
         f.smooth = True

@@ -234,7 +234,8 @@ namespace MetinAR.Editor.AssetPipeline
                 lodSubMeshes[lod] = s + mesh.subMeshCount;
                 if (lod == 0)
                 {
-                    Bounds b = r.bounds;
+                    // Renderer.bounds is not reliable on assets that are not in a scene; use the mesh bounds instead.
+                    Bounds b = TransformBounds(mesh.bounds, r.transform.localToWorldMatrix);
                     if (bounds.HasValue)
                     {
                         Bounds acc = bounds.Value;
@@ -385,6 +386,21 @@ namespace MetinAR.Editor.AssetPipeline
             }
 
             return null;
+        }
+
+        private static Bounds TransformBounds(Bounds local, Matrix4x4 m)
+        {
+            var result = new Bounds(m.MultiplyPoint3x4(local.center), Vector3.zero);
+            for (int i = 0; i < 8; i++)
+            {
+                var corner = new Vector3(
+                    (i & 1) == 0 ? local.min.x : local.max.x,
+                    (i & 2) == 0 ? local.min.y : local.max.y,
+                    (i & 4) == 0 ? local.min.z : local.max.z);
+                result.Encapsulate(m.MultiplyPoint3x4(corner));
+            }
+
+            return result;
         }
 
         private static int TriangleCount(Mesh mesh)
