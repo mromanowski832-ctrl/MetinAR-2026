@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuite name="ArEncounterSmokeTest" tests="3" failures="1">
+  <testcase name="T01_Ok" />
+  <testcase name="T02_Missing">
+    <failure message="2 missing scripts" />
+  </testcase>
+  <testcase name="T03_Ok" />
+</testsuite>

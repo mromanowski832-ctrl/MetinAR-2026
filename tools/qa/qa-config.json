@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "unityVersion": "6000.6.4f1",
+  "unityProject": "client",
+  "testProjects": [
+    "tests/GeoCore.Tests/GeoCore.Tests.csproj",
+    "tests/MetinAR.QA.Tests/MetinAR.QA.Tests.csproj"
+  ],
+  "expectedBuildScenes": [
+    "Assets/MetinAR/Scenes/WorldMapPrototype.unity",
+    "Assets/MetinAR/Scenes/ArEncounterPrototype.unity"
+  ],
+  "missingScriptPrefabRoots": [ "Assets/MetinAR" ],
+  "smokeTests": [
+    {
+      "name": "WorldMapSmoke",
+      "method": "MetinAR.Editor.WorldMapPrototypeSmokeTest.Run",
+      "results": "Builds/metinar-004a-smoke-results.xml",
+      "timeoutMinutes": 20
+    },
+    {
+      "name": "ArSmoke",
+      "method": "MetinAR.Editor.ArEncounterSmokeTest.Run",
+      "results": "Builds/metinar-006-ar-smoke-results.xml",
+      "timeoutMinutes": 25
+    }
+  ],
+  "androidBuild": {
+    "method": "MetinAR.Editor.MetinARAndroidDevBuild.BuildArEncounterDevelopmentApk",
+    "apk": "client/Builds/Android/MetinAR-ar-encounter-dev.apk",
+    "timeoutMinutes": 90,
+    "expectedPackage": "com.metinar.game",
+    "requiredAbi": "arm64-v8a",
+    "forbiddenAbis": [ "armeabi-v7a", "x86", "x86_64" ],
+    "requireDebuggable": true,
+    "minSdk": 31
+  },
+  "permissions": {
+    "forbidden": [
+      "android.permission.ACCESS_BACKGROUND_LOCATION",
+      "android.permission.READ_CONTACTS",
+      "android.permission.READ_SMS",
+      "android.permission.RECORD_AUDIO",
+      "android.permission.READ_PHONE_STATE",
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+      "android.permission.MANAGE_EXTERNAL_STORAGE",
+      "android.permission.SYSTEM_ALERT_WINDOW",
+      "android.permission.QUERY_ALL_PACKAGES"
+    ],
+    "allowed": [
+      "android.permission.INTERNET",
+      "android.permission.ACCESS_NETWORK_STATE",
+      "android.permission.ACCESS_FINE_LOCATION",
+      "android.permission.ACCESS_COARSE_LOCATION",
+      "android.permission.CAMERA",
+      "android.permission.VIBRATE",
+      "com.metinar.game.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+    ]
+  },
+  "budgetsFile": "tools/qa/perf-budgets.json"
+}

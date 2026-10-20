@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "label": "PROTOTYPE GATE - technical regression gates for development builds, not final product targets",
+  "baselineDevice": "Android API 31 baseline phone used for METINAR-003..006 (model recorded per report)",
+  "apk": {
+    "maxDevApkMB": 150,
+    "warnDevApkMB": 110
+  },
+  "scenes": {
+    "WorldMapPrototype": {
+      "description": "World map (no camera/AR)",
+      "minFpsAvg": 28,
+      "maxFrameP95Ms": 45,
+      "maxFrameSpikesPerWindow": 3,
+      "maxMainP95Ms": 33,
+      "maxTotalUsedMB": 450,
+      "maxPssMB": 600
+    },
+    "ArEncounterPrototype": {
+      "description": "AR encounter (camera + ARCore + one mob)",
+      "minFpsAvg": 24,
+      "maxFrameP95Ms": 55,
+      "maxFrameSpikesPerWindow": 4,
+      "maxMainP95Ms": 40,
+      "maxTotalUsedMB": 650,
+      "maxPssMB": 850
+    },
+    "HandTracking": {
+      "description": "Hand-tracking inference (METINAR-007); reported via MetinARPerfProbe.RecordLatency(\"hand.inference\", ms)",
+      "latencyMetric": "lat.hand.inference",
+      "maxLatencyAvgMs": 45,
+      "maxLatencyP95Ms": 70
+    },
+    "CombinedArHandSword": {
+      "description": "AR + hand tracking + sword (METINAR-007 combined scene; scene name to be confirmed when it lands)",
+      "sceneNames": [ "ArHandSwordPrototype" ],
+      "minFpsAvg": 20,
+      "maxFrameP95Ms": 66,
+      "maxFrameSpikesPerWindow": 6,
+      "maxMainP95Ms": 50,
+      "maxTotalUsedMB": 800,
+      "maxPssMB": 1000,
+      "latencyMetric": "lat.hand.inference",
+      "maxLatencyAvgMs": 50,
+      "maxLatencyP95Ms": 80
+    }
+  },
+  "device": {
+    "maxColdLaunchMs": 15000,
+    "warnThermalStatus": 2,
+    "failThermalStatus": 4,
+    "warnBatteryTempC": 40,
+    "failBatteryTempC": 45
+  }
+}

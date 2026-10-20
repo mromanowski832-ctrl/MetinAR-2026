@@ -1,0 +1,10 @@
+10-20 04:30:18.123  4242  4242 I Unity   : [MetinARPerf] v=1 event=start mainThreadRecorder=1 targetFps=-1 device=Pixel_6 gpu=Mali-G78
+10-20 04:30:23.200  4242  4260 I Unity   : [MetinARPerf] v=1 scene=WorldMapPrototype windowS=5 frames=150 fpsAvg=30 frameAvgMs=33.33 frameP50Ms=33 frameP95Ms=40 frameMaxMs=70 frameSpikes=1 mainAvgMs=12 mainP95Ms=20 mainMaxMs=60 mainSpikes=1 totalUsedMB=300.5 gcReservedMB=40 systemUsedMB=500
+10-20 04:30:28.200  4242  4260 I Unity   : [MetinARPerf] v=1 scene=WorldMapPrototype windowS=5 frames=120 fpsAvg=24 frameAvgMs=41.6 frameP50Ms=40 frameP95Ms=50 frameMaxMs=90 frameSpikes=2 mainAvgMs=15 mainP95Ms=25 mainMaxMs=80 mainSpikes=2 totalUsedMB=310 gcReservedMB=40 systemUsedMB=510
+10-20 04:30:29.000  4242  4242 I Unity   : GPS fix lat=52.229770 lon=21.011780 acc=5 from 192.168.1.23 device serial=R5CT12345AB
+10-20 04:30:29.100  4242  4242 E Unity   : NullReferenceException: Object reference not set to an instance of an object
+10-20 04:30:30.000  4242  4242 E AndroidRuntime: FATAL EXCEPTION: main
+10-20 04:30:30.001  4242  4242 E AndroidRuntime: Process: com.metinar.game, PID: 4242
+10-20 04:30:30.500  1500  1600 I ActivityManager: Process com.other.app (pid 999) has died
+10-20 04:30:31.000  999   999 F libc    : Fatal signal 11 (SIGSEGV) in other process
+10-20 04:30:32.000  1500  1610 E ActivityManager: ANR in com.metinar.game (com.metinar.game/com.unity3d.player.UnityPlayerGameActivity)
