@@ -25,5 +25,6 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/Location/ISuspendableLocationProvider.cs" Link="Production/ISuspendableLocationProvider.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Location/DeviceLocationProviderCore.cs" Link="Production/DeviceLocationProviderCore.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Location/ForegroundLocationLifecycle.cs" Link="Production/ForegroundLocationLifecycle.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/WorldMap/AggroConfidenceGate.cs" Link="Production/AggroConfidenceGate.cs" />
   </ItemGroup>
 </Project>
