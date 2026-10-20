@@ -115,6 +115,61 @@ Assert 'overall.unverified-only' ((Get-MetinAROverallStatus -Results @((New-Meti
 $md = ConvertTo-MetinARMarkdownReport -Title 'T' -Results $res -Header @{ Head = 'abc' }
 Assert 'report.table' ($md -match '\| B \| \*\*UNVERIFIED\*\* \|' -and $md -match 'no / device' -and $md -match '### B')
 
+# --- METINAR-014: branch-aware test discovery
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ("metinar-qa-disc-" + [guid]::NewGuid().ToString('N'))
+try {
+    foreach ($d in @('tests/GeoCore.Tests', 'tests/MapCore.Tests', 'tests/Helpers', 'server/tests/MetinAR.Server.Tests', 'client/Tests/HandTracking.Tests')) { New-Item -ItemType Directory -Force -Path (Join-Path $tmp $d) | Out-Null }
+    foreach ($f in @('tests/GeoCore.Tests/GeoCore.Tests.csproj', 'tests/MapCore.Tests/MapCore.Tests.csproj', 'tests/Helpers/Helpers.csproj', 'server/tests/MetinAR.Server.Tests/MetinAR.Server.Tests.csproj', 'client/Tests/HandTracking.Tests/HandTracking.Tests.csproj')) { Set-Content -Path (Join-Path $tmp $f) -Value '<Project />' }
+    $cfgD = [pscustomobject]@{ testProjects = @('tests/GeoCore.Tests/GeoCore.Tests.csproj', 'tests/Gone.Tests/Gone.Tests.csproj'); optionalTestProjectGlobs = @('tests/*/*.Tests.csproj', 'server/tests/*/*.Tests.csproj', 'client/Tests/*/*.Tests.csproj', 'nothere/*/*.Tests.csproj') }
+    $disc = @(Get-MetinARTestProjects -RepoRoot $tmp -Config $cfgD)
+    $paths = @($disc | ForEach-Object { $_.Path })
+    Assert 'discover.required-first' ($disc[0].Path -eq 'tests/GeoCore.Tests/GeoCore.Tests.csproj' -and $disc[0].Required -and $disc[0].Exists) ($paths -join ',')
+    Assert 'discover.required-missing-kept' (@($disc | Where-Object { $_.Path -eq 'tests/Gone.Tests/Gone.Tests.csproj' -and $_.Required -and -not $_.Exists }).Count -eq 1)
+    Assert 'discover.optional-found' (($paths -contains 'tests/MapCore.Tests/MapCore.Tests.csproj') -and ($paths -contains 'server/tests/MetinAR.Server.Tests/MetinAR.Server.Tests.csproj') -and ($paths -contains 'client/Tests/HandTracking.Tests/HandTracking.Tests.csproj')) ($paths -join ',')
+    Assert 'discover.no-duplicates' (@($paths | Where-Object { $_ -eq 'tests/GeoCore.Tests/GeoCore.Tests.csproj' }).Count -eq 1)
+    Assert 'discover.pattern-only' (-not ($paths -contains 'tests/Helpers/Helpers.csproj'))
+    Assert 'discover.count' ($disc.Count -eq 5) ($paths -join ',')
+    $none = @(Get-MetinARTestProjects -RepoRoot $tmp -Config ([pscustomobject]@{ testProjects = @('tests/GeoCore.Tests/GeoCore.Tests.csproj') }))
+    Assert 'discover.no-globs' ($none.Count -eq 1)
+} finally { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
+$repoCfg = Read-MetinARJson -Path (Join-Path $PSScriptRoot '../qa-config.json')
+$repoDisc = @(Get-MetinARTestProjects -RepoRoot (Join-Path $PSScriptRoot '../../..') -Config $repoCfg)
+Assert 'discover.repo-required-exist' (@($repoDisc | Where-Object { $_.Required -and -not $_.Exists }).Count -eq 0) (($repoDisc | ForEach-Object { "$($_.Path)=$($_.Exists)" }) -join ',')
+
+# --- METINAR-014: multiple latency metrics
+$latSamples = @(
+    [pscustomobject]@{ scene = 'WorldMapPrototype'; fpsAvg = 60.0 },
+    [pscustomobject]@{ scene = 'WorldMapPrototype'; fpsAvg = 59.0; 'lat.map.tile.decode.avgMs' = 12.0; 'lat.map.tile.decode.p95Ms' = 95.0 },
+    [pscustomobject]@{ scene = 'WorldMapPrototype'; fpsAvg = 58.0; 'lat.map.tile.decode.avgMs' = 10.0; 'lat.map.tile.decode.p95Ms' = 40.0 }
+)
+$latBudget = [pscustomobject]@{ minFpsAvg = 28; latencyMetrics = @(
+    [pscustomobject]@{ metric = 'map.tile.decode'; maxAvgMs = 30; maxP95Ms = 80; required = $false },
+    [pscustomobject]@{ metric = 'map.tile.mesh'; maxAvgMs = 20; maxP95Ms = 50; required = $false }) }
+$lr = Test-MetinARPerfBudget -Samples $latSamples -Budget $latBudget -BudgetName 'WorldMapPrototype'
+Assert 'lat.multi.fail-on-p95' ($lr.Status -eq 'FAIL' -and @($lr.Checks | Where-Object { $_.Metric -like 'lat.map.tile.decode.p95Ms*' -and $_.Status -eq 'FAIL' -and $_.Observed -eq 95 }).Count -eq 1) "$($lr.Status)"
+Assert 'lat.optional-absent-skipped' (@($lr.Checks | Where-Object { $_.Metric -like 'lat.map.tile.mesh*' }).Count -eq 0)
+$latBudget.latencyMetrics[1].required = $true
+$lr2 = Test-MetinARPerfBudget -Samples $latSamples -Budget $latBudget -BudgetName 'WorldMapPrototype'
+Assert 'lat.required-absent-unverified' (@($lr2.Checks | Where-Object { $_.Metric -like 'lat.map.tile.mesh*' -and $_.Status -eq 'UNVERIFIED' }).Count -eq 2)
+$handBudget = [pscustomobject]@{ anyScene = $true; latencyMetrics = @([pscustomobject]@{ metric = 'lat.hand.inference'; maxAvgMs = 45; maxP95Ms = 70 }) }
+$hr = Test-MetinARPerfBudget -Samples @([pscustomobject]@{ scene = 'A' }, [pscustomobject]@{ scene = 'B'; 'lat.hand.inference.avgMs' = 30.0; 'lat.hand.inference.p95Ms' = 60.0 }) -Budget $handBudget -BudgetName 'HandTracking'
+Assert 'lat.hand-pass' ($hr.Status -eq 'PASS' -and @($hr.Checks).Count -eq 2) "$($hr.Status)"
+$legacy = Test-MetinARPerfBudget -Samples @([pscustomobject]@{ scene = 'X'; 'lat.hand.inference.avgMs' = 50.0; 'lat.hand.inference.p95Ms' = 60.0 }) -Budget ([pscustomobject]@{ latencyMetric = 'lat.hand.inference'; maxLatencyAvgMs = 45; maxLatencyP95Ms = 70 })
+Assert 'lat.legacy-schema' ($legacy.Status -eq 'FAIL')
+$budgetFile = Read-MetinARJson -Path (Join-Path $PSScriptRoot '../perf-budgets.json')
+Assert 'lat.budget-file-metrics' ((@($budgetFile.scenes.WorldMapPrototype.latencyMetrics | ForEach-Object { $_.metric }) -join ',') -eq 'map.tile.decode,map.tile.mesh' -and $budgetFile.scenes.HandTracking.latencyMetrics[0].metric -eq 'hand.inference')
+
+# --- METINAR-014: AR smoke exception injection verdicts
+$jOk = [pscustomobject]@{ Tests = 15; Failures = 0; Failed = @() }
+$jT15 = [pscustomobject]@{ Tests = 15; Failures = 1; Failed = @('T15_NoExceptionsLogged: exceptions: InvalidOperationException: Injected project-code smoke exception') }
+$jOther = [pscustomobject]@{ Tests = 15; Failures = 2; Failed = @('T03_Foo: x', 'T15_NoExceptionsLogged: exceptions: injected') }
+Assert 'inject.metinar-fail-ok' (Get-MetinARSmokeInjectionVerdict -Mode 'metinar' -JUnit $jT15).Ok
+Assert 'inject.metinar-pass-wrong' (-not (Get-MetinARSmokeInjectionVerdict -Mode 'metinar' -JUnit $jOk).Ok)
+Assert 'inject.unknown-other-fail-wrong' (-not (Get-MetinARSmokeInjectionVerdict -Mode 'unknown' -JUnit $jOther).Ok)
+Assert 'inject.searchdb-pass-ok' (Get-MetinARSmokeInjectionVerdict -Mode 'searchdb' -JUnit $jOk).Ok
+Assert 'inject.searchdb-fail-wrong' (-not (Get-MetinARSmokeInjectionVerdict -Mode 'searchdb' -JUnit $jT15).Ok)
+Assert 'inject.no-results' (-not (Get-MetinARSmokeInjectionVerdict -Mode 'unknown' -JUnit $null).Ok)
+
 Write-Host ''
 Write-Host "QA tool tests: $script:passed passed, $script:failed failed"
 if ($script:failed -gt 0) { exit 1 } else { exit 0 }

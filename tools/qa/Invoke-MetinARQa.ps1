@@ -10,6 +10,8 @@
     UnityQaChecks  missing-script scan (build scenes + prefabs) and expected build scenes / indices
     WorldMapSmoke  existing world-map Play Mode smoke (JUnit XML)
     ArSmoke        existing AR encounter Play Mode smoke (XR Simulation, JUnit XML)
+    ArSmokeInjection  (explicit only, not in All) runs the AR smoke three times with METINAR_SMOKE_INJECT=metinar|unknown|searchdb
+                   and passes only if the injected MetinAR and unknown exceptions FAIL T15 and the known Search signature does not
     AndroidBuild   Android ARM64 / IL2CPP development APK
     ApkAudit       APK size + SHA-256, ABI, IL2CPP, debuggable, minSdk, manifest permission audit
                    (FAIL if ACCESS_BACKGROUND_LOCATION or any other forbidden permission is declared)
@@ -27,7 +29,7 @@
 #>
 [CmdletBinding()]
 param(
-    # Comma-separated or array: All, Hygiene, DotNetTests, UnityCompile, UnityQaChecks, WorldMapSmoke, ArSmoke, AndroidBuild, ApkAudit
+    # Comma-separated or array: All, Hygiene, DotNetTests, UnityCompile, UnityQaChecks, WorldMapSmoke, ArSmoke, AndroidBuild, ApkAudit, ArSmokeInjection
     [string[]]$Gates = @('All'),
     [string]$UnityPath,
     [string]$OutputDir,
@@ -53,10 +55,12 @@ $project = Join-Path $repo $config.unityProject
 
 $all = @('Hygiene', 'DotNetTests', 'UnityCompile', 'UnityQaChecks', 'WorldMapSmoke', 'ArSmoke', 'AndroidBuild', 'ApkAudit')
 $Gates = @($Gates | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-$unknown = @($Gates | Where-Object { $_ -ne 'All' -and $all -notcontains $_ })
+$explicitOnly = @('ArSmokeInjection')
+$unknown = @($Gates | Where-Object { $_ -ne 'All' -and $all -notcontains $_ -and $explicitOnly -notcontains $_ })
 if ($unknown.Count) { Write-Host "Unknown gate(s): $($unknown -join ', '). Valid: All, $($all -join ', ')" -ForegroundColor Red; exit 2 }
 $selected = if ($Gates -contains 'All') { $all } else { @($all | Where-Object { $Gates -contains $_ }) }
-$unityGates = @('UnityCompile', 'UnityQaChecks', 'WorldMapSmoke', 'ArSmoke', 'AndroidBuild')
+$selected = @($selected) + @($explicitOnly | Where-Object { $Gates -contains $_ })
+$unityGates = @('UnityCompile', 'UnityQaChecks', 'WorldMapSmoke', 'ArSmoke', 'AndroidBuild', 'ArSmokeInjection')
 
 $results = New-Object System.Collections.Generic.List[object]
 $unityLogs = New-Object System.Collections.Generic.List[string]
@@ -129,7 +133,10 @@ try {
                     $notes.Add('No .NET 8 runtime found; tests ran with DOTNET_ROLL_FORWARD=Major on a newer runtime.')
                 }
                 $ev = @(); $failed = $false; $total = 0; $passed = 0
-                foreach ($proj in $config.testProjects) {
+                $discovered = Get-MetinARTestProjects -RepoRoot $repo -Config $config
+                foreach ($tp in @($discovered | Where-Object { -not $_.Exists })) { $ev += "$($tp.Path) MISSING (required in qa-config.json testProjects)"; $failed = $true }
+                $ev += "discovered: " + ((@($discovered | Where-Object { $_.Exists }) | ForEach-Object { "$($_.Path)$(if (-not $_.Required) { ' (optional)' })" }) -join ', ')
+                foreach ($proj in @($discovered | Where-Object { $_.Exists } | ForEach-Object { $_.Path })) {
                     $log = Join-Path $OutputDir ("logs/dotnet-" + [IO.Path]::GetFileNameWithoutExtension($proj) + ".log")
                     & dotnet test (Join-Path $repo $proj) --configuration Release --logger 'console;verbosity=normal' *> $log
                     $code = $LASTEXITCODE
@@ -194,6 +201,26 @@ try {
                 $ok = ($u.Run.ExitCode -eq 0 -and $j.Failures -eq 0 -and $j.Tests -gt 0)
                 Add-Result (New-MetinARGateResult -Name $gate -Status $(if ($ok) { 'PASS' } else { 'FAIL' }) -Detail ("{0} tests, {1} failures, exit={2}" -f $j.Tests, $j.Failures, $u.Run.ExitCode) `
                     -Evidence (@($j.Failed) + @("results: " + (Rel $xmlPath), "log: " + (Rel $u.Log))) -Seconds $u.Run.Seconds)
+            }
+            'ArSmokeInjection' {
+                $cfg = @($config.smokeTests | Where-Object { $_.name -eq 'ArSmoke' })[0]
+                $xmlPath = Join-Path $repo $cfg.results
+                $ev = @(); $allOk = $true; $secs = 0.0
+                foreach ($mode in @('metinar', 'unknown', 'searchdb')) {
+                    if (Test-Path $xmlPath) { Remove-Item $xmlPath -Force }
+                    $env:METINAR_SMOKE_INJECT = $mode
+                    try { $u = Invoke-UnityGate ("ArSmokeInjection-" + $mode) $cfg.method @() ([int]$cfg.timeoutMinutes) }
+                    finally { Remove-Item Env:\METINAR_SMOKE_INJECT -ErrorAction SilentlyContinue }
+                    if ($u -isnot [pscustomobject] -or -not $u.PSObject.Properties['Run']) { $ev += "$($mode): $($u.Status) $($u.Detail)"; $allOk = $false; continue }
+                    $secs += $u.Run.Seconds
+                    $j = Get-MetinARJUnitSummary -Path $xmlPath
+                    if ($j) { Copy-Item $xmlPath (Join-Path $OutputDir ("inject-" + $mode + "-" + (Split-Path $xmlPath -Leaf))) -Force }
+                    $v = Get-MetinARSmokeInjectionVerdict -Mode $mode -JUnit $j
+                    if (-not $v.Ok) { $allOk = $false }
+                    $ev += "$($mode): $(if ($v.Ok) { 'OK' } else { 'WRONG' }) - $($v.Detail) (exit=$($u.Run.ExitCode), log: $(Rel $u.Log))"
+                }
+                if (Test-Path $xmlPath) { Remove-Item $xmlPath -Force }   # never leave an injected result where ArSmoke looks
+                Add-Result (New-MetinARGateResult -Name 'ArSmokeInjection' -Status $(if ($allOk) { 'PASS' } else { 'FAIL' }) -Detail $(if ($allOk) { 'injected MetinAR + unknown exceptions fail T15; known Search signature does not' } else { 'exception gate did not behave as expected' }) -Evidence $ev -Seconds $secs)
             }
             'AndroidBuild' {
                 if ($SkipAndroid) { Add-Result (New-MetinARGateResult -Name 'AndroidBuild' -Status 'SKIP' -Detail 'skipped (-SkipAndroid)'); break }

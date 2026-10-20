@@ -385,6 +385,80 @@ function Find-MetinARLogcatProblems {
     }
 }
 
+function Get-MetinARTestProjects {
+    <#
+      METINAR-014 branch-aware test discovery. Returns one object per test project:
+        Path (repo-relative, forward slashes), Required (listed in testProjects), Exists.
+      Required projects are always returned (a missing one is a FAIL for the caller). Optional projects come from
+      optionalTestProjectGlobs ('dir/*/file' patterns, '*' matches one path segment) and only when they exist on the
+      current branch, so MapCore.Tests (008B), hand-tracking tests (007) or server tests are picked up when merged
+      without being required before then. Duplicates are removed; order: required first, then optional sorted.
+    #>
+    param([Parameter(Mandatory = $true)][string]$RepoRoot, [Parameter(Mandatory = $true)]$Config)
+    $out = New-Object System.Collections.Generic.List[object]
+    $seen = @{}
+    foreach ($p in @(Get-MetinARProp $Config 'testProjects')) {
+        if (-not $p) { continue }
+        $rel = ([string]$p).Replace('\', '/')
+        if ($seen.ContainsKey($rel.ToLowerInvariant())) { continue }
+        $seen[$rel.ToLowerInvariant()] = $true
+        $out.Add([pscustomobject]@{ Path = $rel; Required = $true; Exists = (Test-Path -LiteralPath (Join-Path $RepoRoot $rel)) })
+    }
+    $optional = New-Object System.Collections.Generic.List[string]
+    foreach ($g in @(Get-MetinARProp $Config 'optionalTestProjectGlobs')) {
+        if (-not $g) { continue }
+        $parts = ([string]$g).Replace('\', '/').Split('/')
+        $current = @($RepoRoot)
+        for ($i = 0; $i -lt $parts.Count; $i++) {
+            $last = ($i -eq $parts.Count - 1)
+            $next = @()
+            foreach ($dir in $current) {
+                if (-not (Test-Path -LiteralPath $dir -PathType Container)) { continue }
+                if ($parts[$i] -match '[\*\?]') {
+                    $items = if ($last) { @(Get-ChildItem -LiteralPath $dir -File -Filter $parts[$i] -ErrorAction SilentlyContinue) }
+                             else { @(Get-ChildItem -LiteralPath $dir -Directory -Filter $parts[$i] -ErrorAction SilentlyContinue) }
+                    $next += @($items | ForEach-Object { $_.FullName })
+                } else {
+                    $cand = Join-Path $dir $parts[$i]
+                    if (($last -and (Test-Path -LiteralPath $cand -PathType Leaf)) -or (-not $last -and (Test-Path -LiteralPath $cand -PathType Container))) { $next += $cand }
+                }
+            }
+            $current = $next
+        }
+        $rootFull = (Resolve-Path -LiteralPath $RepoRoot).Path.TrimEnd('\', '/')
+        foreach ($f in $current) {
+            $rel = $f.Substring($rootFull.Length).TrimStart('\', '/').Replace('\', '/')
+            if (-not $seen.ContainsKey($rel.ToLowerInvariant())) { $seen[$rel.ToLowerInvariant()] = $true; $optional.Add($rel) }
+        }
+    }
+    foreach ($rel in @($optional | Sort-Object)) { $out.Add([pscustomobject]@{ Path = $rel; Required = $false; Exists = $true }) }
+    return $out.ToArray()
+}
+
+function Get-MetinARSmokeInjectionVerdict {
+    <#
+      METINAR-014 negative gate check for the AR smoke: given the injection mode and the JUnit summary of that run,
+      decide whether the gate behaved correctly. metinar/unknown must make T15 fail (and nothing else may fail);
+      searchdb (the known Unity Search startup signature) must leave the whole smoke green.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Mode, $JUnit)
+    if ($null -eq $JUnit) { return [pscustomobject]@{ Mode = $Mode; Ok = $false; Detail = 'no JUnit results' } }
+    $failed = @($JUnit.Failed)
+    $t15 = @($failed | Where-Object { $_ -match '^T15_' })
+    $other = @($failed | Where-Object { $_ -notmatch '^T15_' })
+    switch ($Mode) {
+        { $_ -eq 'metinar' -or $_ -eq 'unknown' } {
+            $ok = ($t15.Count -eq 1 -and $other.Count -eq 0 -and $t15[0] -match 'injected')
+            return [pscustomobject]@{ Mode = $Mode; Ok = $ok; Detail = $(if ($ok) { 'T15 FAILED as expected' } else { "expected only T15 to fail on the injected exception; failed: $($failed -join ' | ')" }) }
+        }
+        'searchdb' {
+            $ok = ($failed.Count -eq 0 -and $JUnit.Tests -gt 0)
+            return [pscustomobject]@{ Mode = $Mode; Ok = $ok; Detail = $(if ($ok) { 'known signature classified as noise, smoke PASS' } else { "expected PASS; failed: $($failed -join ' | ')" }) }
+        }
+        default { return [pscustomobject]@{ Mode = $Mode; Ok = $false; Detail = "unknown injection mode '$Mode'" } }
+    }
+}
+
 function Get-MetinARPerfSamples {
     param([Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines)
     $samples = New-Object System.Collections.Generic.List[object]
@@ -459,9 +533,21 @@ function Test-MetinARPerfBudget {
         Add-Check "$lat.avgMs (worst window)" '<=' (Get-MetinARProp $Budget 'maxLatencyAvgMs') (Values "$lat.avgMs")
         Add-Check "$lat.p95Ms (worst window)" '<=' (Get-MetinARProp $Budget 'maxLatencyP95Ms') (Values "$lat.p95Ms")
     }
+    # METINAR-014: any number of latency metrics, e.g. lat.hand.inference, lat.map.tile.decode, lat.map.tile.mesh.
+    # Optional entries (required=false) are skipped when the build never reports them (feature not on this branch).
+    foreach ($m in @(Get-MetinARProp $Budget 'latencyMetrics')) {
+        if ($null -eq $m) { continue }
+        $name = [string](Get-MetinARProp $m 'metric')
+        if (-not $name) { continue }
+        $key = if ($name.StartsWith('lat.')) { $name } else { 'lat.' + $name }
+        $present = (@(Values "$key.avgMs").Count + @(Values "$key.p95Ms").Count) -gt 0
+        if (-not $present -and (Get-MetinARProp $m 'required') -eq $false) { continue }
+        Add-Check "$key.avgMs (worst window)" '<=' (Get-MetinARProp $m 'maxAvgMs') (Values "$key.avgMs")
+        Add-Check "$key.p95Ms (worst window)" '<=' (Get-MetinARProp $m 'maxP95Ms') (Values "$key.p95Ms")
+    }
     $st = @($checks | ForEach-Object { $_.Status })
     $status = 'PASS'
-    if ($st -contains 'UNVERIFIED') { $status = 'UNVERIFIED' }
+    if ($st.Count -eq 0 -or $st -contains 'UNVERIFIED') { $status = 'UNVERIFIED' }   # no measurable metric is never a PASS
     if ($st -contains 'FAIL') { $status = 'FAIL' }
     [pscustomobject]@{ Name = $BudgetName; Status = $status; Windows = $use.Count; Checks = $checks.ToArray(); Detail = '' }
 }

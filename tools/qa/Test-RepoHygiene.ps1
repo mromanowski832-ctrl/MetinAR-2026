@@ -138,7 +138,8 @@ if (-not $git) {
 
     # 9. test projects reference existing production source
     $badRefs = @()
-    foreach ($proj in @($config.testProjects)) {
+    $testProjects = @(Get-MetinARTestProjects -RepoRoot $RepoRoot -Config $config | ForEach-Object { $_.Path })
+    foreach ($proj in $testProjects) {
         $pp = Join-Path $RepoRoot $proj
         if (-not (Test-Path $pp)) { $badRefs += "missing project $proj"; continue }
         [xml]$x = Get-Content -Raw $pp
@@ -148,7 +149,7 @@ if (-not $git) {
             if (-not (Test-Path $abs)) { $badRefs += "$proj -> $inc" }
         }
     }
-    Add 'TestSourceLinks' $(if ($badRefs.Count) { 'FAIL' } else { 'PASS' }) $(if ($badRefs.Count) { $badRefs -join '; ' } else { "$(@($config.testProjects).Count) test projects, all Compile links resolve" })
+    Add 'TestSourceLinks' $(if ($badRefs.Count) { 'FAIL' } else { 'PASS' }) $(if ($badRefs.Count) { $badRefs -join '; ' } else { "$($testProjects.Count) test projects (required + discovered), all Compile links resolve" })
 
     # 10. guarded files vs base
     if ($BaseRef) {

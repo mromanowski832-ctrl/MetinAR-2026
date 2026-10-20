@@ -249,6 +249,14 @@ foreach ($sc in $scenes) {
     if ($null -eq $b) { $notes.Add("No perf budget defined for scene '$sc'."); continue }
     $budgetResults += Test-MetinARPerfBudget -Samples @($samples | Where-Object { $_.scene -eq $sc }) -Budget $b -BudgetName $sc
 }
+# METINAR-014: scene-independent budgets (e.g. hand.inference latency) run over all samples; optional metrics that the
+# build never reported produce no checks and are listed as a note instead of a fake PASS.
+foreach ($prop in $budgets.scenes.PSObject.Properties) {
+    if ((Get-MetinARProp $prop.Value 'anyScene') -ne $true -or @($samples).Count -eq 0) { continue }
+    $br = Test-MetinARPerfBudget -Samples @($samples) -Budget $prop.Value -BudgetName $prop.Name
+    if (@($br.Checks).Count -eq 0) { $notes.Add("Perf budget '$($prop.Name)': metric not reported by this build (feature not on this branch or not exercised)."); continue }
+    $budgetResults += $br
+}
 if ($budgetResults.Count -eq 0) {
     Add-Result (New-MetinARGateResult -Name 'PerfBudget' -Status 'UNVERIFIED' -Detail 'no [MetinARPerf] samples (release build, probe missing, or soak too short)')
 } else {
