@@ -23,6 +23,14 @@ namespace MetinAR.HandTracking
             AllowGpuOnOpenGles = allowGpuOnOpenGles;
         }
 
+        /// <summary>Recognises Galaxy A31 variants without any Unity dependency (testable on desktop).</summary>
+        public static bool IsGalaxyA31(string deviceModel)
+        {
+            return !string.IsNullOrWhiteSpace(deviceModel)
+                   && (deviceModel.IndexOf("SM-A315", StringComparison.OrdinalIgnoreCase) >= 0
+                       || deviceModel.IndexOf("Galaxy A31", StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
         public bool PreferGpu { get; }
 
         public bool AllowGpuOnOpenGles { get; }
