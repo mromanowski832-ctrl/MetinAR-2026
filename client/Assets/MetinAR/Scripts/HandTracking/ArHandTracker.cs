@@ -47,6 +47,10 @@ namespace MetinAR.HandTracking
         private int _maxImageDimension = 640;
 
         [SerializeField]
+        [Tooltip("Minimum seconds between hand inference attempts. Does not limit the AR camera frame rate.")]
+        private float _minInferenceIntervalSeconds;
+
+        [SerializeField]
         private bool _preferGpu = true;
 
         [SerializeField]
@@ -71,6 +75,8 @@ namespace MetinAR.HandTracking
         private bool _probeStarted;
         private HandInferenceBackendPolicy _backendPolicy;
         private int _failureCount;
+        private int _cameraFailureCount;
+        private float _nextInferenceAt;
 
         /// <summary>Raised on the main thread for every published observation (with or without a hand).</summary>
         public event Action<HandObservation> ObservationUpdated;
@@ -161,6 +167,16 @@ namespace MetinAR.HandTracking
 
         private void Start()
         {
+            if (HandInferenceBackendPolicy.IsGalaxyA31(SystemInfo.deviceModel))
+            {
+                // A31's Helio P65 / Mali-G52: keep AR rendering on GPU, run Sentis on CPU.
+                _preferGpu = false;
+                _maxImageDimension = Mathf.Clamp(_maxImageDimension, 64, 320);
+                _minInferenceIntervalSeconds = Mathf.Max(_minInferenceIntervalSeconds, 0.16f);
+                Debug.Log("[HandTracking] Galaxy A31 low-end profile: backend=CPU, maxImage="
+                          + _maxImageDimension + ", interval=" + _minInferenceIntervalSeconds.ToString("0.00") + "s");
+            }
+
             _backendPolicy = new HandInferenceBackendPolicy(_preferGpu, _allowGpuOnOpenGles);
             bool isGles = SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES3;
             HandInferenceBackend choice = _backendPolicy.Choose(SystemInfo.supportsComputeShaders, isGles);
@@ -226,8 +242,33 @@ namespace MetinAR.HandTracking
                 StartCoroutine(MappingProbe());
             }
 
-            if (!TryCopyLatestImage(out int width, out int height))
+            if (Time.unscaledTime < _nextInferenceAt)
             {
+                return;
+            }
+
+            _nextInferenceAt = Time.unscaledTime + Mathf.Max(0f, _minInferenceIntervalSeconds);
+            int width;
+            int height;
+            try
+            {
+                if (!TryCopyLatestImage(out width, out height))
+                {
+                    return;
+                }
+
+                _cameraFailureCount = 0;
+            }
+            catch (Exception ex)
+            {
+                // XRCpuImage conversion failures previously escaped Update and spammed each frame.
+                _cameraFailureCount++;
+                LastError = "camera image failed: " + HandInferenceBackendPolicy.DescribeChain(ex);
+                if (HandInferenceBackendPolicy.ShouldLogFailure(_cameraFailureCount))
+                {
+                    Debug.LogWarning("[HandTracking] " + LastError + " (failure #" + _cameraFailureCount + ")\n" + ex);
+                }
+
                 return;
             }
 
