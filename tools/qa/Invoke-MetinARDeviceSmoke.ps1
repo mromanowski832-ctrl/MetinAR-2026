@@ -44,6 +44,8 @@ param(
 )
 $ErrorActionPreference = 'Continue'
 Import-Module (Join-Path $PSScriptRoot 'MetinARQa.psm1') -Force -DisableNameChecking
+# Reports use '.' decimals regardless of the Windows locale (e.g. pl-PL).
+[System.Threading.Thread]::CurrentThread.CurrentCulture = [System.Globalization.CultureInfo]::InvariantCulture
 $repo = Get-MetinARRepoRoot -Start $PSScriptRoot
 $config = Read-MetinARJson -Path (Join-Path $repo 'tools/qa/qa-config.json')
 $budgets = Read-MetinARJson -Path (Join-Path $repo $config.budgetsFile)
