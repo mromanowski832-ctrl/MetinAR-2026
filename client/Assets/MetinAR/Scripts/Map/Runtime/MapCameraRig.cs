@@ -10,7 +10,7 @@ namespace MetinAR.Map.Runtime
     /// <summary>
     /// Angled Pokémon-GO style follow camera for the OSM POC (separate from the 004A
     /// <see cref="MapCameraFollow"/>, which stays untouched). Orbits the target: yaw by horizontal drag /
-    /// Q-E, pitch by two-finger vertical drag / R-F / right-mouse drag, distance by pinch / scroll.
+    /// J-L, pitch by two-finger vertical drag / I-K / right-mouse drag, distance by pinch / scroll.
     /// Optionally follows the avatar heading. Everything also reachable through the public API (tests).
     /// </summary>
     [DefaultExecutionOrder(100)]
@@ -99,10 +99,10 @@ namespace MetinAR.Map.Runtime
             Keyboard kb = Keyboard.current;
             if (kb != null)
             {
-                if (kb.qKey.isPressed) Rotate(-_keyDegreesPerSecond * dt);
-                if (kb.eKey.isPressed) Rotate(_keyDegreesPerSecond * dt);
-                if (kb.rKey.isPressed) Tilt(_keyDegreesPerSecond * 0.5f * dt);
-                if (kb.fKey.isPressed) Tilt(-_keyDegreesPerSecond * 0.5f * dt);
+                if (kb.jKey.isPressed) Rotate(-_keyDegreesPerSecond * dt);
+                if (kb.lKey.isPressed) Rotate(_keyDegreesPerSecond * dt);
+                if (kb.iKey.isPressed) Tilt(_keyDegreesPerSecond * 0.5f * dt);
+                if (kb.kKey.isPressed) Tilt(-_keyDegreesPerSecond * 0.5f * dt);
                 if (kb.zKey.isPressed) Zoom(1f - dt);
                 if (kb.xKey.isPressed) Zoom(1f + dt);
             }
