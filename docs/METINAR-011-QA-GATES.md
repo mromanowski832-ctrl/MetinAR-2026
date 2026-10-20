@@ -190,7 +190,19 @@ explicit UNVERIFIED with a reason:
 8. **Known limitations** listed honestly.
 9. **Recommendation** — MERGE / DO NOT MERGE with blocking items first.
 
-## 9. Known limitations of the QA layer
+## 9. Evidence from METINAR-011 (LuzMen, 2026-10-20)
+
+Full outputs: [docs/qa/METINAR-011-sample-qa-report.md](qa/METINAR-011-sample-qa-report.md).
+
+- Hygiene PASS; DotNetTests 143/143 (125 GeoCore + 18 QA); UnityCompile exit 0, 0 `error CS`; UnityQaChecks 0
+  missing scripts, index 0 WorldMap / 1 AR; WorldMapSmoke 15/15; AndroidBuild PASS; ApkAudit PASS (48.86 MB,
+  arm64-v8a IL2CPP, debuggable, 5 permissions, **no `ACCESS_BACKGROUND_LOCATION`**).
+- **ArSmoke 14/15 — FAIL on T15** (Editor-internal `UnityEditor.Search.SearchDatabase` exception on a fresh
+  `Library`). Reproduced on clean `main`, so it is pre-existing and not caused by this issue; left for an owner /
+  controller decision because the fix belongs in the AR smoke test.
+- Physical device: **UNVERIFIED** (no phone connected).
+
+## 10. Known limitations of the QA layer
 
 - Unity gates run only on Windows `LuzMen` (no licence-free cloud Unity). The runner needs the project closed in
   other Unity instances; agents working in parallel should use separate clones.

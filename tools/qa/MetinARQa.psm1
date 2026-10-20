@@ -28,6 +28,7 @@ function Get-MetinAROverallStatus {
     param([object[]]$Results)
     $statuses = @($Results | ForEach-Object { $_.Status })
     if ($statuses -contains 'FAIL') { return 'FAIL' }
+    if ($statuses.Count -gt 0 -and $statuses -notcontains 'PASS' -and $statuses -notcontains 'WARN' -and $statuses -contains 'UNVERIFIED') { return 'UNVERIFIED' }
     if ($statuses -contains 'WARN' -or $statuses -contains 'UNVERIFIED') { return 'PASS_WITH_WARNINGS' }
     if ($statuses.Count -eq 0) { return 'NOT_RUN' }
     return 'PASS'

@@ -111,6 +111,7 @@ $res = @(
 )
 Assert 'overall.warnings' ((Get-MetinAROverallStatus -Results $res) -eq 'PASS_WITH_WARNINGS')
 Assert 'overall.fail' ((Get-MetinAROverallStatus -Results (@($res) + (New-MetinARGateResult -Name 'C' -Status 'FAIL'))) -eq 'FAIL')
+Assert 'overall.unverified-only' ((Get-MetinAROverallStatus -Results @((New-MetinARGateResult -Name 'Device' -Status 'UNVERIFIED'))) -eq 'UNVERIFIED')
 $md = ConvertTo-MetinARMarkdownReport -Title 'T' -Results $res -Header @{ Head = 'abc' }
 Assert 'report.table' ($md -match '\| B \| \*\*UNVERIFIED\*\* \|' -and $md -match 'no / device' -and $md -match '### B')
 

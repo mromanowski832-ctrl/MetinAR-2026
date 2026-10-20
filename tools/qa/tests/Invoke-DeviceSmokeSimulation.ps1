@@ -19,7 +19,7 @@ function Run([string]$mode, [int]$expectedExit, [scriptblock]$check) {
     Write-Host ("{0} device-sim mode={1} exit={2} (expected {3}) -> {4}" -f $(if ($ok) { 'PASS' } else { 'FAIL' }), $mode, $code, $expectedExit, $out)
     if (-not $ok) { $script:failed++; Get-Content (Join-Path $out 'console.txt') | Write-Host }
 }
-Run 'nodevice' 2 { param($o) (Get-Content -Raw (Join-Path $o 'device-report.md')) -match 'UNVERIFIED' }
+Run 'nodevice' 2 { param($o) (Get-Content -Raw (Join-Path $o 'device-report.md')) -match '\*\*Overall:\*\* UNVERIFIED' }
 Run 'ok' 0 {
     param($o)
     $md = Get-Content -Raw (Join-Path $o 'device-report.md'); $log = Get-Content -Raw (Join-Path $o 'logcat-redacted.txt')
