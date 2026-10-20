@@ -94,7 +94,7 @@ namespace MetinAR.ArEncounter
             {
                 float time = Mathf.Lerp(Timeline.HitWindowStart, Timeline.HitWindowEnd, i / (float)steps);
                 if (!BladeIntersects(mob, time)) continue;
-                if (Timeline.TryRecordHit(mob.GetInstanceID()))
+                if (Timeline.TryRecordHit(mob.GetEntityId().GetHashCode()))
                 {
                     HitCount++;
                     _encounter.Hud?.ShowToast("Trafienie!");
