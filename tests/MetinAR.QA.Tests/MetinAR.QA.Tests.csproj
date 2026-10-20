@@ -15,5 +15,6 @@
   <!-- METINAR-011: tests compile the production QA source directly (engine-free files only). -->
   <ItemGroup>
     <Compile Include="../../client/Assets/MetinAR/Scripts/QA/FrameStatsAccumulator.cs" Link="Production/FrameStatsAccumulator.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Editor/SmokeExceptionClassifier.cs" Link="Production/SmokeExceptionClassifier.cs" />
   </ItemGroup>
 </Project>
