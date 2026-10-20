@@ -123,6 +123,8 @@ namespace MetinAR.ArEncounter
 
         public bool IsExiting { get; private set; }
 
+        public FppCombatController FppCombat { get; private set; }
+
         public void Configure(
             ARSession session,
             XROrigin origin,
@@ -176,6 +178,10 @@ namespace MetinAR.ArEncounter
 
         private void Start()
         {
+            // Owner-approved FPP prototype (#31). Main has no live-hand inference dependency.
+            FppCombat = gameObject.AddComponent<FppCombatController>();
+            FppCombat.Initialize(this);
+
             if (!_availabilityCheckStarted && FrameSourceOverride == null)
             {
                 // Resolves Unsupported when no AR subsystem exists (ARSession itself only checks when it has one).
@@ -517,6 +523,7 @@ namespace MetinAR.ArEncounter
             }
 
             IsExiting = true;
+            FppCombat?.CancelActions();
             ArEncounterHandoff.Clear();
             Debug.Log("[ArEncounter] exit to world map");
             if (_session != null && _session.subsystem != null)
@@ -529,3 +536,4 @@ namespace MetinAR.ArEncounter
         }
     }
 }
+
