@@ -107,7 +107,7 @@ def rest_pose(rig):
 
 FBX_COMMON = dict(
     use_selection=True, use_armature_deform_only=True, add_leaf_bones=False,
-    axis_forward="Z", axis_up="Y", apply_unit_scale=True, apply_scale_options="FBX_SCALE_ALL",
+    axis_forward="-Z", axis_up="Y", apply_unit_scale=True, apply_scale_options="FBX_SCALE_ALL",
     use_space_transform=True, primary_bone_axis="Y", secondary_bone_axis="X",
     path_mode="STRIP", embed_textures=False, use_custom_props=False,
 )
@@ -126,6 +126,18 @@ def export_model(rig, lods, path):
     bpy.ops.export_scene.fbx(filepath=path, object_types={"ARMATURE", "MESH"}, bake_anim=False,
                              mesh_smooth_type="OFF", use_triangles=True, use_tspace=False,
                              use_mesh_modifiers=False, **FBX_COMMON)
+
+
+def turn_for_unity(rig, meshes):
+    """Rotate rest geometry and rest bones 180 deg about Z (an involution: calling twice restores)."""
+    from mathutils import Matrix
+    rz = Matrix.Rotation(math.pi, 4, "Z")
+    rest_pose(rig)
+    for o in meshes:
+        o.data.transform(rz)
+        o.data.update()
+    rig.data.transform(rz)
+    bpy.context.view_layer.update()
 
 
 def export_clip(rig, action, last, path):
@@ -180,9 +192,15 @@ def full():
         report["clips"]["A_VenomousSpider_" + state] = {"frames": last, "seconds": round((last - 1) / sa.FPS, 3), "loop": loop, "min_deformed_z_m": round(lowest, 4)}
     report["attack_hit_frame"] = sa.ATTACK_HIT_FRAME
 
+    # Unity's FBX import with Bake Axis Conversion maps Blender +Y to Unity +Z whatever axis_forward says
+    # (verified in Unity 6000.6: a model facing Blender -Y arrives facing -Z). The spider is modelled facing
+    # Blender -Y (Front view), so turn rest geometry + rig 180 deg about Z for export only. Bone-local keys are
+    # unaffected, object transforms stay identity.
+    turn_for_unity(rig, lods)
     export_model(rig, lods, os.path.join(models, "SK_Mob_VenomousSpider.fbx"))
     for state, act in actions.items():
         export_clip(rig, act, sa.CLIPS[state][0], os.path.join(anims, "A_VenomousSpider_%s.fbx" % state))
+    turn_for_unity(rig, lods)  # back to the Blender front-view orientation for the .blend and the renders
     rest_pose(rig)
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "VenomousSpider_work.blend"))
 
