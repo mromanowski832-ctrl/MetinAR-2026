@@ -198,7 +198,8 @@ namespace MetinAR.Editor
                     ("T07_XrSimulationDetectsGroundReadyToPlace", T07_XrSimulationDetectsGroundReadyToPlace),
                     ("T08_PlaceButtonSpawnsOneAnchoredMonsterOnGround", T08_PlaceButtonSpawnsOneAnchoredMonsterOnGround),
                     ("T09_RepeatedPlaceNeverDuplicatesAndStaysStable", T09_RepeatedPlaceNeverDuplicatesAndStaysStable),
-                    ("T10_PlaceholderButtonsHaveNoGameplayFunction", T10_PlaceholderButtonsHaveNoGameplayFunction),
+                    ("T10_FppActionsAndRemainingPlaceholders", T10_FppActionsAndRemainingPlaceholders),
+                    ("T10b_FppAttackAuraAndHitGeometry", T10b_FppAttackAuraAndHitGeometry),
                     ("T11_ExitButtonReturnsToWorldMap", T11_ExitButtonReturnsToWorldMap),
                     ("T12_SyntheticFrames_ScanReadyPlacedSingleSpawn", T12_SyntheticFrames_ScanReadyPlacedSingleSpawn),
                     ("T13_UnsupportedStateIsClearAndNonCrashing", T13_UnsupportedStateIsClearAndNonCrashing),
@@ -625,7 +626,7 @@ namespace MetinAR.Editor
                 Debug.Log("[ArSmoke] T09 drift=" + drift);
             }
 
-            private IEnumerator T10_PlaceholderButtonsHaveNoGameplayFunction()
+            private IEnumerator T10_FppActionsAndRemainingPlaceholders()
             {
                 if (_ar == null)
                 {
@@ -633,7 +634,8 @@ namespace MetinAR.Editor
                     yield break;
                 }
 
-                var all = new List<Button>(_ar.Hud.ActionButtons);
+                var all = new List<Button>();
+                for (int i = 2; i < _ar.Hud.ActionButtons.Length; i++) all.Add(_ar.Hud.ActionButtons[i]);
                 all.AddRange(_ar.Hud.NavButtons);
                 ArEncounterState stateBefore = _ar.State;
                 int mobsBefore = MobCount();
@@ -645,6 +647,67 @@ namespace MetinAR.Editor
                     Check(_ar.Hud.IsToastVisible && _ar.Hud.LastToastMessage == ArEncounterHud.UnassignedNotice, b.name + " toast " + _ar.Hud.LastToastMessage);
                     Check(_ar.State == stateBefore && MobCount() == mobsBefore && _ar.SpawnCount == mobsBefore
                           && ActiveScenePath == ArEncounterScenes.ArEncounterScenePath, b.name + " changed the encounter");
+                }
+            }
+
+            private IEnumerator T10b_FppAttackAuraAndHitGeometry()
+            {
+                FppCombatController combat = _ar != null ? _ar.FppCombat : null;
+                Check(combat != null, "FPP component missing");
+                if (combat == null) yield break;
+                var savedFrameSource = _ar.FrameSourceOverride;
+                Vector3 savedPosition = _ar.SpawnedMob.transform.position;
+                Quaternion savedRotation = _ar.SpawnedMob.transform.rotation;
+                _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionTracking;
+                yield return Frames(3);
+                try
+                {
+                    Check(combat.Ready && combat.View != null && combat.View.gameObject.activeInHierarchy, "FPP view not ready");
+                    if (combat.View == null) yield break;
+                    Check(combat.View.RightGrip != null && combat.View.LeftHand != null, "virtual hands missing");
+                    Check(_ar.Hud.ActionButtons[0].interactable && _ar.Hud.ActionButtons[1].interactable, "combat buttons not enabled");
+                    Pose pose = FppHandsView.SwordPose(FppCombatAction.Attack, 0.30f);
+                    Vector3 localMid = pose.position + pose.rotation * Vector3.Lerp(FppHandsView.BladeBase, FppHandsView.BladeTip, 0.5f);
+                    Transform target = _ar.SpawnedMob.transform;
+                    target.rotation = _ar.ArCamera.transform.rotation;
+                    target.position = _ar.ArCamera.transform.TransformPoint(localMid) - target.TransformVector(new Vector3(0, 0.33f, -0.13f));
+                    Check(combat.BladeIntersects(_ar.SpawnedMob, 0.30f), "near target should intersect blade");
+                    target.position += Vector3.right * 20f;
+                    Check(!combat.BladeIntersects(_ar.SpawnedMob, 0.30f), "distant target incorrectly intersects blade");
+                    int before = combat.HitCount;
+                    _ar.Hud.ActionButtons[0].onClick.Invoke();
+                    Check(combat.Timeline.Action == FppCombatAction.Attack, "Attack button not bound");
+                    int swing = combat.Timeline.SwingId;
+                    _ar.Hud.ActionButtons[0].onClick.Invoke();
+                    _ar.Hud.ActionButtons[1].onClick.Invoke();
+                    Check(combat.Timeline.SwingId == swing && combat.Timeline.Action == FppCombatAction.Attack, "tap spam restarted/overlapped attack");
+                    yield return WaitUntil(() => combat.Timeline.Action == FppCombatAction.Idle, 3f);
+                    Check(combat.HitCount == before, "attack hit a distant target");
+                    target.position = _ar.ArCamera.transform.TransformPoint(localMid) - target.TransformVector(new Vector3(0, 0.33f, -0.13f));
+                    _ar.Hud.ActionButtons[0].onClick.Invoke();
+                    yield return WaitUntil(() => combat.Timeline.Action == FppCombatAction.Idle, 3f);
+                    Check(combat.HitCount == before + 1, "near swing must hit exactly once");
+                    before = combat.HitCount;
+                    _ar.Hud.ActionButtons[1].onClick.Invoke();
+                    Check(combat.Timeline.Action == FppCombatAction.Aura, "Aura button not bound");
+                    yield return WaitUntil(() => combat.Timeline.Elapsed >= 0.4f, 3f);
+                    Check(combat.Timeline.Action == FppCombatAction.Aura, "Aura cancelled too early");
+                    Vector3 expectedLeft = combat.View.RightGrip.localPosition + combat.View.RightGrip.localRotation * new Vector3(0, -0.12f, 0);
+                    Check(Vector3.Distance(combat.View.LeftHand.localPosition, expectedLeft) < 0.015f, "left hand did not grip hilt");
+                    yield return WaitUntil(() => combat.Timeline.Action == FppCombatAction.Idle, 3f);
+                    Check(combat.Timeline.AuraActive, "Aura blade effect missing after activation");
+                    Check(combat.HitCount == before, "Aura must not deal hits");
+                    Check(!combat.RequestAura(), "active Aura can be spammed");
+                    _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionInitializing;
+                    yield return Frames(2);
+                    Check(!combat.Ready && !combat.Timeline.AuraActive && !combat.View.gameObject.activeSelf, "tracking loss did not cancel/hide FPP");
+                    Check(!combat.RequestAttack() && !combat.RequestAura(), "actions accepted with tracking lost");
+                }
+                finally
+                {
+                    combat.CancelActions();
+                    _ar.SpawnedMob.transform.SetPositionAndRotation(savedPosition, savedRotation);
+                    _ar.FrameSourceOverride = savedFrameSource;
                 }
             }
 
@@ -662,6 +725,7 @@ namespace MetinAR.Editor
                 Check(ActiveScenePath == ArEncounterScenes.WorldMapScenePath, "not back on world map: " + ActiveScenePath);
                 Check(FindAnyObjectByType<ArEncounterSceneController>() == null && MobCount() == 0, "AR objects left after exit");
                 Check(!ArEncounterHandoff.HasPending, "handoff pending after exit");
+                Check(FindAnyObjectByType<FppHandsView>() == null, "FPP view leaked after scene exit");
                 PrototypeWorldPlacement placement = FindAnyObjectByType<PrototypeWorldPlacement>();
                 yield return WaitUntil(() => placement != null && placement.IsInitialized, 10f);
                 Check(placement != null && placement.IsInitialized, "world map did not re-initialize");
@@ -867,3 +931,4 @@ namespace MetinAR.Editor
         }
     }
 }
+
