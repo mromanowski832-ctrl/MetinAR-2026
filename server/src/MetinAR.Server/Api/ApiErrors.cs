@@ -13,6 +13,11 @@ public static class ErrorCodes
     public const string WorldEntityInactive = "WORLD_ENTITY_INACTIVE";
     public const string EncounterNotFound = "ENCOUNTER_NOT_FOUND";
     public const string EncounterPlayerMismatch = "ENCOUNTER_PLAYER_MISMATCH";
+    public const string EncounterNonceMismatch = "ENCOUNTER_NONCE_MISMATCH";
+    public const string EncounterExpired = "ENCOUNTER_EXPIRED";
+    public const string EncounterTooFar = "ENCOUNTER_TOO_FAR";
+    public const string GpsAccuracyInsufficient = "GPS_ACCURACY_INSUFFICIENT";
+    public const string GpsFixStale = "GPS_FIX_STALE";
     public const string NotFound = "NOT_FOUND";
     public const string MethodNotAllowed = "METHOD_NOT_ALLOWED";
     public const string InternalError = "INTERNAL_ERROR";
@@ -22,7 +27,7 @@ public static class ErrorCodes
 public static class ApiErrors
 {
     public static ProblemDetails Create(HttpContext context, int status, string code, string title, string? detail = null,
-        IDictionary<string, string[]>? errors = null)
+        IDictionary<string, string[]>? errors = null, IReadOnlyDictionary<string, object?>? extensions = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         var problem = new ProblemDetails
@@ -40,12 +45,20 @@ public static class ApiErrors
             problem.Extensions["errors"] = errors;
         }
 
+        if (extensions is not null)
+        {
+            foreach ((string key, object? value) in extensions)
+            {
+                problem.Extensions[key] = value;
+            }
+        }
+
         return problem;
     }
 
     public static IResult Result(HttpContext context, int status, string code, string title, string? detail = null,
-        IDictionary<string, string[]>? errors = null) =>
-        Results.Problem(Create(context, status, code, title, detail, errors));
+        IDictionary<string, string[]>? errors = null, IReadOnlyDictionary<string, object?>? extensions = null) =>
+        Results.Problem(Create(context, status, code, title, detail, errors, extensions));
 
     public static IResult Validation(HttpContext context, IDictionary<string, string[]> errors) =>
         Result(context, StatusCodes.Status400BadRequest, ErrorCodes.ValidationFailed, "One or more request fields are invalid.", errors: errors);

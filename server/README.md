@@ -1,7 +1,8 @@
 # MetinAR backend (METINAR-010 prototype)
 
 Local-development backend for MetinAR: .NET 8 ASP.NET Core Minimal API + SQLite.
-Full design, API contract and trust boundaries: [`docs/METINAR-010-BACKEND.md`](../docs/METINAR-010-BACKEND.md).
+Full design, API contract and trust boundaries: [`docs/METINAR-010-BACKEND.md`](../docs/METINAR-010-BACKEND.md);
+server-side encounter authority and spawn schedules: [`docs/METINAR-012-SERVER-AUTHORITY.md`](../docs/METINAR-012-SERVER-AUTHORITY.md).
 
 > Prototype only. No authentication, no secrets, no public deployment. Kestrel binds to `localhost` only.
 
@@ -44,7 +45,7 @@ Windows (PowerShell): same commands; delete the data folder with `Remove-Item -R
 cd server
 dotnet build MetinAR.Server.sln -c Release                 # warnings are errors
 dotnet format MetinAR.Server.sln --verify-no-changes        # style/lint
-dotnet test  MetinAR.Server.sln -c Release                  # 54 tests, no network
+dotnet test  MetinAR.Server.sln -c Release                  # 100 tests, no network
 dotnet list  MetinAR.Server.sln package --vulnerable --include-transitive
 ./scripts/smoke-local.sh                                    # Linux/macOS/WSL/Git Bash: real process + restart
 ```
@@ -57,7 +58,10 @@ curl "http://localhost:5080/api/v1/world/nearby?lat=0&lon=0&radiusMeters=300"
 curl -X PUT http://localhost:5080/api/v1/player/demo-player -H "Content-Type: application/json" \
      -d '{"displayName":"Demo","lastKnownPosition":{"latitude":0.0004,"longitude":0.0004}}'
 curl -X POST http://localhost:5080/api/v1/encounters/start -H "Content-Type: application/json" \
-     -d '{"playerId":"demo-player","worldEntityId":"seed-mob-0001"}'
+     -d '{"playerId":"demo-player","worldEntityId":"seed-mob-0001","clientPosition":{"latitude":0.0005,"longitude":0.00048,"horizontalAccuracyMeters":5}}'
 curl -X POST http://localhost:5080/api/v1/encounters/complete -H "Content-Type: application/json" \
-     -d '{"encounterId":"<id from start>","playerId":"demo-player"}'
+     -d '{"encounterId":"<id from start>","playerId":"demo-player","nonce":"<nonce from start>"}'
 ```
+
+Encounter authority limits (distance, accuracy, fix age, TTL) live in the `EncounterRules` section of `appsettings.json`;
+see [`docs/METINAR-012-SERVER-AUTHORITY.md`](../docs/METINAR-012-SERVER-AUTHORITY.md).

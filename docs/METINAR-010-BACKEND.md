@@ -2,6 +2,10 @@
 
 Status: prototype, local development only. Issue: #17. Code: [`server/`](../server/README.md).
 
+> **Updated by METINAR-012 (#22):** encounter start now requires a client fix and is checked server-side for proximity;
+> completion needs the start nonce and respects a TTL; entities can have deterministic schedules. This document is
+> updated in place. The rationale and details are in [METINAR-012-SERVER-AUTHORITY.md](METINAR-012-SERVER-AUTHORITY.md).
+
 This is a separate backend workspace. It doesn't touch the Unity client, AR encounter, hand tracking/sword,
 GPS provider core, the map provider work or the 3D asset pipeline. The Unity client doesn't call it yet;
 this document is the contract a later client integration issue will code against.
@@ -124,14 +128,22 @@ On the wire, `active` is the **effective** state: stored flag on **and** now ins
 |---|---|
 | `id` | Server-generated (32 hex chars) |
 | `playerId`, `worldEntityId` | FK to the two tables above |
-| `startedAt`, `completedAt` | UTC; `completedAt` is set exactly once |
-| `status` | `in_progress` → `completed` (one-way) |
+| `startedAt`, `expiresAt` | UTC; `expiresAt = startedAt + EncounterTtlSeconds` (METINAR-012) |
+| `completedAt`, `expiredAt` | UTC; at most one of them is ever set, exactly once |
+| `status` | `in_progress` → `completed` or `in_progress` → `expired` (one-way) |
+| (not on the wire) `nonce_sha256`, `start_distance_meters`, `start_accuracy_meters`, `start_allowed_meters` | replay nonce hash and rounded start evidence. **No client coordinates are stored.** |
 
-A partial unique index allows at most one `in_progress` session per (player, entity).
+A partial unique index allows at most one `in_progress` session per (player, entity). Every status change is also
+appended to `encounter_transitions` (from, to, at, reason).
+
+### World entity schedules (`world_entity_schedules`, METINAR-012)
+
+Optional deterministic repeating window per entity: `anchor_at`, `period_seconds`, `active_seconds`. See
+[METINAR-012 §4](METINAR-012-SERVER-AUTHORITY.md#4-spawn-scheduling-foundation).
 
 ### Seed data
 
-`0002_seed_synthetic_world.sql` adds six entities around **Null Island (0.0, 0.0)** in the Gulf of Guinea, an obviously
+`0002_seed_synthetic_world.sql` adds six entities and `0003_encounter_authority_and_spawn_schedules.sql` two scheduled ones, around **Null Island (0.0, 0.0)** in the Gulf of Guinea, an obviously
 synthetic location. No owner, player or real venue location is in the repository.
 
 | id | type | at | purpose |
@@ -142,6 +154,8 @@ synthetic location. No owner, player or real venue location is in the repository
 | seed-mob-0003 | mob | (0.0003, 0.0) | stored `active = 0` |
 | seed-mob-0004 | mob | (0.0, -0.0003) | despawned 2026-01-02T00:00:00.000Z |
 | seed-mob-0005 | mob | (0.05, 0.05) ~7.9 km | outside every allowed radius |
+| seed-mob-0006 | mob | (-0.02, 0.0002) ~2.2 km S | `0003`: scheduled, first 5 min of every 10 min |
+| seed-npc-0002 | npc | (-0.02, -0.0002) ~2.2 km S | `0003`: scheduled, 06:00–18:00 UTC daily |
 
 ## 5. API contract (v1)
 
@@ -166,7 +180,7 @@ Clients parse it as UTC and never send local time. Storage uses the same text fo
 
 `200`:
 ```json
-{ "status": "ok", "serverTime": "2026-10-20T02:36:22.237Z", "apiVersion": "v1", "schemaVersion": "0002_seed_synthetic_world" }
+{ "status": "ok", "serverTime": "2026-10-20T02:36:22.237Z", "apiVersion": "v1", "schemaVersion": "0003_encounter_authority_and_spawn_schedules" }
 ```
 `503` with `"status": "degraded"` when the database can't be read.
 
@@ -235,56 +249,70 @@ Response (`radiusMeters=120&limit=1`):
     {
       "id": "seed-mob-0001", "type": "mob", "templateId": "prototype_mob_a",
       "latitude": 0.0005, "longitude": 0.0005, "level": 5, "aggressive": true, "active": true,
-      "spawnedAt": "2026-01-01T00:00:00.000Z", "despawnAt": null, "distanceMeters": 78.6
+      "spawnedAt": "2026-01-01T00:00:00.000Z", "despawnAt": null, "activeUntil": null, "distanceMeters": 78.6
     }
   ]
 }
 ```
-`distanceMeters` is rounded to 0.1 m and is informational.
+`distanceMeters` is rounded to 0.1 m and is informational. `activeUntil` (METINAR-012) is when the entity stops being
+active (end of its scheduled phase or `despawnAt`, whichever is earlier), or `null` for no end.
 
 ### 5.7 `POST /api/v1/encounters/start`
 
 Request:
 ```json
-{ "playerId": "demo-player", "worldEntityId": "seed-mob-0001", "clientPosition": { "latitude": 0.0004, "longitude": 0.0004 } }
+{
+  "playerId": "demo-player",
+  "worldEntityId": "seed-mob-0001",
+  "clientPosition": { "latitude": 0.0005, "longitude": 0.00048, "horizontalAccuracyMeters": 5, "capturedAt": "2026-10-20T03:59:50.900Z" }
+}
 ```
-`clientPosition` is optional. It is range-checked but **not trusted or enforced** yet (§9).
+`clientPosition` is **required** (METINAR-012). `latitude`, `longitude` and `horizontalAccuracyMeters` (≥ 0) are required,
+and `capturedAt` (UTC) is optional. The fix is evidence only: the server compares it with its own entity position
+([METINAR-012 §2](METINAR-012-SERVER-AUTHORITY.md#2-encounter-proximity-validation)).
 
-Validation order: body fields → player exists (`404 PLAYER_NOT_FOUND`) → entity exists (`404 WORLD_ENTITY_NOT_FOUND`)
-→ entity effectively active now (`409 WORLD_ENTITY_INACTIVE`).
+Validation order: body fields (`400`) → player exists (`404 PLAYER_NOT_FOUND`) → entity exists (`404 WORLD_ENTITY_NOT_FOUND`)
+→ entity effectively active now, including its schedule (`409 WORLD_ENTITY_INACTIVE`) → fix accuracy
+(`422 GPS_ACCURACY_INSUFFICIENT`) → fix age (`422 GPS_FIX_STALE`) → distance (`422 ENCOUNTER_TOO_FAR`).
 
 Responses:
 - `201` + `Location` — new session:
   ```json
   {
     "encounter": {
-      "id": "20422490f7c34822ab7ab8267d73b19a", "playerId": "demo-player", "worldEntityId": "seed-mob-0001",
-      "startedAt": "2026-10-20T02:48:04.490Z", "completedAt": null, "status": "in_progress"
+      "id": "d837dca48ac74dfbb0e673f124a7bea0", "playerId": "demo-player", "worldEntityId": "seed-mob-0001",
+      "startedAt": "2026-10-20T03:59:51.015Z", "expiresAt": "2026-10-20T04:09:51.015Z",
+      "completedAt": null, "expiredAt": null, "status": "in_progress"
     },
-    "created": true
+    "created": true,
+    "nonce": "MO-68u63xGVw9ACE4qNbtWXfCzwD7a19qBcUMz5vrI4"
   }
   ```
-- `200` with `"created": false` — an `in_progress` session for the same (player, entity) already exists and is returned
-  as-is. Retrying `start` is therefore safe.
+- `200` with `"created": false` — an unexpired `in_progress` session for the same (player, entity) already exists and
+  is returned with a **new** `nonce` (the previous one stops working). Retrying `start` is therefore safe; always use the
+  latest nonce.
 
 ### 5.8 `POST /api/v1/encounters/complete`
 
 Request:
 ```json
-{ "encounterId": "20422490f7c34822ab7ab8267d73b19a", "playerId": "demo-player" }
+{ "encounterId": "d837dca48ac74dfbb0e673f124a7bea0", "playerId": "demo-player", "nonce": "MO-68u63xGVw9ACE4qNbtWXfCzwD7a19qBcUMz5vrI4" }
 ```
 Responses:
-- `200` — always the stored session plus `firstCompletion`:
+- `200` — the stored session plus `firstCompletion`:
   ```json
   {
     "encounter": {
-      "id": "20422490f7c34822ab7ab8267d73b19a", "playerId": "demo-player", "worldEntityId": "seed-mob-0001",
-      "startedAt": "2026-10-20T02:48:04.490Z", "completedAt": "2026-10-20T02:48:04.556Z", "status": "completed"
+      "id": "d837dca48ac74dfbb0e673f124a7bea0", "playerId": "demo-player", "worldEntityId": "seed-mob-0001",
+      "startedAt": "2026-10-20T03:59:51.015Z", "expiresAt": "2026-10-20T04:09:51.015Z",
+      "completedAt": "2026-10-20T03:59:51.091Z", "expiredAt": null, "status": "completed"
     },
     "firstCompletion": true
   }
   ```
-- `404 ENCOUNTER_NOT_FOUND`, `403 ENCOUNTER_PLAYER_MISMATCH` (session belongs to another player; it is not modified).
+- `404 ENCOUNTER_NOT_FOUND`; `403 ENCOUNTER_PLAYER_MISMATCH` (another player's session); `403 ENCOUNTER_NONCE_MISMATCH`
+  (wrong or superseded nonce); `410 ENCOUNTER_EXPIRED` (reached `expiresAt` before completing; the session becomes `expired`).
+  None of these modify a completed session.
 
 No reward, XP, loot or HP change is applied. The endpoint only records completion.
 
@@ -293,8 +321,8 @@ No reward, XP, loot or HP change is applied. The endpoint only records completio
 | Operation | Guarantee |
 |---|---|
 | `PUT /player/{id}` | Same body → same stored state (only `updatedAt` moves). |
-| `POST /encounters/start` | At most one open session per (player, entity), enforced by a partial unique index plus `INSERT … ON CONFLICT DO NOTHING`. Retries return the open session with `created:false`. After completion, a new `start` opens a new session. |
-| `POST /encounters/complete` | One atomic compare-and-set: `UPDATE … SET status='completed', completed_at=$now WHERE id=$id AND status='in_progress'`. Exactly one call ever gets `firstCompletion: true`. Retries, concurrent calls (tested with 16 in parallel) and calls after a server restart get `firstCompletion: false` and the original `completedAt`. |
+| `POST /encounters/start` | At most one open session per (player, entity), enforced by a partial unique index plus `INSERT … ON CONFLICT DO NOTHING`. Retries return the open session with `created:false` and a rotated nonce. After completion or expiry, a new `start` opens a new session. |
+| `POST /encounters/complete` | One atomic compare-and-set: `UPDATE … SET status='completed', completed_at=$now WHERE id=$id AND status='in_progress' AND expires_at > $now`. Exactly one call ever gets `firstCompletion: true`. Retries, concurrent calls (tested with 16 in parallel) and calls after a server restart or after the TTL get `firstCompletion: false` and the original `completedAt`. A session that reached its TTL first answers `410` on every call. |
 
 **Rule for future rewards:** grant anything only inside the same transaction that observed the compare-and-set
 succeed (`firstCompletion == true`). Never grant on the client's word or on a repeated call. Ideally record the grant in a
@@ -327,12 +355,17 @@ Clients switch on `code` only; `title`/`detail` are human text and may change.
 | 400 | `VALIDATION_FAILED` | A field is missing or out of range. `errors` maps field → messages. |
 | 400 | `MALFORMED_REQUEST` | Unparseable JSON, wrong JSON type, unknown body field, or a non-numeric query value (`lat=abc`). |
 | 403 | `ENCOUNTER_PLAYER_MISMATCH` | Completing someone else's encounter. |
+| 403 | `ENCOUNTER_NONCE_MISMATCH` | Completion nonce is wrong or was superseded by a later start. |
 | 404 | `PLAYER_NOT_FOUND` | Unknown player id. |
 | 404 | `WORLD_ENTITY_NOT_FOUND` | Unknown world entity id. |
 | 404 | `ENCOUNTER_NOT_FOUND` | Unknown encounter id. |
 | 404 | `NOT_FOUND` | Unknown route. |
 | 405 | `METHOD_NOT_ALLOWED` | Wrong HTTP method on a known route. |
-| 409 | `WORLD_ENTITY_INACTIVE` | Entity exists but is switched off or outside its spawn window. |
+| 409 | `WORLD_ENTITY_INACTIVE` | Entity exists but is switched off, outside its spawn window or outside its scheduled active phase. |
+| 410 | `ENCOUNTER_EXPIRED` | Encounter reached `expiresAt` before completion. |
+| 422 | `GPS_ACCURACY_INSUFFICIENT` | Fix accuracy worse than `MaxAcceptedAccuracyMeters`. Extension `maxAccuracyMeters`. |
+| 422 | `GPS_FIX_STALE` | `capturedAt` older than `MaxFixAgeSeconds` or too far in the future. Extension `maxFixAgeSeconds`. |
+| 422 | `ENCOUNTER_TOO_FAR` | Client fix farther from the entity than allowed. Extensions `distanceMeters`, `allowedMeters`. |
 | 500 | `INTERNAL_ERROR` | Unexpected failure. No stack trace or type names are returned. |
 
 ## 8. Persistence and migrations
@@ -340,7 +373,9 @@ Clients switch on `code` only; `title`/`detail` are human text and may change.
 - Schema and seed are versioned SQL files in `server/src/MetinAR.Server/Persistence/Migrations/`, embedded in the
   assembly and applied in filename order on startup by `SchemaMigrator`. Each runs in its own transaction and is
   recorded in `schema_migrations`. Re-running is a no-op.
-- New schema changes go in a new numbered file (`0003_…sql`). Applied files are never edited.
+- New schema changes go in a new numbered file (next: `0004_…sql`). Applied files are never edited. `0003` rebuilds
+  `encounter_sessions` (SQLite can't alter CHECK constraints) and keeps METINAR-010 rows; legacy open sessions get
+  `expires_at = started_at` and no nonce, so they can't be completed.
 - SQLite runs in WAL mode with foreign keys on.
 - PostgreSQL path: the SQL uses only constructs PostgreSQL also supports (`TEXT`, `INTEGER`, `REAL`, `CHECK`,
   partial unique index, `ON CONFLICT`). The move means a `PostgresGameStore` implementing the same three
@@ -352,10 +387,10 @@ Clients switch on `code` only; `title`/`detail` are human text and may change.
 | Input | Trusted? | Today | Future check (not implemented) |
 |---|---|---|---|
 | `playerId` in path/body | **No** — anyone can claim any id | accepted after format check | derived from an authenticated session/token; never from the body |
-| Client GPS (`lat/lon`, `lastKnownPosition`, `clientPosition`) | **No** | range-checked; profile position coarsened; never used to grant anything | server-side proximity check at encounter start (player ↔ entity distance vs. GPS accuracy), speed/teleport plausibility between reports, mock-location signals |
-| Encounter outcome | **No** — complete is only "client says it's done" | recorded once, nothing granted | server-side combat/reward validation, minimum duration, server-issued encounter nonce |
+| Client GPS (`lat/lon`, `lastKnownPosition`, `clientPosition`) | **No** | range-checked; profile position coarsened; encounter start requires a fix within the allowed distance of the server-owned entity position (capped accuracy tolerance, poor/stale fixes rejected; METINAR-012). Start coordinates are never stored or logged | speed/teleport plausibility between reports, mock-location signals, attestation |
+| Encounter outcome | **No** — complete is only "client says it's done" | recorded once via compare-and-set; needs the latest start nonce and must happen before `expiresAt`; nothing granted | server-side combat/reward validation, minimum duration |
 | Server-owned stats | n/a | client writes rejected | — |
-| World entities | server-authoritative | seeded via migration | spawn service with the project brief's safety rules (no roads, railways, water, buildings, private areas) |
+| World entities | server-authoritative | seeded via migration; flag + spawn window + deterministic schedule | spawn service with the project brief's safety rules (no roads, railways, water, buildings, private areas): see [METINAR-012 §5](METINAR-012-SERVER-AUTHORITY.md#5-future-integration-points-for-map-safety-data) |
 
 ## 10. Security baseline
 
@@ -381,7 +416,7 @@ Required before any non-local deployment (separate, owner-approved issues):
 Commands (from `server/`) and results at PR time are in the PR description and the issue #17 review comment.
 - `dotnet build MetinAR.Server.sln -c Release` — `TreatWarningsAsErrors` + `latest-recommended` analyzers.
 - `dotnet format MetinAR.Server.sln --verify-no-changes`.
-- `dotnet test MetinAR.Server.sln -c Release` — 54 tests: health, OpenAPI document + UI, 404/405 problem+json, nearby query (radius, ordering,
+- `dotnet test MetinAR.Server.sln -c Release` — 100 tests since METINAR-012 (see its §7). The METINAR-010 set: health, OpenAPI document + UI, 404/405 problem+json, nearby query (radius, ordering,
   spawn window, paging, limits), player upsert/validation/coarsening/server-owned fields, encounter start validation
   (unknown / inactive / despawned / unknown player / reuse), idempotent completion (sequential, 16 concurrent, after restart),
   wrong-player completion, migrations once-only, unique open-session constraint, geo math.
@@ -397,8 +432,8 @@ is a small follow-up outside `server/` and `docs/`.
 ## 12. Known limitations / out of scope
 
 - No authentication or real identity (by design, §10).
-- Client position isn't checked against the entity at encounter start (documented future check).
+- ~~Client position isn't checked against the entity at encounter start~~ done in METINAR-012 (no speed/teleport plausibility yet).
 - No rewards, XP, combat, loot or economy. `firstCompletion` is only the hook.
 - `offset` paging isn't snapshot-consistent across spawn changes.
-- No dynamic spawning; the world is the static synthetic seed.
+- No dynamic spawning; the world is the static synthetic seed (plus deterministic schedules since METINAR-012).
 - Unity client integration (HTTP client, DTO mirror) is a separate future issue.
