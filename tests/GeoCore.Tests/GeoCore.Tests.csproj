@@ -26,5 +26,10 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/Location/DeviceLocationProviderCore.cs" Link="Production/DeviceLocationProviderCore.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Location/ForegroundLocationLifecycle.cs" Link="Production/ForegroundLocationLifecycle.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/WorldMap/AggroConfidenceGate.cs" Link="Production/AggroConfidenceGate.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArEncounterRequest.cs" Link="Production/ArEncounterRequest.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArEncounterHandoff.cs" Link="Production/ArEncounterHandoff.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArEncounterState.cs" Link="Production/ArEncounterState.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArPlaneObservation.cs" Link="Production/ArPlaneObservation.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArEncounterStateMachine.cs" Link="Production/ArEncounterStateMachine.cs" />
   </ItemGroup>
 </Project>

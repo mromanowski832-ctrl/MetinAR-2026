@@ -66,6 +66,7 @@ namespace MetinAR.Editor
             controllerGo.transform.SetParent(systems.transform, false);
             var controller = controllerGo.AddComponent<WorldMapPrototypeController>();
             controllerGo.AddComponent<WorldMapPrototypeBootstrap>();
+            controllerGo.AddComponent<MetinAR.ArEncounter.ArEncounterLauncher>().Configure(controller);
 
             // Player
             GameObject player = BuildPlayer(mats);

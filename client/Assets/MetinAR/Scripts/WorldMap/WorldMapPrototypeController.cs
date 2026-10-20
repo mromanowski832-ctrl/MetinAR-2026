@@ -52,6 +52,9 @@ namespace MetinAR.WorldMap
         public int EncounterRequestCount { get; private set; }
         public int AttackedCount { get; private set; }
         public string LastEncounterReason { get; private set; }
+
+        /// <summary>Mob of the latest encounter request (null if the request did not name one).</summary>
+        public PrototypeMob LastEncounterMob { get; private set; }
         public string LastToastMessage { get; private set; }
         public bool IsToastVisible => _toastRoot != null && _toastRoot.activeSelf;
         private GameObject _activePanel;
@@ -100,8 +103,15 @@ namespace MetinAR.WorldMap
 
         public void RequestArEncounter(string reason, bool showToast)
         {
+            RequestArEncounter(reason, showToast, null);
+        }
+
+        /// <summary>Requests an AR encounter for <paramref name="mob"/> (METINAR-006: opened by ArEncounterLauncher).</summary>
+        public void RequestArEncounter(string reason, bool showToast, PrototypeMob mob)
+        {
             EncounterRequestCount++;
             LastEncounterReason = reason;
+            LastEncounterMob = mob;
             Debug.Log("[WorldMapPrototype] AR ENCOUNTER REQUESTED (" + reason + ")");
             if (showToast)
             {
