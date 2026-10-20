@@ -111,6 +111,7 @@ InitTestScene*.unity*
 # Independent .NET test project. Unity-generated csproj files stay ignored.
 !tests/GeoCore.Tests/GeoCore.Tests.csproj
 !tests/MetinAR.QA.Tests/MetinAR.QA.Tests.csproj
+!tests/AssetPipeline.Tests/AssetPipeline.Tests.csproj
 
 # Independent .NET test build outputs (do not ignore the .csproj itself).
 tests/**/bin/
