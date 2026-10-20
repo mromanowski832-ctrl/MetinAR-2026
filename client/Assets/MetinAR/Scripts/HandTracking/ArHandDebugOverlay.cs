@@ -81,7 +81,11 @@ namespace MetinAR.HandTracking
                 string text;
                 if (!_tracker.ModelsLoaded && _tracker.ObservationOverride == null)
                 {
-                    text = UnavailableText;
+                    text = string.IsNullOrEmpty(_tracker.LastError) ? UnavailableText : "Ręka: błąd uruchomienia AI (sprawdź log)";
+                }
+                else if (!string.IsNullOrEmpty(_tracker.LastError))
+                {
+                    text = "Ręka: błąd analizy obrazu (sprawdź log)";
                 }
                 else if (hand)
                 {

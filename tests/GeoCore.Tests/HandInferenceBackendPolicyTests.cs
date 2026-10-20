@@ -6,6 +6,26 @@ namespace GeoCore.Tests;
 /// <summary>METINAR-007: backend selection / GPU→CPU fallback / log throttle for on-device hand inference.</summary>
 public class HandInferenceBackendPolicyTests
 {
+    [Theory]
+    [InlineData("SM-A315F")]
+    [InlineData("samsung SM-A315G")]
+    [InlineData("SM-A315N")]
+    [InlineData("Galaxy A31")]
+    public void GalaxyA31Profile_RecognisesVariants(string model)
+    {
+        Assert.True(HandInferenceBackendPolicy.IsGalaxyA31(model));
+    }
+
+    [Theory]
+    [InlineData("SM-A325F")]
+    [InlineData("SM-A310F")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void GalaxyA31Profile_DoesNotSelectOtherDevices(string model)
+    {
+        Assert.False(HandInferenceBackendPolicy.IsGalaxyA31(model));
+    }
+
     [Fact]
     public void OpenGles_DefaultsToCpu_EvenWithComputeShaders()
     {
