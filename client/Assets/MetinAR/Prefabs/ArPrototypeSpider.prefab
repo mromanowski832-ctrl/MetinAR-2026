@@ -3331,6 +3331,8 @@ MonoBehaviour:
   _levelText: {fileID: 4334705928349890869}
   _hpText: {fileID: 6092255889465610395}
   _hpFillPivot: {fileID: 7610295691995735042}
+  _hitVolumeCenter: {x: 0, y: 0.3, z: 0.08}
+  _hitVolumeHalfExtents: {x: 0.66, y: 0.3, z: 0.56}
 --- !u!1 &8920710000785389820
 GameObject:
   m_ObjectHideFlags: 0
