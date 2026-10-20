@@ -11,6 +11,7 @@ namespace MetinAR.Editor
     /// Usage: -executeMethod MetinAR.Editor.MetinARAndroidDevBuild.BuildDevelopmentApk
     ///        -executeMethod MetinAR.Editor.MetinARAndroidDevBuild.BuildWorldMapDevelopmentApk
     ///        -executeMethod MetinAR.Editor.MetinARAndroidDevBuild.BuildArEncounterDevelopmentApk
+    ///        -executeMethod MetinAR.Editor.MetinARAndroidDevBuild.BuildHandSwordDevelopmentApk
     /// </summary>
     public static class MetinARAndroidDevBuild
     {
@@ -19,6 +20,7 @@ namespace MetinAR.Editor
         private const string WorldMapScenePath = "Assets/MetinAR/Scenes/WorldMapPrototype.unity";
         private const string ArEncounterApkRelativePath = "Builds/Android/MetinAR-ar-encounter-dev.apk";
         private const string ArEncounterScenePath = "Assets/MetinAR/Scenes/ArEncounterPrototype.unity";
+        private const string HandSwordApkRelativePath = "Builds/Android/MetinAR-hand-sword-dev.apk";
 
         public static void BuildDevelopmentApk()
         {
@@ -39,6 +41,14 @@ namespace MetinAR.Editor
         public static void BuildArEncounterDevelopmentApk()
         {
             Build(ArEncounterApkRelativePath, WorldMapScenePath, ArEncounterScenePath);
+        }
+
+        /// <summary>
+        /// METINAR-007: same scenes as the AR encounter build (world map startup, AR encounter with hand tracking + sword).
+        /// </summary>
+        public static void BuildHandSwordDevelopmentApk()
+        {
+            Build(HandSwordApkRelativePath, WorldMapScenePath, ArEncounterScenePath);
         }
 
         private static void Build(string apkRelativePath, string requiredStartupScene, string requiredScene = null)

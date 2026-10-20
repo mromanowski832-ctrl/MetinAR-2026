@@ -104,3 +104,6 @@
 *.gz binary
 *.bytes binary
 *.cubemap binary
+
+# ML models (METINAR-007)
+*.onnx binary

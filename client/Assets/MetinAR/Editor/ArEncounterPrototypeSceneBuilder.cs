@@ -49,6 +49,7 @@ namespace MetinAR.Editor
         {
             BuildArtAndPrefabs(out GameObject spiderPrefab, out GameObject planePrefab, out Material reticleMat);
             BuildArScene(spiderPrefab, planePrefab, reticleMat);
+            ArHandSwordPrototypeBuilder.Apply(); // METINAR-007: hand tracking + hand-attached sword
             RegisterBuildScenes();
             AddLauncherToWorldMap();
             AssetDatabase.SaveAssets();

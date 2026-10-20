@@ -31,5 +31,17 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArEncounterState.cs" Link="Production/ArEncounterState.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArPlaneObservation.cs" Link="Production/ArPlaneObservation.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArEncounterStateMachine.cs" Link="Production/ArEncounterStateMachine.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/HandLandmark.cs" Link="Production/HandTracking/HandLandmark.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/Affine2D.cs" Link="Production/HandTracking/Affine2D.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/PalmAnchors.cs" Link="Production/HandTracking/PalmAnchors.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/PalmDetection.cs" Link="Production/HandTracking/PalmDetection.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/HandRoi.cs" Link="Production/HandTracking/HandRoi.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/HandImageSampler.cs" Link="Production/HandTracking/HandImageSampler.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/CameraImageViewportMapper.cs" Link="Production/HandTracking/CameraImageViewportMapper.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/HandLandmarkDecoder.cs" Link="Production/HandTracking/HandLandmarkDecoder.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/HandPoseEstimator.cs" Link="Production/HandTracking/HandPoseEstimator.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/SyntheticHand.cs" Link="Production/HandTracking/SyntheticHand.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/HandPoseSmoother.cs" Link="Production/HandTracking/HandPoseSmoother.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/HandTracking/SwordHitGate.cs" Link="Production/HandTracking/SwordHitGate.cs" />
   </ItemGroup>
 </Project>
