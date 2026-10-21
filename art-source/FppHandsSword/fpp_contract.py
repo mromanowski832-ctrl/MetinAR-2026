@@ -41,6 +41,14 @@ REST_EULER = (15.0, -30.0, -22.0)
 LEFT_REST = Vector((-0.08, -0.23, 0.42))
 LEFT_REST_EULER = (0.0, 0.0, 12.0)  # unchanged from V1
 AURA_POSE = (Vector((0.10, -0.14, 0.50)), (10.0, -30.0, -18.0))  # AuraActivate hold
+# Attack left-hand dodge (MANAGER DECISION #36 2026-10-21T13:33Z, option 1): during Attack the left hand moves away
+# from the cut and is back at LEFT_REST before the clip ends. Rest/Aura/left-rest values above are unchanged.
+# Position only (the left rotation stays LEFT_REST_EULER); weight: ease in T0->T1, hold, ease out T2->T3.
+LEFT_ATTACK_DODGE = Vector((-0.08, -0.03, -0.04))
+LEFT_ATTACK_DODGE_TIMES = (0.18, 0.30, 0.48, 0.70)
+MIN_HILT_LEFT_CLEARANCE_M = 0.050  # acceptance: hilt segment (pommel..guard) to the left socket during Attack
+HILT_SEGMENT_MODEL_Y = (-0.215, 0.116)  # pommel end .. guard, sword-model units (x SWORD_SCALE in the grip frame)
+
 # shared by every contract (hit window 0.18-0.42 s blends only windup -> end)
 ATTACK_WINDUP = (Vector((0.25, -0.08, 0.48)), (0.0, -10.0, -65.0))
 ATTACK_END = (Vector((-0.15, -0.22, 0.50)), (70.0, 30.0, 60.0))
@@ -113,12 +121,41 @@ def left_grip_blend(action, time):
     return ease(time / 0.35) if time < 0.9 else 1.0 - ease((time - 0.9) / 0.25)
 
 
+def left_dodge_weight(action, time):
+    """0..1 weight of LEFT_ATTACK_DODGE (Attack only; 0 at 0 s and from T3 on)."""
+    if action != "Attack":
+        return 0.0
+    t0, t1, t2, t3 = LEFT_ATTACK_DODGE_TIMES
+    if time <= t0 or time >= t3:
+        return 0.0
+    if time < t1:
+        return ease((time - t0) / (t1 - t0))
+    if time <= t2:
+        return 1.0
+    return 1.0 - ease((time - t2) / (t3 - t2))
+
+
+def left_rest_position(action, time):
+    return LEFT_REST + LEFT_ATTACK_DODGE * left_dodge_weight(action, time)
+
+
 def left_hand_pose(action, time):
-    """Port of FppHandsView.Render for the LeftHand transform."""
+    """Port of FppPoseContract.LeftHandPose (+ the Attack dodge of the #36 decision) for the LeftHand transform."""
     p, r = sword_pose(action, time)
     g = left_grip_blend(action, time)
     target = p + r @ LEFT_GRIP_OFFSET
-    return LEFT_REST.lerp(target, g), slerp(u_euler(*LEFT_REST_EULER), r, g)
+    return left_rest_position(action, time).lerp(target, g), slerp(u_euler(*LEFT_REST_EULER), r, g)
+
+
+def hilt_left_distance(action, time):
+    """Distance (m) from the left socket to the drawn hilt segment (pommel..guard, scaled)."""
+    p, r = sword_pose(action, time)
+    a = p + r @ (Vector((0.0, HILT_SEGMENT_MODEL_Y[0], 0.0)) * SWORD_SCALE)
+    b = p + r @ (Vector((0.0, HILT_SEGMENT_MODEL_Y[1], 0.0)) * SWORD_SCALE)
+    lp = left_hand_pose(action, time)[0]
+    ab = b - a
+    k = min(1.0, max(0.0, (lp - a).dot(ab) / ab.dot(ab)))
+    return (a + ab * k - lp).length
 
 
 # ---------------------------------------------------------------- conversions

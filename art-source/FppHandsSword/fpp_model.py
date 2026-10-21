@@ -117,9 +117,22 @@ def build_sword():
 
 
 # ---------------------------------------------------------------- hands (grip-local Unity design frame)
+# Grip fit for the 0.75 sword (P3, art only, no contract value): palm, knuckles, fingers and thumb move radially
+# towards the hilt axis by the hilt-radius reduction, so the life-size hands close on the thinner drawn hilt.
+GRIP_TIGHTEN = HILT_RADIUS * (1.0 - C.SWORD_SCALE)
+
+
+def _tight(x, z):
+    r = math.hypot(x, z)
+    if r < 1e-9:
+        return x, z
+    k = max(0.0, r - GRIP_TIGHTEN) / r
+    return x * k, z * k
+
+
 HAND_YAW_DEG = -45.0  # right hand rotated about the hilt so the wrist points back towards the elbow
 UPPER_LEN, FORE_LEN = 0.30, 0.285
-PALM_X = 0.036
+PALM_X = 0.036 - GRIP_TIGHTEN
 WRIST_LOCAL = Vector((PALM_X, 0.0, -0.080))
 KNUCKLE_LOCAL = Vector((PALM_X, 0.0, 0.024))
 FINGERS = (  # name, y, radius, last-segment scale
@@ -128,8 +141,9 @@ FINGERS = (  # name, y, radius, last-segment scale
     ("Ring", -0.011, 0.0090, 0.85),
     ("Pinky", -0.029, 0.0080, 0.60),
 )
-FINGER_PATH = ((PALM_X, 0.022), (-0.004, 0.036), (-0.033, 0.008), (-0.020, -0.026))  # (x, z) MCP, PIP, DIP, tip
-THUMB_PATH = ((0.040, 0.038, -0.040), (0.014, 0.050, -0.036), (-0.012, 0.054, -0.030), (-0.029, 0.051, -0.012))
+FINGER_PATH = ((PALM_X, 0.022),) + tuple(_tight(x, z) for x, z in ((-0.004, 0.036), (-0.033, 0.008), (-0.020, -0.026)))  # MCP, PIP, DIP, tip
+THUMB_PATH = tuple((_tight(x, z)[0], y, _tight(x, z)[1]) for x, y, z in
+                   ((0.040, 0.038, -0.040), (0.014, 0.050, -0.036), (-0.012, 0.054, -0.030), (-0.029, 0.051, -0.012)))
 THUMB_RADIUS = 0.0098
 
 
@@ -262,7 +276,7 @@ def _build_arm(b, side):
     # back-of-hand plate (dark metal) and gold knuckle bar
     b.tube([W((PALM_X + 0.0175, 0, z)) for z in (-0.062, -0.032, -0.002, 0.016)],
            [(0.0035, 0.030), (0.0035, 0.035), (0.0035, 0.036), (0.0035, 0.033)], 12, REG_METAL, lambda i, n: hw, side_axis_b)
-    b.tube([W((0.047, y, 0.026)) for y in (-0.040, -0.013, 0.013, 0.041)], [0.0075] * 4, 8, REG_GOLD, lambda i, n: hw,
+    b.tube([W((0.047 - GRIP_TIGHTEN, y, 0.026)) for y in (-0.040, -0.013, 0.013, 0.041)], [0.0075] * 4, 8, REG_GOLD, lambda i, n: hw,
            side_axis_b)
 
     # fingers

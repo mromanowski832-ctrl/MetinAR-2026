@@ -182,6 +182,27 @@ def socket_samples(rig, actions):
     return out
 
 
+def hilt_left_clearance(rig, act):
+    """Min distance (m) from the baked B_Socket_GripL to the baked drawn hilt segment over the Attack clip."""
+    from mathutils import Vector
+    rig.animation_data.action = act
+    a_m = Vector((0.0, C.HILT_SEGMENT_MODEL_Y[0], 0.0)) * C.SWORD_SCALE
+    b_m = Vector((0.0, C.HILT_SEGMENT_MODEL_Y[1], 0.0)) * C.SWORD_SCALE
+    best = (9.0, 0.0)
+    for f in range(1, int(act.frame_range[1]) + 1):
+        bpy.context.scene.frame_set(f)
+        g = socket_world(rig, "B_Socket_Sword")
+        lp = socket_world(rig, "B_Socket_GripL").translation
+        a, b = g @ C.to_blender_point(a_m), g @ C.to_blender_point(b_m)
+        ab = b - a
+        k = min(1.0, max(0.0, (lp - a).dot(ab) / ab.dot(ab)))
+        d = (a + ab * k - lp).length
+        if d < best[0]:
+            best = (d, (f - 1) / C.FPS)
+    return {"min_m": round(best[0], 4), "at_s": round(best[1], 2), "required_m": C.MIN_HILT_LEFT_CLEARANCE_M,
+            "contract_min_m": round(min(C.hilt_left_distance("Attack", f / 1000.0) for f in range(721)), 4)}
+
+
 def full():
     reset()
     root = os.path.join(OUT, "Assets")
@@ -228,6 +249,9 @@ def full():
     }
     report["socket_vs_pr32_blender"] = socket_samples(rig, actions)
     report["hand_sword_contact"] = sword_contacts(arms, rig, actions)
+    report["attack_hilt_left_socket"] = hilt_left_clearance(rig, actions["Attack"])
+    report["left_attack_dodge"] = {"offset": list(C.LEFT_ATTACK_DODGE), "times_s": list(C.LEFT_ATTACK_DODGE_TIMES)}
+    report["grip_tighten_m"] = round(M.GRIP_TIGHTEN, 5)
 
     # ---- export
     A.rest_pose(rig)

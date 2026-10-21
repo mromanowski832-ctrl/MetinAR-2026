@@ -36,6 +36,7 @@ model, texture or trace source (visual direction only: dark/gold gauntlets, blue
 | Units | metres, 1 Unity unit = 1 m, FBX Convert Units on, Scale Factor 1 |
 | Space of the arms prefab | **AR-camera local**: origin = camera, +X right, +Y up, +Z forward (put `PF_Player_FppArms` under the AR camera with identity local transform) |
 | Authoring space | Blender x = Unity x, Blender y = Unity z, Blender z = Unity y (Unity's Bake Axis Conversion maps it back; verified numerically in Unity, section 7) |
+| Attack left-hand dodge | #36 MANAGER DECISION 2026-10-21T13:33Z (option 1): during Attack only, the left hand position is `LEFT_REST + (−0.08,−0.03,−0.04)·w(t)`, w = SmoothStep in 0.18→0.30 s, 1 until 0.48 s, SmoothStep out 0.48→0.70 s (back at rest from 0.70 s); rotation stays E(0,0,12). Minimum drawn-hilt (pommel…guard) to left-socket distance over the whole Attack: **74.8 mm at 0.42 s** (required ≥ 50 mm; without the dodge 5.7 mm). All V3 values (rest, Aura, left rest) unchanged. The code side (`FppPoseContract.LeftHandPose` on #31) needs the same term to match the clips |
 | Contract | V3 `v3-a31-retest`: rest `RightGrip (0.09,−0.17,0.46)` Euler(15,−30,−22); AuraActivate hold `(0.10,−0.14,0.50)` Euler(10,−30,−18); left hand rest `(−0.08,−0.23,0.42)` Euler(0,0,12) (unchanged); sword scale **0.75** around the grip; windup/end, timings, hit window unchanged |
 | Right grip | bone `B_Socket_Sword` = `RightGrip` frame (unscaled); hilt axis = local +Y, blade towards +Y |
 | Left grip | bone `B_Socket_GripL` = `LeftHand` frame (rest above; on the hilt at `RightGrip·(0,−0.09,0)` = model (0,−0.12,0) × 0.75) |
@@ -113,23 +114,17 @@ never LOD-switched (constant screen size) and drawn on top of AR camera tracking
 
 ## 6. Findings for #31 on contract V3 (contract, not the asset)
 
-**6.1 Attack: the right hilt sweeps through the resting left hand.** With V3 the left hand rests at
-`(−0.08,−0.23,0.42)` and stays there during Attack (`LeftGripBlend` = 0), while the cut ends at `(−0.15,−0.22,0.50)`
-E(70,30,60) and returns to the new rest. The hilt axis passes **5.7 mm** from the left-hand socket centre at
-t = 0.38 s (inside the hit window); with V1 the minimum distance was 74 mm (`fpp_contract.py` poses, measured with
-both sets of values). The baked clips follow the contract exactly (0 mm / 0°), so the left palm and fingers are inside
-the drawn hilt in frames 35–54 (0.35–0.54 s; Blender report `penetrating_vertices` 591 over the 73 Attack frames,
-mostly `B_Hand_L`; the finger fit cannot move the palm). The code-driven procedural view uses the same poses, so its
-left glove sits in the same place (not measured here). The
-asset cannot fix this without leaving the contract; options for #31: (a) move the left hand out of the cut during
-Attack (e.g. a left-hand dodge offset in `FppPoseContract.LeftHandPose` for 0.25–0.55 s), (b) a left rest further left
-/ lower (V1's `(−0.19,−0.25,0.43)` gives 74 mm with the V3 rest), or (c) a different attack end pose. After a
-decision, change `fpp_contract.py` and re-run `fpp_build.py`.
+**6.1 Attack: the right hilt swept through the resting left hand (resolved).** With V3 alone the hilt axis passed
+5.7 mm from the left-hand socket at t = 0.38 s (Unity check of `22d2b1a`: 527 hand vertices inside the hilt proxy).
+Decision on #36 (13:33Z, option 1): the left hand dodges during Attack (section 1). Now: 74.8 mm minimum at 0.42 s,
+0 penetrating vertices in every clip (Blender and Unity). The procedural/code-driven view (#31) has to add the same
+dodge term in `LeftHandPose` to stay identical to the clips:
+`leftRest(t) = LeftRest + (−0.08,−0.03,−0.04) · w(t)` for Attack, w as above (`fpp_contract.left_dodge_weight`).
 
-**6.2 Grip gap.** The hands stay life-size and were shaped around the scale-1 hilt (radius 16.5 mm); the drawn hilt
-is 12.4 mm, so the minimum hand–hilt clearance grows from 3.1 to 7.2 mm (right) and 2.8 to 5.7 mm (left on the hilt in
-the Aura hold). Visible in the grip close-up; at FPP distance it reads as a looser grip. Fix if wanted: a tighter
-finger pose/hand shape for the 0.75 hilt (art change, no contract change).
+**6.2 Grip gap (fixed, P3, art only).** The hands are life-size and were shaped around the scale-1 hilt (16.5 mm); the
+drawn hilt is 12.4 mm. `fpp_model.GRIP_TIGHTEN` (= 16.5 mm × 0.25 = 4.1 mm) moves palm, knuckles, fingers and thumb
+radially towards the hilt axis. No contract value changes (the socket frames are the contract). Minimum hand–hilt
+clearance now R 3.8 mm / L 2.1 mm (was 7.2 / 5.7 with the 0.75 sword, 3.1 / 2.8 in V1).
 
 **6.3 Framing.** With the estimated A31 portrait FOV (69.4° vertical, an estimate, not measured on the device) the V3
 rest pose has the grip, guard, blade and left hand in the lower part of the frame (renders in
@@ -140,7 +135,9 @@ rest pose has the grip, guard, blade and left hand in the lower part of the fram
 **V3 regeneration:** results of the V3 clips are in section 7.0 (added with the Unity run). The tables below 7.0
 are the V1 run (`a5d7e27`/`cd3d02c`) and are kept as history.
 
-### 7.0 V3 (contract `v3-a31-retest`)
+### 7.0 V3 (contract `v3-a31-retest`) — first run, before the left-hand dodge (history)
+
+These are the results of `22d2b1a`, before the dodge. The final run is in 7.0b.
 
 Unity 6000.6.4f1 on LuzMen, batch mode. Each run used a **new clean clone** from GitHub with a fresh Library
 (first import). Run 1: `C:\Users\mroma\MetinAR-FPPART-V3` @ `3092949`; its only output was the expected
@@ -209,11 +206,11 @@ Unity -batchmode -projectPath client -executeMethod MetinAR.Editor.AssetPipeline
   ≈0.29 m from the camera).
 - Finger opening in Attack/Aura is an automatic fit, not hand-keyed animation; it reads as a reflexive opening.
 - The FOV numbers in section 6 are estimates.
-- Attack hand/hilt overlap of contract V3 (section 6.1) is a contract decision for #31.
+- The Attack left-hand dodge (section 6.1) lives in the clips; the code-driven view needs the same term (#31).
 - The Player budget is a proposal (owner decision).
 
 ## 10. Owner / #31 decisions
 
 1. Accept the `Player` category and its budget (section 4) or set different limits.
 2. #31: keep code-driven sockets or play the baked clips (both match).
-3. #31: contract V3 Attack/left-hand overlap (section 6.1) and the grip gap of the 0.75 sword (section 6.2).
+3. #31: add the Attack left-hand dodge to `FppPoseContract.LeftHandPose` (section 6.1).

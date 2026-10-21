@@ -48,6 +48,12 @@ namespace MetinAR.Editor.FppArt
         public static readonly Vector3 WindupPos = new Vector3(0.25f, -0.08f, 0.48f), WindupEuler = new Vector3(0f, -10f, -65f);
         public static readonly Vector3 EndPos = new Vector3(-0.15f, -0.22f, 0.50f), EndEuler = new Vector3(70f, 30f, 60f);
         public static readonly Vector3 AuraPos = new Vector3(0.10f, -0.14f, 0.50f), AuraEuler = new Vector3(10f, -30f, -18f);
+        /// <summary>Attack left-hand dodge (#36 MANAGER DECISION 2026-10-21T13:33Z, option 1); fpp_contract.LEFT_ATTACK_DODGE.</summary>
+        public static readonly Vector3 LeftAttackDodge = new Vector3(-0.08f, -0.03f, -0.04f);
+        public static readonly float[] LeftAttackDodgeTimes = { 0.18f, 0.30f, 0.48f, 0.70f };
+        /// <summary>Acceptance: drawn hilt segment (model y -0.215..0.116 x SwordScale) to B_Socket_GripL during Attack.</summary>
+        public const float MinHiltLeftClearance = 0.050f;
+        public static readonly Vector3 ModelHiltBottom = new Vector3(0f, -0.215f, 0f), ModelHiltTop = new Vector3(0f, 0.116f, 0f);
         public const float AttackSeconds = 0.72f, HitStart = 0.18f, HitEnd = 0.42f, AuraCastSeconds = 1.15f, IdleSeconds = 2.0f;
 
         private static float Ease(float t) => Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t));
@@ -78,11 +84,21 @@ namespace MetinAR.Editor.FppArt
             return t < 0.9f ? Ease(t / 0.35f) : 1f - Ease((t - 0.9f) / 0.25f);
         }
 
+        public static float LeftDodgeWeight(string action, float t)
+        {
+            if (action != "Attack") return 0f;
+            float[] k = LeftAttackDodgeTimes;
+            if (t <= k[0] || t >= k[3]) return 0f;
+            if (t < k[1]) return Ease((t - k[0]) / (k[1] - k[0]));
+            if (t <= k[2]) return 1f;
+            return 1f - Ease((t - k[2]) / (k[3] - k[2]));
+        }
+
         public static void LeftHandPose(string action, float t, out Vector3 p, out Quaternion r)
         {
             SwordPose(action, t, out Vector3 sp, out Quaternion sr);
             float g = LeftGripBlend(action, t);
-            p = Vector3.Lerp(LeftRest, sp + sr * LeftGripOffset, g);
+            p = Vector3.Lerp(LeftRest + LeftAttackDodge * LeftDodgeWeight(action, t), sp + sr * LeftGripOffset, g);
             r = Quaternion.Slerp(Quaternion.Euler(LeftRestEuler), sr, g);
         }
 
@@ -282,7 +298,7 @@ namespace MetinAR.Editor.FppArt
                     c.Check(Mathf.Abs(clip.length - expected[state]) < 0.006f, state + ": length " + clip.length.ToString("0.000") + " s (contract " + expected[state] + " s), frameRate " + clip.frameRate + ", loop " + clip.isLooping);
                     c.Check(clip.isLooping == (state == "Idle"), state + ": loop flag " + clip.isLooping);
 
-                    float maxP = 0f, maxR = 0f, maxPL = 0f, maxRL = 0f, idleAmp = 0f, minClear = 9f;
+                    float maxP = 0f, maxR = 0f, maxPL = 0f, maxRL = 0f, idleAmp = 0f, minClear = 9f, minHiltLeft = 9f, minHiltLeftAt = 0f;
                     Quaternion worstDelta = Quaternion.identity;
                     int penetrations = 0, samples = 0, visGrip = 0, visTip = 0, visLeft = 0;
                     int n = Mathf.RoundToInt(clip.length * 100f);
@@ -316,6 +332,13 @@ namespace MetinAR.Editor.FppArt
                             LeftHandPose(state, t, out Vector3 lp, out Quaternion lr);
                             maxPL = Mathf.Max(maxPL, (pl - lp).magnitude);
                             maxRL = Mathf.Max(maxRL, Quaternion.Angle(rl, lr));
+                        }
+
+                        // drawn hilt segment (baked B_Socket_Sword, scaled model) to the baked left socket
+                        {
+                            Vector3 a = p + r * (ModelHiltBottom * SwordScale), b = p + r * (ModelHiltTop * SwordScale), ab = b - a;
+                            float d = (a + ab * Mathf.Clamp01(Vector3.Dot(pl - a, ab) / ab.sqrMagnitude) - pl).magnitude;
+                            if (d < minHiltLeft) { minHiltLeft = d; minHiltLeftAt = t; }
                         }
 
                         // visibility (camera at the prefab root = AR camera)
@@ -352,6 +375,9 @@ namespace MetinAR.Editor.FppArt
                     string what = state == "Idle" ? "start/end vs rest pose" : "vs contract " + FppArtAssetBuilder.ContractId + " pose (" + (n + 1) + " samples)";
                     c.Check(maxP <= MaxPositionError && maxR <= MaxRotationErrorDeg, state + ": B_Socket_Sword " + what + ": max " + (maxP * 1000f).ToString("0.00") + " mm / " + maxR.ToString("0.00") + " deg (worst local delta euler " + Fmt(worstDelta.eulerAngles) + ")");
                     c.Check(maxPL <= MaxPositionError && maxRL <= MaxRotationErrorDeg, state + ": B_Socket_GripL " + what + ": max " + (maxPL * 1000f).ToString("0.00") + " mm / " + maxRL.ToString("0.00") + " deg");
+                    string hl = state + ": min hilt-to-B_Socket_GripL distance " + (minHiltLeft * 1000f).ToString("0.0") + " mm at " + minHiltLeftAt.ToString("0.00") + " s";
+                    if (state == "Attack") c.Check(minHiltLeft >= MinHiltLeftClearance, hl + " (>= " + (MinHiltLeftClearance * 1000f).ToString("0") + " mm, left-hand dodge)");
+                    else c.Info(hl);
                     if (state == "Idle") c.Check(idleAmp <= 0.006f, "Idle: sway amplitude " + (idleAmp * 1000f).ToString("0.0") + " mm (<= 6 mm)");
                     c.Check(penetrations == 0, state + ": hand vertices inside sword proxies = " + penetrations + " over " + samples + " sampled frames (min grip clearance " + (minClear * 1000f).ToString("0.0") + " mm)");
                     string vis = state + ": visible in estimated A31 portrait view (" + PortraitVerticalFov + " deg v): grip " + visGrip + "/" + (n + 1) + ", blade tip " + visTip + "/" + (n + 1) + ", left hand " + visLeft + "/" + (n + 1);
