@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Audio;
 
 namespace MetinAR.Editor.Audio
 {
@@ -58,7 +59,53 @@ namespace MetinAR.Editor.Audio
                 problems++;
             }
 
+            problems += CheckMixer();
             Debug.Log("[AudioVerify] clips=" + checkedClips + " problems=" + problems + " result=" + (problems == 0 ? "PASS" : "FAIL"));
+            return problems;
+        }
+
+        /// <summary>The project mixer (if committed) must load and contain Master with the child groups SFX, UI, Music.</summary>
+        private static int CheckMixer()
+        {
+            if (!File.Exists(AudioMixerBuilder.MixerPath))
+            {
+                Debug.LogWarning("[AudioVerify] WARN no mixer at " + AudioMixerBuilder.MixerPath);
+                return 0;
+            }
+
+            var mixer = AssetDatabase.LoadAssetAtPath<AudioMixer>(AudioMixerBuilder.MixerPath);
+            if (mixer == null)
+            {
+                Debug.LogError("[AudioVerify] FAIL mixer does not load: " + AudioMixerBuilder.MixerPath);
+                return 1;
+            }
+
+            int problems = 0;
+            AudioMixerGroup[] all = mixer.FindMatchingGroups(string.Empty);
+            var names = new List<string>();
+            foreach (AudioMixerGroup g in all)
+            {
+                names.Add(g.name);
+            }
+
+            AudioMixerGroup[] master = mixer.FindMatchingGroups(AudioMixerBuilder.MasterGroup);
+            if (master.Length == 0 || master[0].name != AudioMixerBuilder.MasterGroup)
+            {
+                Debug.LogError("[AudioVerify] FAIL mixer has no Master group");
+                problems++;
+            }
+
+            foreach (string child in AudioMixerBuilder.ChildGroups)
+            {
+                AudioMixerGroup[] found = mixer.FindMatchingGroups(AudioMixerBuilder.MasterGroup + "/" + child);
+                if (found.Length != 1 || found[0].name != child)
+                {
+                    Debug.LogError("[AudioVerify] FAIL mixer group Master/" + child + " missing (found " + found.Length + ")");
+                    problems++;
+                }
+            }
+
+            Debug.Log("[AudioVerify] mixer " + AudioMixerBuilder.MixerPath + " groups=[" + string.Join(", ", names) + "] " + (problems == 0 ? "OK" : "FAIL"));
             return problems;
         }
 
