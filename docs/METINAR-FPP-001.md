@@ -121,7 +121,9 @@ Projection checks use the ESTIMATED A31 portrait camera (69.4° vertical, 540×1
    - #34 proposal `(0.06, -0.15, 0.44)` / `(15, 0, -14)` was not taken as is: at full scale its guard spans
      x −0.22..1.46 (84 % of the width, across the centre). Windup/end of the swing, timings, cancel and one-hit rule
      are unchanged; the swing still crosses the centre for its 0.24 s active window, which is intended.
-   - left hand rest unchanged (off-screen); on the hilt during Aura at `LeftGripOffset = -0.09` (scaled hilt).
+   - left hand rest `(-0.08, -0.23, 0.42)` / `(0, 0, 12)` (was `(-0.19, -0.25, 0.43)`, off-screen): lower-left of the
+     frame, NDC ≈ (-0.61, -0.79), so both hands are visible at rest; on the hilt during Aura at `LeftGripOffset = -0.09`
+     (scaled hilt).
 3. **Spider too close.** Placement targets closer than 1.5 m along the ground are skipped (reticle points 0.5/0.6/0.7/
    0.4/0.3 of the screen height, then the plane-centre fallback). If only closer ground is found, the place button
    stays disabled and the status says „Za blisko. Odsuń się albo wyceluj dalej w podłoże (min. 1,5 m).”. The spawned

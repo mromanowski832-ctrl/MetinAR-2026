@@ -71,6 +71,18 @@ public class FppFramingTests
     }
 
     [Fact]
+    public void LeftHandAtRest_VisibleLowerLeft_AwayFromCentre()
+    {
+        foreach (double fov in VerticalFovs)
+            foreach (double aspect in Aspects)
+            {
+                Assert.True(FppViewFraming.TryProject(FppViewFraming.LeftRestPosition, fov, aspect, out double x, out double y));
+                Assert.InRange(x, -0.95, -0.2);
+                Assert.InRange(y, -0.95, -0.3);
+            }
+    }
+
+    [Fact]
     public void OldRetestPose_IsRejectedByTheSameChecks()
     {
         // A31 retest APK 2ec7a47: Aura hold (0.02,-0.18,0.52)/(12,0,0) at full scale put the blade on the centre line.

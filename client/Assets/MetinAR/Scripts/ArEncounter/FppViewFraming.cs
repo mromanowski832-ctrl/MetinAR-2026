@@ -17,6 +17,9 @@ namespace MetinAR.ArEncounter
 
         public static readonly FppPoint RestPosition = new FppPoint(0.09, -0.17, 0.46);
         public static readonly FppPoint RestEuler = new FppPoint(15, -30, -22);
+        /// <summary>Left hand at rest: inside the lower-left of the portrait frame (#31: both hands visible at rest).</summary>
+        public static readonly FppPoint LeftRestPosition = new FppPoint(-0.08, -0.23, 0.42);
+        public static readonly FppPoint LeftRestEuler = new FppPoint(0, 0, 12);
         public static readonly FppPoint AuraPosition = new FppPoint(0.10, -0.14, 0.50);
         public static readonly FppPoint AuraEuler = new FppPoint(10, -30, -18);
 
