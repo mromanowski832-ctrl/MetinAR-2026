@@ -63,6 +63,7 @@ namespace AssetPipeline.Tests
         [InlineData("Assets/MetinAR/Audio/SFX/Item/SFX_Item_Potion_01.wav", AudioCategory.ItemSfx)]
         [InlineData("Assets/MetinAR/Audio/SFX/Loot/SFX_Loot_Common_01.wav", AudioCategory.LootSfx)]
         [InlineData("Assets/MetinAR/Audio/SFX/Status/SFX_Status_PoisonTick_01.wav", AudioCategory.StatusSfx)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Stinger/SFX_Stinger_LevelUp_01.wav", AudioCategory.StingerSfx)]
         [InlineData("Assets/MetinAR/Audio/SFX/Shop/SFX_Shop_Buy_01.wav", AudioCategory.None)]
         [InlineData("Assets/MetinAR/Audio/SFX/Item/Extra/SFX_Item_Potion_01.wav", AudioCategory.None)]
         [InlineData("Assets/MetinAR/Audio/SFX/Mobs/VenomousSpider/Extra/x.wav", AudioCategory.None)]
@@ -84,6 +85,8 @@ namespace AssetPipeline.Tests
         [InlineData("Assets/MetinAR/Audio/SFX/Status/SFX_Status_PoisonTick_01.wav", true)]
         [InlineData("Assets/MetinAR/Audio/SFX/Status/SFX_Status_poisonTick_01.wav", false)]
         [InlineData("Assets/MetinAR/Audio/SFX/UI/SFX_Status_PoisonTick_01.wav", false)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Stinger/SFX_Stinger_LevelUp_01.wav", true)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Stinger/SFX_UI_LevelUp_01.wav", false)]
         [InlineData("Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_SwordHit_01.ogg", false)]
         [InlineData("Assets/MetinAR/Audio/SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Step_03.wav", true)]
         [InlineData("Assets/MetinAR/Audio/SFX/Mobs/VenomousSpider/SFX_Mob_Wolf_Step_03.wav", false)]
@@ -148,12 +151,63 @@ namespace AssetPipeline.Tests
             Assert.Contains(b.Check(AudioFormatInfo.ParseWav(Wav(1, 22050, 16, 22050 * 3)), 132344), p => p.Contains("duration"));
             Assert.Contains(b.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 24, 1000)), 3044), p => p.Contains("bits"));
             AudioBudget ui = AudioPipelineRules.GetBudget(AudioCategory.UiSfx);
-            Assert.Empty(ui.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 16, 61740)), 123524));          // 1.4 s level-up jingle
-            Assert.Contains(ui.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 16, 70560)), 141164), p => p.Contains("duration"));
+            Assert.Empty(ui.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 16, 22050)), 44144));            // 0.5 s passes
+            // UI stays <= 0.5 s (owner decision #60): 0.6 s and the 1.4 s level-up jingle fail as UI
+            Assert.Contains(ui.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 16, 26460)), 52964), p => p.Contains("duration"));
+            Assert.Contains(ui.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 16, 61740)), 123524), p => p.Contains("duration"));
+            // one-shot combat SFX: spec 1.5 s (was 2.0 s before the Loop category existed)
+            Assert.Contains(b.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 16, 79380)), 158804), p => p.Contains("duration"));
+        }
+
+        [Fact]
+        public void LoopBudgetAllowsTwoAndAHalfSecondsAndSixtyFourKb()
+        {
+            AudioBudget loop = AudioPipelineRules.LoopBudget;
+            Assert.Equal(2.5, loop.MaxSeconds, 6);
+            Assert.Equal(64000, loop.MaxCompressedBytes);
+            Assert.Empty(loop.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 16, 88200)), 176444));          // Aura loop shape, 2.0 s
+            Assert.Empty(loop.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 16, 110250)), 220544));         // 2.5 s passes
+            // > 2.5 s fails
+            Assert.Contains(loop.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 16, 114660)), 229364), p => p.Contains("duration"));
+            // > 64 KB compressed fails (stereo 2.0 s = ~89 KB ADPCM; mono 16-bit <= 48 kHz <= 2.5 s always stays under 64 KB)
+            Assert.Contains(loop.Check(AudioFormatInfo.ParseWav(Wav(2, 44100, 16, 88200)), 352844), p => p.Contains("ADPCM estimate"));
+            // the 64 KB cap itself, independent of the duration rule
+            var tight = new AudioBudget(".wav", 10.0, 1024 * 1024, 48000, true, 16, AudioPipelineRules.LoopCompressedBytesLimit);
+            Assert.Contains(tight.Check(AudioFormatInfo.ParseWav(Wav(1, 48000, 16, 130000)), 260044), p => p.Contains("ADPCM estimate"));
+            Assert.Empty(tight.Check(AudioFormatInfo.ParseWav(Wav(1, 48000, 16, 120000)), 240044));
         }
 
         [Theory]
-        [InlineData(AudioCategory.UiSfx)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_AuraLoop_01.wav", true)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Status/SFX_Status_PoisonLoop_01.wav", true)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_AuraStart_01.wav", false)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Stinger/SFX_Stinger_LevelUp_01.wav", false)]
+        public void LoopClipsGetTheLoopBudgetCategory(string path, bool loop)
+        {
+            AudioBudget b = AudioPipelineRules.GetBudgetForPath(path);
+            Assert.Equal(loop, ReferenceEquals(b, AudioPipelineRules.LoopBudget));
+            Assert.Equal(loop ? 2.5 : 1.5, b.MaxSeconds, 6);
+        }
+
+        [Fact]
+        public void ValidateAssetUsesLoopBudgetOnlyForLoopClips()
+        {
+            byte[] twoSeconds = WavFrom(Sine(220, 88200));
+            string sha = AudioPipelineRules.Sha256Hex(twoSeconds);
+            Assert.Empty(AudioPipelineRules.ValidateAsset("Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_AuraLoop_01.wav", twoSeconds, Meta(0, 2),
+                AudioLicenseLedger.Parse(Ledger("SFX/Combat/SFX_Combat_AuraLoop_01.wav", sha: sha))));
+            // the same 2 s clip as a one-shot is over the 1.5 s spec length and the 40 KB cap: no loose exception left
+            var oneShot = AudioPipelineRules.ValidateAsset("Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_AuraBurst_01.wav", twoSeconds, Meta(0, 2),
+                AudioLicenseLedger.Parse(Ledger("SFX/Combat/SFX_Combat_AuraBurst_01.wav", sha: sha)));
+            Assert.Contains(oneShot, i => i.Message.Contains("duration"));
+            Assert.Contains(oneShot, i => i.Message.Contains("ADPCM estimate"));
+            byte[] tooLong = WavFrom(Sine(220, 114660));
+            Assert.Contains(AudioPipelineRules.ValidateAsset("Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_AuraLoop_01.wav", tooLong, Meta(0, 2),
+                AudioLicenseLedger.Parse(Ledger("SFX/Combat/SFX_Combat_AuraLoop_01.wav", sha: AudioPipelineRules.Sha256Hex(tooLong)))), i => i.Message.Contains("duration"));
+        }
+
+        [Theory]
+        [InlineData(AudioCategory.StingerSfx)]
         [InlineData(AudioCategory.ItemSfx)]
         [InlineData(AudioCategory.LootSfx)]
         [InlineData(AudioCategory.StatusSfx)]
@@ -667,7 +721,7 @@ namespace AssetPipeline.Tests
             "SFX/Item/SFX_Item_Antidote_01.wav",
             "SFX/Loot/SFX_Loot_Common_01.wav",
             "SFX/UI/SFX_UI_CoinPickup_01.wav",
-            "SFX/UI/SFX_UI_LevelUp_01.wav",
+            "SFX/Stinger/SFX_Stinger_LevelUp_01.wav",
             "SFX/UI/SFX_UI_ShopOpen_01.wav",
             "SFX/UI/SFX_UI_Buy_01.wav",
             "SFX/UI/SFX_UI_Sell_01.wav",
@@ -695,16 +749,27 @@ namespace AssetPipeline.Tests
         }
 
         [Fact]
-        public void OneShotSfxMeetTheSpecLengthAndCompressedSize()
+        public void EverySfxFitsItsBudgetCategoryWithoutExceptions()
         {
-            // ITEMS_COMBAT_SPEC.md (#44): SFX mono, <= 1.5 s, <= 40 KB. Loop clips (Aura, 2 s) are the documented exception.
-            foreach (string f in AudioFiles().Where(x => AudioPipelineRules.IsSfx(AudioPipelineRules.ClassifyPath(x)) && !AudioPipelineRules.IsLoopClip(x)))
+            // One-shots: spec ITEMS_COMBAT_SPEC (#44) <= 1.5 s (UI <= 0.5 s) and <= 40 KB ADPCM estimate.
+            // *Loop clips: budget category Loop (#60) <= 2.5 s, <= 64 KB. No file-specific exceptions.
+            int loops = 0;
+            foreach (string f in AudioFiles().Where(x => AudioPipelineRules.IsSfx(AudioPipelineRules.ClassifyPath(x))))
             {
-                AudioFormatInfo i = AudioFormatInfo.ParseWav(File.ReadAllBytes(f));
-                Assert.True(i.Seconds <= AudioPipelineRules.SpecSfxMaxSeconds + 1e-9, f + ": " + i.Seconds + " s > spec 1.5 s");
-                long est = AudioPipelineRules.EstimateAdpcmBytes(i.Frames, i.Channels);
-                Assert.True(est <= AudioPipelineRules.SpecSfxCompressedBytesLimit, f + ": ADPCM estimate " + est + " B > 40 KB");
+                AudioBudget b = AudioPipelineRules.GetBudgetForPath(f);
+                byte[] data = File.ReadAllBytes(f);
+                Assert.Empty(b.Check(AudioFormatInfo.ParseWav(data), data.LongLength).Select(p => f + ": " + p));
+                if (AudioPipelineRules.IsLoopClip(f))
+                {
+                    loops++;
+                }
+                else
+                {
+                    Assert.True(b.MaxSeconds <= AudioPipelineRules.SpecSfxMaxSeconds && b.MaxCompressedBytes == AudioPipelineRules.SpecSfxCompressedBytesLimit, f);
+                }
             }
+
+            Assert.Equal(1, loops);   // SFX_Combat_AuraLoop_01
         }
 
         [Fact]

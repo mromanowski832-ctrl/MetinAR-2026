@@ -492,7 +492,7 @@ def coin_pickup():
 
 
 def level_up():
-    """Level up: rising major arpeggio (C5 E5 G5 C6) into a sustained chord with a sparkle swell."""
+    """Level up (SFX_Stinger_LevelUp_01): rising major arpeggio (C5 E5 G5 C6) into a sustained chord with a sparkle swell."""
     dur = 1.4
     t = t_axis(dur)
     n = len(t)
@@ -510,14 +510,14 @@ def level_up():
 
 def shop_open():
     """Opening the merchant's shop: wooden latch knock and a two-tone shop bell."""
-    dur = 0.7
+    dur = 0.5   # UI budget <= 0.5 s (#60)
     t = t_axis(dur)
     n = len(t)
     r = rng(3310)
     knock = onepole_lp(r.standard_normal(n), 1000) * env_ad(n, 0.001, 0.02)
     wood = sum(a * tone(t, f) * env_ad(n, 0.001, d) for f, a, d in [(240, 0.6, 0.05), (450, 0.35, 0.03)])
     x = 0.8 * knock + 0.6 * wood
-    x += 0.45 * bell(t, 1244.5, 0.22, 0.07) + 0.4 * bell(t, 1661.2, 0.25, 0.16)
+    x += 0.45 * bell(t, 1244.5, 0.12, 0.05) + 0.4 * bell(t, 1661.2, 0.13, 0.13)
     return fade_out(normalize(dc_block(x), -6.0), 0.05)
 
 
@@ -600,7 +600,7 @@ SOUNDS = [
     ("Item/SFX_Item_Antidote_01.wav", antidote_drink),
     ("Loot/SFX_Loot_Common_01.wav", loot_pickup),
     ("UI/SFX_UI_CoinPickup_01.wav", coin_pickup),
-    ("UI/SFX_UI_LevelUp_01.wav", level_up),
+    ("Stinger/SFX_Stinger_LevelUp_01.wav", level_up),
     ("UI/SFX_UI_ShopOpen_01.wav", shop_open),
     ("UI/SFX_UI_Buy_01.wav", buy),
     ("UI/SFX_UI_Sell_01.wav", sell),
