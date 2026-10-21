@@ -12,6 +12,7 @@ namespace MetinAR.Editor.AssetPipeline
     /// METINAR-009: validates everything inside the pipeline folders against docs/METINAR-009-ASSET-PIPELINE.md:
     /// placement and naming, ASSET_SOURCE.txt provenance, mesh/LOD/bone/material budgets, texture size and import
     /// settings, prefab template (LODGroup, missing scripts, ground pivot) and required animation states.
+    /// METINAR-FPP-ART-001 adds the Player category (Characters/Player: first-person arms).
     /// Read-only: it never changes assets.
     /// Menu: MetinAR/Asset Pipeline/Validate. Batch: -executeMethod MetinAR.Editor.AssetPipeline.AssetPipelineValidator.RunBatch
     /// </summary>
@@ -131,7 +132,7 @@ namespace MetinAR.Editor.AssetPipeline
                     issues.AddRange(AssetSourceManifest.Parse(File.ReadAllText(manifestPath)).Validate(manifestPath, id));
                 }
 
-                if (category == AssetCategory.Mob || category == AssetCategory.Boss || category == AssetCategory.Npc)
+                if (category == AssetCategory.Mob || category == AssetCategory.Boss || category == AssetCategory.Npc || category == AssetCategory.Player)
                 {
                     var states = new List<string>();
                     string animFolder = assetFolder + "/Animations";
@@ -196,6 +197,12 @@ namespace MetinAR.Editor.AssetPipeline
             if (importer.importCameras || importer.importLights) issues.Add(PipelineIssue.Warning(path, "Cameras/lights imported from FBX."));
             if (category == AssetCategory.Npc && importer.animationType != ModelImporterAnimationType.Human) issues.Add(PipelineIssue.Error(path, "NPC rigs must be Humanoid."));
             if ((category == AssetCategory.Mob || category == AssetCategory.Boss) && Path.GetFileName(path).StartsWith("SK_", StringComparison.Ordinal) && importer.animationType != ModelImporterAnimationType.Generic) issues.Add(PipelineIssue.Warning(path, "Mob/boss rigs are Generic by default (non-humanoid skeletons)."));
+            if (category == AssetCategory.Player && Path.GetFileName(path).StartsWith("SK_", StringComparison.Ordinal))
+            {
+                if (importer.animationType != ModelImporterAnimationType.Generic) issues.Add(PipelineIssue.Error(path, "Player (FPP arms) rigs must be Generic (no humanoid body)."));
+                if (!importer.preserveHierarchy) issues.Add(PipelineIssue.Error(path, "Player rigs need Preserve Hierarchy so the A_*.fbx clip paths bind (METINAR-FPP-ART-001)."));
+            }
+
 
             GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(path);
             if (root == null)
@@ -234,7 +241,8 @@ namespace MetinAR.Editor.AssetPipeline
                 lodSubMeshes[lod] = s + mesh.subMeshCount;
                 if (lod == 0)
                 {
-                    Bounds b = r.bounds;
+                    // Renderer.bounds is not reliable on assets that are not in a scene; use the mesh bounds instead.
+                    Bounds b = TransformBounds(mesh.bounds, r.transform.localToWorldMatrix);
                     if (bounds.HasValue)
                     {
                         Bounds acc = bounds.Value;
@@ -258,7 +266,8 @@ namespace MetinAR.Editor.AssetPipeline
             if (bounds.HasValue)
             {
                 Bounds b = bounds.Value;
-                if (category != AssetCategory.Weapon && Mathf.Abs(b.min.y) > GroundTolerance)
+                // Weapons pivot on the grip; Player (FPP arms) pivots on the camera origin (METINAR-FPP-ART-001 §2).
+                if (category != AssetCategory.Weapon && category != AssetCategory.Player && Mathf.Abs(b.min.y) > GroundTolerance)
                 {
                     issues.Add(PipelineIssue.Warning(path, "Pivot is not on the ground: mesh min Y = " + b.min.y.ToString("0.000") + " m (expected 0 ± " + GroundTolerance + ")."));
                 }
@@ -385,6 +394,21 @@ namespace MetinAR.Editor.AssetPipeline
             }
 
             return null;
+        }
+
+        private static Bounds TransformBounds(Bounds local, Matrix4x4 m)
+        {
+            var result = new Bounds(m.MultiplyPoint3x4(local.center), Vector3.zero);
+            for (int i = 0; i < 8; i++)
+            {
+                var corner = new Vector3(
+                    (i & 1) == 0 ? local.min.x : local.max.x,
+                    (i & 2) == 0 ? local.min.y : local.max.y,
+                    (i & 4) == 0 ? local.min.z : local.max.z);
+                result.Encapsulate(m.MultiplyPoint3x4(corner));
+            }
+
+            return result;
         }
 
         private static int TriangleCount(Mesh mesh)

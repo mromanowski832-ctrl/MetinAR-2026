@@ -1,0 +1,10 @@
+# METINAR-FPP-ART-001 — provenance / licence record (METINAR-009 section 11)
+asset_id: FppSword
+origin: original
+author: MetinAR project (Grok Bot implementation agent for the owner Michał Romanowski)
+license: MetinAR-Owned
+commercial_use: yes
+created_with: Blender 4.2.3 LTS (official blender.org build) driven by project scripts art-source/FppHandsSword/*.py; one-handed/two-handed sword with grip and FX sockets; geometry, rig, animation, UVs and textures generated procedurally; Cycles bakes; Unity 6000.6.4f1 for materials/controller/prefabs
+date_added: 2026-10-21
+modifications: n/a (first version)
+notes: no external meshes, scans, textures, marketplace or AI-generated content; the owner's reference image was NOT used as a model or texture; reproducible with blender -b --factory-startup --python art-source/FppHandsSword/fpp_build.py -- full <out_dir>
