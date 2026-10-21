@@ -17,5 +17,6 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/QA/FrameStatsAccumulator.cs" Link="Production/FrameStatsAccumulator.cs" />
     <!-- #31: engine-free APK player-data check used by MetinARAndroidDevBuild. -->
     <Compile Include="../../client/Assets/MetinAR/Editor/Build/AndroidPlayerDataValidator.cs" Link="Production/AndroidPlayerDataValidator.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Editor/SmokeExceptionClassifier.cs" Link="Production/SmokeExceptionClassifier.cs" />
   </ItemGroup>
 </Project>
