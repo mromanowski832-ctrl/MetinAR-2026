@@ -93,21 +93,29 @@ Runtime voice count (`AudioManager` real voices 32) is unchanged. Not measured o
 
 | File | Length | WAV | ADPCM est. | Use |
 |---|---|---|---|---|
-| `SFX/Combat/SFX_Combat_SwordSwing_01.wav` | 0.38 s | 33 560 B | ~9.3 KB | sword swing (whoosh) |
-| `SFX/Combat/SFX_Combat_SwordHit_01.wav` | 0.42 s | 37 088 B | ~10.3 KB | blade hits a mob |
-| `SFX/Combat/SFX_Combat_ShieldBlock_01.wav` | 0.50 s | 44 144 B | ~11.4 KB | shield block (wood + metal rim) |
-| `SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Attack_01.wav` | 0.55 s | 48 554 B | ~12.4 KB | spider attack (hiss + mandibles) |
-| `SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Hit_01.wav` | 0.36 s | 31 796 B | ~8.3 KB | spider hurt |
-| `SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Death_01.wav` | 1.20 s | 105 884 B | ~26.7 KB | spider death |
-| `SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Step_01..03.wav` | 0.12 s each | 10 628 B each | ~3.2 KB each | leg taps (3 variants) |
-| `SFX/UI/SFX_UI_Click_01.wav` | 0.06 s | 5 336 B | ~2.1 KB | UI button |
-| `SFX/Combat/SFX_Combat_AuraStart_01.wav` | 1.20 s | 105 884 B | ~26.7 KB | Aura cast: rising energy, burst at 0.65 s (= `AuraBurstSeconds`), settles by 1.15 s |
-| `SFX/Combat/SFX_Combat_AuraLoop_01.wav` | 2.00 s (88 200 samples) | 176 444 B | ~45.2 KB | Aura active on the blade, played with `AudioSource.loop` |
-| `SFX/Combat/SFX_Combat_AuraStop_01.wav` | 0.60 s | 52 964 B | ~13.4 KB | Aura expiry: pitch drop + crackling discharge |
+| `SFX/Combat/SFX_Combat_SwordSwing_01.wav` | 0.379 s (16 704 samples) | 33 452 B | ~9.3 KB | sword swing (whoosh) |
+| `SFX/Combat/SFX_Combat_SwordHit_01.wav` | 0.419 s (18 496 samples) | 37 036 B | ~10.3 KB | blade hits a mob |
+| `SFX/Combat/SFX_Combat_ShieldBlock_01.wav` | 0.499 s (22 016 samples) | 44 076 B | ~11.3 KB | shield block (wood + metal rim) |
+| `SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Attack_01.wav` | 0.549 s (24 192 samples) | 48 428 B | ~12.4 KB | spider attack (hiss + mandibles) |
+| `SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Hit_01.wav` | 0.360 s (15 872 samples) | 31 788 B | ~8.3 KB | spider hurt |
+| `SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Death_01.wav` | 1.199 s (52 864 samples) | 105 772 B | ~26.7 KB | spider death |
+| `SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Step_01..03.wav` | 0.119 s (5 248 samples) each | 10 540 B each | ~3.2 KB each | leg taps (3 variants) |
+| `SFX/UI/SFX_UI_Click_01.wav` | 0.060 s (2 624 samples) | 5 292 B | ~2.1 KB | UI button |
+| `SFX/Combat/SFX_Combat_AuraStart_01.wav` | 1.199 s (52 864 samples) | 105 772 B | ~26.7 KB | Aura cast: rising energy, burst at 0.65 s (= `AuraBurstSeconds`), settles by 1.15 s |
+| `SFX/Combat/SFX_Combat_AuraLoop_01.wav` | 1.99982 s (88 192 samples) | 176 428 B | ~45.1 KB | Aura active on the blade, played with `AudioSource.loop` |
+| `SFX/Combat/SFX_Combat_AuraStop_01.wav` | 0.599 s (26 432 samples) | 52 908 B | ~13.4 KB | Aura expiry: pitch drop + crackling discharge |
 
-Total sources 673 538 B (budget 2 MiB); ADPCM estimate (ffmpeg `adpcm_ima_wav`) ~175 KB. Aura loop peak −12 dBFS
+Total sources 672 572 B (budget 2 MiB); ADPCM estimate (ffmpeg `adpcm_ima_wav`) ~175 KB. Aura loop peak −12 dBFS
 (RMS ≈ −21 dBFS, a dense 6 s bed), Aura start −1 dBFS, Aura stop −4 dBFS. Peaks normalised: hits/blocks −1 dBFS,
 mob −2 dBFS, swing −3 dBFS, steps and UI click −6 dBFS (quieter by design). Unity `normalize` is off so these levels hold.
+
+Every SFX length is a whole number of 64-sample blocks (lengths rounded **down** from the nominal duration).
+Reason: Unity's ADPCM import pads a clip to the next multiple of 64 samples — measured in Unity 6000.6.4f1 on LuzMen,
+the former 88 200-sample loop imported as 88 256 samples (`AudioClip.length` 2.00127 s, verifier FAIL against 2.0 s,
+report in #42) and left ~56 padded samples (~1.3 ms) of silence at the loop seam. With aligned sources the imported
+length equals the source length. Enforced by `AudioPipelineRules.CheckAdpcmBlockAlignment` (part of `ValidateAsset`
+for every SFX), the repository test `EverySfxSourceIsAWholeNumberOfAdpcmBlocks`, `generate_sfx.py` (refuses to write an
+unaligned clip) and `generate_sfx.py --check` (`lengths multiple of 64 samples: YES`).
 
 Regenerate: `python3 tools/audio/generate_sfx.py`. Check bytes: `python3 tools/audio/generate_sfx.py --check`
 (bit-identical with numpy 2.5.4; other numpy versions may differ in the last bits — then update the SHA-256 in LICENSES.md
@@ -121,14 +129,17 @@ final duration undecided). The Aura is therefore Start (one-shot) → Loop (whil
 - A loop clip is an SFX whose event ends in `Loop` (`SFX_Combat_AuraLoop_01.wav`). It stays in the **SFX profile**
   (ADPCM, Decompress On Load, mono, preload): 2 s mono is ~172 KiB PCM in RAM, played without per-frame decoding on
   the A31; no separate import profile is needed. Looping is an `AudioSource.loop` setting. Budget: category **Loop**
-  (≤ 2.5 s, ≤ 64 KB ADPCM estimate, owner decision #60); the Aura loop is 2.0 s, ~44 KB.
-- Seamless by construction: every partial and modulation has an integer number of cycles in exactly 88 200 samples,
+  (≤ 2.5 s, ≤ 64 KB ADPCM estimate, owner decision #60); the Aura loop is 1.99982 s, ~44 KB.
+- Seamless by construction: every partial and modulation has an integer number of cycles in exactly 88 192 samples
+  (1378 ADPCM blocks, 1.99982 s): the partials are re-tuned to whole cycles per loop (`loop_hz`: 110.010 Hz = 220
+  cycles, shimmer 1320.12 / 1981.68 / 2643.24 Hz = 2640 / 3963 / 5286 cycles), not cut from a longer render,
   the noise layer is synthesised periodically in the frequency domain, and there are no fades.
   `generate_sfx.py --check` renders two periods and checks they repeat (`aura loop periodic: YES`).
 - Gate (`AudioPipelineRules.CheckLoopSeam`, run for every loop clip): seam step |x[0] − x[N−1]| and the second differences
   across the seam must not exceed the largest inside the clip, and the first/last 50 ms RMS must agree within 3 dB.
   Unit tests cover a seamless integer-cycle sine and failing half-cycle cut, kink and faded loops.
-- Risk (not verified in Unity/A31 here): ADPCM quantisation could add a tiny step at the seam after import. Vorbis /
+- ADPCM block padding (measured, see above) is avoided by the 64-sample-aligned length. Remaining risk: ADPCM
+  quantisation could add a tiny step at the seam after import. Vorbis /
   MP3 are not used for this loop (encoder padding is the usual cause of loop gaps). To be checked by ear on the A31.
 
 ## 7. Hooks for stage 5 (not wired in this issue)

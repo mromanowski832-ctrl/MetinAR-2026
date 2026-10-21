@@ -381,6 +381,27 @@ namespace MetinAR.Editor.Audio
             return problems;
         }
 
+        /// <summary>
+        /// Unity's ADPCM import stores whole blocks of 64 samples and pads a clip up to the next multiple
+        /// (verified in Unity 6000.6.4f1 on LuzMen: 88 200 -> 88 256 samples, AudioClip.length 2.00127 s). SFX sources
+        /// must therefore be a whole number of blocks: the imported length then equals the source length (the
+        /// budget check holds after import) and a loop has no padded silence at its seam.
+        /// </summary>
+        public const int AdpcmBlockFrames = 64;
+
+        /// <summary>null when <paramref name="frames"/> is a whole number of ADPCM blocks, otherwise the problem.</summary>
+        public static string CheckAdpcmBlockAlignment(long frames)
+        {
+            if (frames % AdpcmBlockFrames == 0)
+            {
+                return null;
+            }
+
+            long padded = (frames / AdpcmBlockFrames + 1) * AdpcmBlockFrames;
+            return string.Format(CultureInfo.InvariantCulture,
+                "{0} samples is not a multiple of {1} (Unity ADPCM pads to {2}; round the length down)", frames, AdpcmBlockFrames, padded);
+        }
+
         /// <summary>Budget for all SFX source files together (lossless WAV in the repo, before Unity compression).</summary>
         public const long TotalSfxSourceBytesBudget = 2L * 1024 * 1024;
 
@@ -455,6 +476,12 @@ namespace MetinAR.Editor.Audio
                     foreach (string problem in budget.Check(info, data.LongLength))
                     {
                         issues.Add(AudioIssue.Error(p, "budget: " + problem));
+                    }
+
+                    string block = IsSfx(category) && info.Format == "wav" ? CheckAdpcmBlockAlignment(info.Frames) : null;
+                    if (block != null)
+                    {
+                        issues.Add(AudioIssue.Error(p, "budget: " + block));
                     }
 
                     if (IsLoopClip(p) && info.Format == "wav" && info.Channels == 1 && info.BitsPerSample == 16)

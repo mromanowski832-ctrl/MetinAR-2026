@@ -591,7 +591,7 @@ namespace AssetPipeline.Tests
             string path = "Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_AuraLoop_01.wav";
             var ledger = AudioLicenseLedger.Parse(Ledger("SFX/Combat/SFX_Combat_AuraLoop_01.wav", sha: AudioPipelineRules.Sha256Hex(bad)));
             Assert.Contains(AudioPipelineRules.ValidateAsset(path, bad, Meta(0, 2), ledger), i => i.Message.StartsWith("loop:"));
-            byte[] good = WavFrom(Sine(220, 44100));
+            byte[] good = WavFrom(Sine(220.0 * 44100 / 44032, 44032)); // 688 ADPCM blocks, exactly 220 cycles
             ledger = AudioLicenseLedger.Parse(Ledger("SFX/Combat/SFX_Combat_AuraLoop_01.wav", sha: AudioPipelineRules.Sha256Hex(good)));
             Assert.Empty(AudioPipelineRules.ValidateAsset(path, good, Meta(0, 2), ledger));
         }
@@ -599,7 +599,7 @@ namespace AssetPipeline.Tests
         [Fact]
         public void ValidateAssetRequiresLedgerEntryMatchingShaAndMeta()
         {
-            byte[] wav = Wav(1, 44100, 16, 4410);
+            byte[] wav = Wav(1, 44100, 16, 4416);
             string path = "Assets/MetinAR/Audio/SFX/UI/SFX_UI_Click_01.wav";
             string sha = AudioPipelineRules.Sha256Hex(wav);
             Assert.Empty(AudioPipelineRules.ValidateAsset(path, wav, Meta(0, 2), AudioLicenseLedger.Parse(Ledger("SFX/UI/SFX_UI_Click_01.wav", sha: sha))));
@@ -607,6 +607,27 @@ namespace AssetPipeline.Tests
             Assert.Contains(AudioPipelineRules.ValidateAsset(path, wav, Meta(0, 2), AudioLicenseLedger.Parse(Ledger("SFX/UI/SFX_UI_Click_01.wav"))), i => i.Message.Contains("does not match"));
             Assert.Contains(AudioPipelineRules.ValidateAsset(path, wav, null, AudioLicenseLedger.Parse(Ledger("SFX/UI/SFX_UI_Click_01.wav", sha: sha))), i => i.Message.Contains(".meta"));
             Assert.Contains(AudioPipelineRules.ValidateAsset(path, wav, Meta(0, 2), null), i => i.Message.Contains("LICENSES.md"));
+        }
+
+        [Theory]
+        [InlineData(64L, true)]
+        [InlineData(22016L, true)]   // 0.49923 s - fits UI <= 0.5 s after import
+        [InlineData(88192L, true)]   // Aura loop, 1378 blocks
+        [InlineData(22050L, false)]  // 0.5 s exactly -> Unity pads to 22 080 = 0.50068 s
+        [InlineData(88200L, false)]  // 2.0 s exactly -> Unity pads to 88 256 = 2.00127 s
+        [InlineData(1L, false)]
+        public void AdpcmBlockAlignmentRule(long frames, bool ok)
+        {
+            Assert.Equal(ok, AudioPipelineRules.CheckAdpcmBlockAlignment(frames) == null);
+        }
+
+        [Fact]
+        public void ValidateAssetRejectsSfxThatUnityWouldPad()
+        {
+            byte[] wav = Wav(1, 44100, 16, 22050);
+            string path = "Assets/MetinAR/Audio/SFX/UI/SFX_UI_Click_01.wav";
+            var ledger = AudioLicenseLedger.Parse(Ledger("SFX/UI/SFX_UI_Click_01.wav", sha: AudioPipelineRules.Sha256Hex(wav)));
+            Assert.Contains(AudioPipelineRules.ValidateAsset(path, wav, Meta(0, 2), ledger), i => i.Message.Contains("not a multiple of 64") && i.Message.Contains("22080"));
         }
     }
 
@@ -851,10 +872,29 @@ namespace AssetPipeline.Tests
             AudioFormatInfo info = AudioFormatInfo.ParseWav(data);
             Assert.True(AudioPipelineRules.IsLoopClip(f));
             Assert.Equal(1, info.Channels);
-            Assert.Equal(88200, info.Frames); // exactly 2.000 s: every partial has an integer number of cycles
+            Assert.Equal(88192, info.Frames); // 1378 ADPCM blocks (1.99982 s): every partial has an integer number of cycles
+            Assert.True(info.Seconds < 2.0);
             List<string> seam = AudioPipelineRules.CheckLoopSeam(AudioFormatInfo.ReadPcm16(data), info.SampleRate);
             Assert.True(seam.Count == 0, string.Join("\n", seam));
             Assert.Equal(AudioCategory.CombatSfx, AudioPipelineRules.ClassifyPath(f)); // SFX profile (ADPCM, Decompress On Load)
+        }
+
+        [Fact]
+        public void EverySfxSourceIsAWholeNumberOfAdpcmBlocks()
+        {
+            // Unity pads ADPCM clips to 64-sample blocks; a source that is not aligned grows on import
+            // (budget overrun after import, silence in a loop seam).
+            var bad = new List<string>();
+            foreach (string f in AudioFiles().Where(f => AudioPipelineRules.IsSfx(AudioPipelineRules.ClassifyPath(f))))
+            {
+                AudioFormatInfo info = AudioFormatInfo.ParseWav(File.ReadAllBytes(f));
+                if (info.Error != null || info.Frames % AudioPipelineRules.AdpcmBlockFrames != 0)
+                {
+                    bad.Add(AudioPipelineRules.LedgerPath(f) + " frames=" + info.Frames);
+                }
+            }
+
+            Assert.True(bad.Count == 0, "not a multiple of 64 samples: " + string.Join(", ", bad));
         }
 
         [Fact]
