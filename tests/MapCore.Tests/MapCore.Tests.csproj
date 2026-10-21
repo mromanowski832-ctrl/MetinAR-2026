@@ -18,5 +18,7 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/Location/GeoMath.cs" Link="Production/GeoMath.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Map/Core/*.cs" LinkBase="Production/Map/Core" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Map/Osm/*.cs" LinkBase="Production/Map/Osm" />
+    <!-- P8 side-by-side build target: pure save/apply/restore plan only (the Unity adapter is not compiled here). -->
+    <Compile Include="../../client/Assets/MetinAR/Editor/MapPocP8BuildPlan.cs" Link="Production/Editor/MapPocP8BuildPlan.cs" />
   </ItemGroup>
 </Project>

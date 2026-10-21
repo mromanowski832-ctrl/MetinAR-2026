@@ -189,9 +189,9 @@ No phone was attached over ADB, so P8 performance and physical GPS are **UNVERIF
 For the owner:
 
 1. Enable USB debugging, connect the phone to LuzMen, accept the RSA prompt; `adb devices` must list it.
-2. `adb install -r client/Builds/Android/MetinAR-osm-poc-dev.apk`. **Warning:** this APK uses the same package id
-   `com.metinar.game` as the FPP build (#31), so it replaces the installed FPP app. Coordinate in #33 first
-   (see "P8 measurement package" below).
+2. Install the **side-by-side P8 variant** `client/Builds/Android/MetinAR-mappoc-p8-dev.apk`
+   (`com.metinar.game.mappoc`), not the old `MetinAR-osm-poc-dev.apk`. The old APK uses the product id
+   `com.metinar.game` and would replace the FPP app. See "P8 measurement package" below.
 3. Start the app, choose **Demo: Kraków** (dense old-town block, no GPS used) and let the map load.
    Then orbit (one-finger drag), pinch-zoom and two-finger tilt for about 60 s.
 4. Read the overlay or `adb logcat -s Unity | findstr OsmPocPerf`: fps / frameMs avg / p95, drawCalls, setPass,
@@ -204,7 +204,23 @@ For the owner:
 Status: **UNVERIFIED**. This section is a protocol, not a result. The Samsung Galaxy A31 is reserved for #31 (FPP).
 Coordinate the slot in #33 before using it.
 
-#### Exact build under test
+#### Side-by-side P8 variant (controller decision on PR #28, comment 6305001886, option b)
+
+| Item | Value |
+|---|---|
+| Build method | `Unity -batchmode -projectPath client -executeMethod MetinAR.Editor.MapPocP8AndroidBuild.BuildP8Apk -logFile -` |
+| Output | `client/Builds/Android/MetinAR-mappoc-p8-dev.apk` (not committed) |
+| applicationId / label | `com.metinar.game.mappoc` / `MetinAR Mapa TEST`. This is a test-tool id only, not a product rename or a release |
+| Scene | `[WorldMapOsmPoc]` only (same as `BuildPocApk`), ARM64 IL2CPP development build, debug keystore |
+| Settings safety | `MapPocP8BuildPlan.RunWithVariant` captures applicationId (Android), productName, scripting backend, target architectures, useCustomKeystore, buildAppBundle, androidBuildSystem and androidBuildType. It applies the variant and restores every field in `finally`, also after a failed build, an exception or a partly applied variant. It then saves assets and logs `settings restored` or `RESTORE MISMATCH`. `EditorApplication.Exit` runs only after the restore. It refuses to run if the variant id is invalid or equals the product id |
+| Tests | `tests/MapCore.Tests/MapPocP8BuildPlanTests.cs` covers the pure plan (restore after success, failure, exception and partial apply; a failing restore step doesn't stop the others; product id refused) |
+| Expected after build | `git status` shows no new ProjectSettings changes |
+
+Before installing, confirm there is no id collision: `adb shell pm list packages com.metinar.game` lists `com.metinar.game` (FPP) and, after install, `com.metinar.game.mappoc` as a separate entry. Never uninstall `com.metinar.game` or clear its data.
+
+The new APK needs its own record of source SHA, SHA256, Unity version and manifest/id audit. The hash of the old APK below does **not** carry over to it.
+
+#### Previous POC APK (superseded for P8 because it uses the product id)
 
 | Item | Value |
 |---|---|
@@ -216,26 +232,26 @@ Coordinate the slot in #33 before using it.
 | Package id | `com.metinar.game`, the same as the FPP / #31 dev build. **Installing replaces FPP.** Debug keystore, ARM64 IL2CPP development build |
 | Build-time local state | The LuzMen checkout still has 4 uncommitted settings files that Unity rewrote (`DefaultVolumeProfile`, `URP-Performant`, `UniversalRenderPipelineGlobalSettings`, `UnityConnectSettings`). These are URP shader-prefilter flags with no map code. They were written before the APK finished |
 
-Before you install, re-run `Get-FileHash <apk> -Algorithm SHA256` and compare it with the hash above.
+Before you install, re-run `Get-FileHash <apk> -Algorithm SHA256` on the **P8 variant** APK and compare it with the hash recorded for that variant on PR #28.
 
 #### Preconditions (all must hold)
 
-1. #33 records that #31 has released the A31, and that someone has agreed on how the FPP app comes back afterwards: reinstall the FPP APK `52a1375` or another build named in #31.
+1. #33 records that #31 has released the A31. The P8 variant installs next to FPP, so FPP is neither overwritten nor uninstalled.
 2. `adb devices` lists exactly one device. Don't paste its serial number or its wireless-debugging IP anywhere.
 3. Phone setup: charged above 50 %, not charging if possible, at room temperature, screen brightness fixed, Wi-Fi on. Write down whether the network was Wi-Fi or mobile data.
-4. `adb shell dumpsys package com.metinar.game | findstr versionName` is recorded before and after, so the swap is visible.
+4. Record `adb shell dumpsys package com.metinar.game | findstr versionName` before and after to show that FPP was left untouched.
 
 #### Run (Demo: Kraków)
 
-1. `adb install -r <apk>`. This replaces FPP, so do it only under the agreed slot.
+1. `adb install MetinAR-mappoc-p8-dev.apk` (package `com.metinar.game.mappoc`) under the agreed slot.
 2. `adb logcat -c`, then in a second shell `adb logcat -s Unity | findstr /C:"[OsmPocPerf]" > p8-osm.txt`. Keep this file outside the repo.
 3. Launch the app and tap **Demo: Kraków**. Wait until `initialAreaMs` shows a value (≠ 0 / -1). That is the cold-cache first run.
 4. **Idle 30 s.** Don't touch the screen.
 5. **Pan 30 s.** Make 10 repeatable one-finger drags with `adb shell input swipe 200 1200 900 1200 400`, with about 2 s between them, then pinch-zoom and two-finger tilt by hand for about 15 s.
-6. Run `adb shell dumpsys meminfo com.metinar.game` after the idle phase and again after the pan phase. Record `TOTAL PSS` only.
+6. Run `adb shell dumpsys meminfo com.metinar.game.mappoc` after the idle phase and again after the pan phase. Record `TOTAL PSS` only.
 7. Kill and restart the app, then repeat steps 3–4 once. That is the warm-cache run.
 8. Optionally record `adb shell dumpsys thermalservice | findstr "Status"` at the end.
-9. Afterwards, reinstall the FPP build as agreed in #33 and post `LOCAL SLOT RELEASED`.
+9. Afterwards, check again that the FPP `versionName` hasn't changed, then post `LOCAL SLOT RELEASED`. Removing the test app is a separate decision; this protocol doesn't do it.
 
 #### Measurement table (fill in; anything not measured stays UNVERIFIED)
 
@@ -253,7 +269,7 @@ Before you install, re-run `Get-FileHash <apk> -Algorithm SHA256` and compare it
 | Geometry | `tris=` / `renderers=` | | | | record |
 | Pan responsiveness | max `frameMs` during swipes plus a 1–5 rating (1 = smooth, 5 = clearly stuttering) | n/a | | n/a | record |
 | Spawn safety (demo) | `spawn mob=` / `npc=` | | | | Allowed |
-| APK size | file length | 51,537,451 B | | | record |
+| APK size | file length of the P8 variant | | | | record |
 | Thermal status | `dumpsys thermalservice` | | | | record |
 
 #### Privacy rules for the report
