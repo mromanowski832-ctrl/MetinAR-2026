@@ -4,14 +4,32 @@ Every audio file under `client/Assets/MetinAR/Audio` must have exactly one row i
 The test `tests/AssetPipeline.Tests` (`AudioRepositoryTests`) fails when a file has no row, a row has no file,
 the SHA-256 does not match the bytes, the licence is not allowed or the file breaks its budget / import profile.
 
-Rules (see `docs/METINAR-018-AUDIO-PIPELINE.md`):
+Rules (see `docs/METINAR-018-AUDIO-PIPELINE.md`, owner decision 2026-10-21 in #42):
 
-- `origin`: `original` (made by the project, licence `MetinAR-Owned`), `cc0` (licence `CC0-1.0`, source must contain the
-  download URL and the author). `third_party` with any other licence is currently not allowed.
-- Allowed licences: `MetinAR-Owned`, `CC0-1.0` (production decision 2026-10-21 in #42: CC-BY-4.0 not for now).
+- `origin` / licence:
+  - `original` → `MetinAR-Owned` (made by the project).
+  - `cc0` → `CC0-1.0`; `Source` must contain the author and the download URL.
+  - `cc_by` → `CC-BY-x.y` (e.g. `CC-BY-4.0`, `CC-BY-3.0`); `Source` must contain the author and the download URL, and the
+    file needs one row in the **CC-BY attribution** table below (all fields required, none empty or `-`).
+- Excluded: any CC licence with NC, ND or SA terms (`CC-BY-NC-*`, `CC-BY-ND-*`, `CC-BY-SA-*` and combinations such as
+  `CC-BY-NC-SA-*`), anything from Metin2 / Gameforge / Ymir, paid sound libraries, ripped game audio, unclear licences.
   Any other licence needs an owner decision first.
-- Forbidden: anything from Metin2 / Gameforge / Ymir, paid sound libraries, ripped game audio, unclear licences.
-- `File` is relative to `client/Assets/MetinAR/Audio`.
+- CC-BY rows must later appear on the in-game credits screen (no screen yet: dependency recorded for spec #40).
+- `File` is relative to `client/Assets/MetinAR/Audio`. The SHA-256 is of the file bytes as committed.
+
+Entry format (example only — fenced blocks are ignored by the test):
+
+```text
+| File | Origin | Author | License | Source | SHA-256 |
+| `SFX/Combat/SFX_Combat_SwordHit_02.wav` | cc_by | Jane Doe | CC-BY-4.0 | Jane Doe, https://example.org/sounds/123 | `<64 hex>` |
+
+| File | Title | Author | Source URL | License | Changes |
+| `SFX/Combat/SFX_Combat_SwordHit_02.wav` | Steel Hit | Jane Doe | https://example.org/sounds/123 | CC-BY-4.0 | trimmed to 0.4 s, mono, peak -1 dBFS |
+```
+
+Attribution fields: `Title` = title of the original work; `Author` = exactly as in the ledger row; `Source URL` = absolute
+http(s) link to the original; `License` = licence version, same as the ledger row; `Changes` = what we changed
+(trim, fades, pitch, mix…) or `unmodified`.
 
 ## Ledger
 
@@ -27,6 +45,10 @@ Rules (see `docs/METINAR-018-AUDIO-PIPELINE.md`):
 | `SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Step_02.wav` | original | MetinAR project (Grok Bot — Dźwięk i muzyka, for the owner Michał Romanowski) | MetinAR-Owned | procedural synthesis, `tools/audio/generate_sfx.py` spider_step(), seed 1808 | `d6573903d641756da066617f8d3a646f5c943ceeb7e3d4191ac07da39255803d` |
 | `SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Step_03.wav` | original | MetinAR project (Grok Bot — Dźwięk i muzyka, for the owner Michał Romanowski) | MetinAR-Owned | procedural synthesis, `tools/audio/generate_sfx.py` spider_step(), seed 1809 | `8d75ec0df76ac2e47d28c8c8ee405ee6ac720dbfc713993340c1579cb09b9821` |
 | `SFX/UI/SFX_UI_Click_01.wav` | original | MetinAR project (Grok Bot — Dźwięk i muzyka, for the owner Michał Romanowski) | MetinAR-Owned | procedural synthesis, `tools/audio/generate_sfx.py` ui_click(), seed 1810 | `51e851c96b5c09e3e615912efa7a561cf0d0be3019ab55a5838fa999a23c6017` |
+
+## CC-BY attribution
+
+No CC-BY files yet. Add a table with the header `| File | Title | Author | Source URL | License | Changes |` here.
 
 ## Notes on the original SFX (METINAR-018)
 

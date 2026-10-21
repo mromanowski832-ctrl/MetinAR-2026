@@ -59,8 +59,17 @@ Runtime voice count (`AudioManager` real voices 32) is unchanged. Not measured o
 
 ## 5. Licence rules
 
-- Allowed: `original` / `MetinAR-Owned` (made by the project) and `cc0` / `CC0-1.0` with download URL and author.
-  Production decision 2026-10-21 (#42): CC-BY-4.0 not for now. Anything else is an owner decision.
+- Owner decision 2026-10-21 (#42, supersedes the earlier "CC-BY not for now"):
+  - `original` / `MetinAR-Owned`: made by the project.
+  - `cc0` / `CC0-1.0`: download URL and author in `Source`.
+  - `cc_by` / `CC-BY-x.y` (e.g. CC-BY-4.0): download URL and author in `Source`, plus one row in the **CC-BY attribution**
+    table of `Audio/LICENSES.md`: `| File | Title | Author | Source URL | License | Changes |`. All fields are required;
+    empty or `-` is rejected; `Author` and `License` must equal the ledger row; `Source URL` must be an absolute http(s)
+    URL; `Changes` describes the edits or says `unmodified`. Attribution rows without a `cc_by` ledger entry are rejected.
+  - Excluded: CC licences with NC, ND or SA terms (CC-BY-NC, CC-BY-ND, CC-BY-SA and combinations, any version or
+    spelling). Anything else is an owner decision.
+- CC-BY entries must appear on an in-game credits screen. There is none yet: dependency for the spec #40.
+- Format examples in fenced code blocks inside `LICENSES.md` are ignored by the parser.
 - Forbidden: Metin2 / Gameforge / Ymir content, ripped game audio, paid libraries, unclear licences.
 - The ledger stores the SHA-256 of each file; replacing the bytes without updating provenance fails the test.
 

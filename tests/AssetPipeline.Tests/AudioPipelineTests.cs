@@ -195,8 +195,8 @@ namespace AssetPipeline.Tests
         [InlineData("cc0", "CC0-1.0", "freesound, no link", "URL")]
         [InlineData("cc0", "CC0-1.0", "ripped from Metin2 client https://x.org/a", "proprietary")]
         [InlineData("third_party", "Proprietary-Pack", "https://shop.example/pack", "not allowed")]
-        [InlineData("third_party", "CC-BY-4.0", "Jane Doe, https://example.org/sound/2", "not allowed")]
-        [InlineData("bought", "MetinAR-Owned", "store", "must be original, cc0 or third_party")]
+        [InlineData("third_party", "CC-BY-4.0", "Jane Doe, https://example.org/sound/2", "requires origin 'cc_by'")]
+        [InlineData("bought", "MetinAR-Owned", "store", "must be original, cc0 or cc_by")]
         public void LedgerRejectsBadProvenance(string origin, string license, string source, string expected)
         {
             var issues = AudioLicenseLedger.Parse(Ledger("SFX/UI/SFX_UI_Click_01.wav", origin, license, source)).Validate();
@@ -211,6 +211,147 @@ namespace AssetPipeline.Tests
             Assert.Contains(AudioLicenseLedger.Parse(dup).Validate(), i => i.Message.Contains("duplicate"));
             Assert.Contains(AudioLicenseLedger.Parse(Ledger("a.wav", sha: "abc")).Validate(), i => i.Message.Contains("SHA-256"));
             Assert.Contains(AudioLicenseLedger.Parse(Ledger("a.wav", author: " ")).Validate(), i => i.Message.Contains("author"));
+        }
+
+        // ---- CC-BY (owner decision 2026-10-21, #42): allowed with full attribution; NC / ND / SA excluded.
+
+        private const string CcByFile = "SFX/Combat/SFX_Combat_SwordHit_02.wav";
+        private const string CcByAuthor = "Jane Doe";
+
+        private static string CcByLedger(string license = "CC-BY-4.0", string title = "Steel Hit", string author = CcByAuthor,
+            string url = "https://example.org/sounds/123", string attrLicense = null, string changes = "trimmed to 0.4 s, mono, peak -1 dBFS",
+            bool attributionRow = true, string ledgerSource = "Jane Doe, https://example.org/sounds/123")
+        {
+            string text = Ledger(CcByFile, "cc_by", license, ledgerSource, author: CcByAuthor);
+            if (attributionRow)
+            {
+                text += "\n## CC-BY attribution\n\n| File | Title | Author | Source URL | License | Changes |\n|---|---|---|---|---|---|\n" +
+                        "| `" + CcByFile + "` | " + title + " | " + author + " | " + url + " | " + (attrLicense ?? license) + " | " + changes + " |\n";
+            }
+
+            return text;
+        }
+
+        [Theory]
+        [InlineData("CC-BY-4.0")]
+        [InlineData("CC-BY-3.0")]
+        [InlineData("CC-BY-2.5")]
+        public void CcByWithCompleteAttributionIsValid(string license)
+        {
+            AudioLicenseLedger l = AudioLicenseLedger.Parse(CcByLedger(license));
+            Assert.Single(l.Attributions);
+            Assert.Equal("Steel Hit", l.Attributions[0].Title);
+            List<AudioIssue> issues = l.Validate();
+            Assert.True(issues.Count == 0, string.Join("\n", issues));
+            Assert.True(AudioPipelineRules.IsAllowedLicense(license));
+        }
+
+        [Fact]
+        public void CcByUnmodifiedIsAcceptedWhenStatedExplicitly()
+        {
+            Assert.Empty(AudioLicenseLedger.Parse(CcByLedger(changes: "unmodified")).Validate());
+        }
+
+        [Theory]
+        [InlineData("CC-BY-NC-4.0")]
+        [InlineData("CC-BY-ND-4.0")]
+        [InlineData("CC-BY-SA-4.0")]
+        [InlineData("CC-BY-NC-SA-4.0")]
+        [InlineData("CC-BY-NC-ND-4.0")]
+        [InlineData("CC-BY-SA-3.0")]
+        [InlineData("cc-by-nc-4.0")]
+        [InlineData("CC BY-NC 4.0")]
+        public void CcByWithNcNdSaIsRejected(string license)
+        {
+            Assert.True(AudioLicenseLedger.IsRestrictedCc(license));
+            Assert.False(AudioPipelineRules.IsAllowedLicense(license));
+            List<AudioIssue> issues = AudioLicenseLedger.Parse(CcByLedger(license)).Validate();
+            Assert.Contains(issues, i => i.Message.Contains("NC/ND/SA"));
+        }
+
+        [Theory]
+        [InlineData("CC-BY")]
+        [InlineData("CC-BY-4")]
+        [InlineData("CC-BY-4.0-international")]
+        [InlineData("CC BY 4.0")]
+        public void MalformedCcByVersionIsRejected(string license)
+        {
+            Assert.False(AudioLicenseLedger.IsRestrictedCc(license));
+            List<AudioIssue> issues = AudioLicenseLedger.Parse(CcByLedger(license)).Validate();
+            Assert.Contains(issues, i => i.Message.Contains("not allowed"));
+        }
+
+        [Theory]
+        [InlineData("title", "", "title missing")]
+        [InlineData("title", "-", "title missing")]
+        [InlineData("author", " ", "author missing")]
+        [InlineData("author", "Someone Else", "differs from the ledger author")]
+        [InlineData("url", "", "source URL")]
+        [InlineData("url", "example.org/sounds/123", "source URL")]
+        [InlineData("license", "", "licence version missing")]
+        [InlineData("license", "CC-BY-3.0", "differs from the ledger licence")]
+        [InlineData("license", "CC-BY-SA-4.0", "NC/ND/SA")]
+        [InlineData("changes", "", "changes missing")]
+        [InlineData("changes", "—", "changes missing")]
+        public void CcByAttributionFieldsAreRequired(string field, string value, string expected)
+        {
+            string text = field switch
+            {
+                "title" => CcByLedger(title: value),
+                "author" => CcByLedger(author: value),
+                "url" => CcByLedger(url: value),
+                "license" => CcByLedger(attrLicense: value),
+                _ => CcByLedger(changes: value),
+            };
+            List<AudioIssue> issues = AudioLicenseLedger.Parse(text).Validate();
+            Assert.Contains(issues, i => i.Message.Contains(expected));
+        }
+
+        [Fact]
+        public void ExamplesInFencedBlocksAreNotLedgerData()
+        {
+            string text = "```text\n| File | Origin | Author | License | Source | SHA-256 |\n|---|---|---|---|---|---|\n| `x.wav` | cc_by | A | CC-BY-4.0 | https://e.org/x | `" + Sha + "` |\n```\n" + CcByLedger();
+            AudioLicenseLedger l = AudioLicenseLedger.Parse(text);
+            Assert.Single(l.Entries);
+            Assert.Equal(CcByFile, l.Entries[0].File);
+            Assert.Empty(l.Validate());
+        }
+
+        [Fact]
+        public void CcByWithoutAttributionRowIsRejected()
+        {
+            Assert.Contains(AudioLicenseLedger.Parse(CcByLedger(attributionRow: false)).Validate(), i => i.Message.Contains("attribution table"));
+        }
+
+        [Fact]
+        public void CcByLedgerRowNeedsUrlAndAuthor()
+        {
+            Assert.Contains(AudioLicenseLedger.Parse(CcByLedger(ledgerSource: "Jane Doe, freesound")).Validate(), i => i.Message.Contains("download URL"));
+        }
+
+        [Fact]
+        public void AttributionRowWithoutCcByEntryIsRejected()
+        {
+            string text = Ledger("SFX/UI/SFX_UI_Click_01.wav") +
+                          "\n| File | Title | Author | Source URL | License | Changes |\n|---|---|---|---|---|---|\n" +
+                          "| `SFX/UI/SFX_UI_Click_01.wav` | Click | x | https://example.org/a | CC-BY-4.0 | none |\n";
+            Assert.Contains(AudioLicenseLedger.Parse(text).Validate(), i => i.Message.Contains("without a cc_by ledger entry"));
+        }
+
+        [Fact]
+        public void DuplicateAttributionRowsAndWrongColumnCountAreParseErrors()
+        {
+            string row = "| `" + CcByFile + "` | Steel Hit | Jane Doe | https://example.org/sounds/123 | CC-BY-4.0 | unmodified |\n";
+            Assert.Contains(AudioLicenseLedger.Parse(CcByLedger() + "\n| File | Title | Author | Source URL | License | Changes |\n|---|---|---|---|---|---|\n" + row + row).Validate(),
+                i => i.Message.Contains("duplicate attribution"));
+            Assert.Contains(AudioLicenseLedger.Parse(CcByLedger(changes: "a | b")).Validate(), i => i.Message.Contains("columns"));
+        }
+
+        [Fact]
+        public void CcByLicenceOnOriginalOrCc0OriginIsRejected()
+        {
+            Assert.Contains(AudioLicenseLedger.Parse(Ledger("a.wav", "original", "CC-BY-4.0")).Validate(), i => i.Message.Contains("MetinAR-Owned"));
+            Assert.Contains(AudioLicenseLedger.Parse(Ledger("a.wav", "cc0", "CC-BY-4.0", "x https://example.org/a")).Validate(), i => i.Message.Contains("CC0-1.0"));
         }
 
         [Fact]

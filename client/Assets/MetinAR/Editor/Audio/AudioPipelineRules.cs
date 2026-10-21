@@ -37,10 +37,16 @@ namespace MetinAR.Editor.Audio
         public static readonly string[] AudioExtensions = { ".wav", ".ogg", ".mp3", ".aif", ".aiff", ".flac", ".m4a", ".aac" };
 
         /// <summary>
-        /// Licences accepted in the ledger. Production decision 2026-10-21 (#42): only own synthesis or CC0 for now;
-        /// CC-BY-4.0 and anything else need a new owner/production decision before they are added here.
+        /// Fixed licences accepted in the ledger. In addition, plain attribution licences CC-BY-x.y are accepted with a
+        /// complete attribution row (owner decision 2026-10-21, #42). NC / ND / SA variants stay excluded; any other
+        /// licence needs an owner decision first.
         /// </summary>
         public static readonly string[] AllowedLicenses = { "MetinAR-Owned", "CC0-1.0" };
+
+        public static bool IsAllowedLicense(string license)
+        {
+            return Array.IndexOf(AllowedLicenses, license) >= 0 || AudioLicenseLedger.IsCcBy(license);
+        }
 
         /// <summary>Words that must never appear as the source of a MetinAR sound (proprietary game content).</summary>
         public static readonly string[] ForbiddenSourceWords = { "metin2", "metin 2", "gameforge", "ymir" };
@@ -643,18 +649,41 @@ namespace MetinAR.Editor.Audio
         public int Line { get; set; }
     }
 
+    /// <summary>One row of the "CC-BY attribution" table (required for every CC-BY file; feeds the future credits screen).</summary>
+    public sealed class AudioAttributionEntry
+    {
+        public string File { get; set; }
+        public string Title { get; set; }
+        public string Author { get; set; }
+        public string SourceUrl { get; set; }
+        public string License { get; set; }
+        public string Changes { get; set; }
+        public int Line { get; set; }
+    }
+
     /// <summary>
-    /// Parser for Audio/LICENSES.md. Every audio file has one Markdown table row:
+    /// Parser for Audio/LICENSES.md. Every audio file has one row in the ledger table:
     /// | File | Origin | Author | License | Source | SHA-256 |
-    /// Origin: original | cc0 | third_party. File is relative to Assets/MetinAR/Audio and wrapped in back-ticks.
+    /// Origin: original | cc0 | cc_by. File is relative to Assets/MetinAR/Audio and wrapped in back-ticks.
+    /// Every cc_by file additionally has one row in the attribution table:
+    /// | File | Title | Author | Source URL | License | Changes |
     /// </summary>
     public sealed class AudioLicenseLedger
     {
         private static readonly string[] Header = { "file", "origin", "author", "license", "source", "sha-256" };
+        private static readonly string[] AttributionHeader = { "file", "title", "author", "source url", "license", "changes" };
         private static readonly Regex Sha = new Regex("^[0-9a-f]{64}$");
         private static readonly Regex Url = new Regex("https?://\\S+");
+        private static readonly Regex AbsoluteUrl = new Regex("^https?://[^\\s/]+\\.[^\\s]+$");
+
+        /// <summary>Plain attribution licence CC BY x.y (no NC / ND / SA elements), e.g. CC-BY-4.0, CC-BY-3.0.</summary>
+        private static readonly Regex CcBy = new Regex("^CC-BY-(\\d)\\.(\\d)$");
+
+        /// <summary>Any CC licence carrying NonCommercial, NoDerivatives or ShareAlike (also combinations), in any spelling.</summary>
+        private static readonly Regex CcRestricted = new Regex("(?i)^CC[-_ ]?BY.*[-_ ](NC|ND|SA)([-_ .]|$)");
 
         public List<AudioLicenseEntry> Entries { get; } = new List<AudioLicenseEntry>();
+        public List<AudioAttributionEntry> Attributions { get; } = new List<AudioAttributionEntry>();
         public List<string> ParseErrors { get; } = new List<string>();
 
         public AudioLicenseEntry Find(string ledgerPath)
@@ -670,6 +699,29 @@ namespace MetinAR.Editor.Audio
             return null;
         }
 
+        public AudioAttributionEntry FindAttribution(string ledgerPath)
+        {
+            foreach (AudioAttributionEntry a in Attributions)
+            {
+                if (a.File == ledgerPath)
+                {
+                    return a;
+                }
+            }
+
+            return null;
+        }
+
+        public static bool IsCcBy(string license)
+        {
+            return CcBy.IsMatch(license ?? string.Empty);
+        }
+
+        public static bool IsRestrictedCc(string license)
+        {
+            return CcRestricted.IsMatch((license ?? string.Empty).Trim());
+        }
+
         private static string Cell(string s)
         {
             s = s.Trim();
@@ -681,17 +733,44 @@ namespace MetinAR.Editor.Audio
             return s;
         }
 
+        private static bool Matches(List<string> cells, string[] header)
+        {
+            if (cells.Count != header.Length)
+            {
+                return false;
+            }
+
+            for (int k = 0; k < header.Length; k++)
+            {
+                if (!string.Equals(cells[k], header[k], StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         public static AudioLicenseLedger Parse(string text)
         {
             var ledger = new AudioLicenseLedger();
             string[] lines = (text ?? string.Empty).Replace("\r\n", "\n").Split('\n');
-            bool inTable = false;
+            int table = 0; // 0 = none, 1 = ledger, 2 = attribution
+            bool inFence = false;
             for (int i = 0; i < lines.Length; i++)
             {
                 string line = lines[i].Trim();
-                if (!line.StartsWith("|", StringComparison.Ordinal))
+                if (line.StartsWith("```", StringComparison.Ordinal))
                 {
-                    inTable = false;
+                    // Fenced blocks hold format examples (LICENSES.md header); they are never ledger data.
+                    inFence = !inFence;
+                    table = 0;
+                    continue;
+                }
+
+                if (inFence || !line.StartsWith("|", StringComparison.Ordinal))
+                {
+                    table = 0;
                     continue;
                 }
 
@@ -702,15 +781,9 @@ namespace MetinAR.Editor.Audio
                     cells.Add(Cell(c));
                 }
 
-                if (!inTable)
+                if (table == 0)
                 {
-                    bool isHeader = cells.Count == Header.Length;
-                    for (int k = 0; isHeader && k < Header.Length; k++)
-                    {
-                        isHeader = string.Equals(cells[k], Header[k], StringComparison.OrdinalIgnoreCase);
-                    }
-
-                    inTable = isHeader;
+                    table = Matches(cells, Header) ? 1 : Matches(cells, AttributionHeader) ? 2 : 0;
                     continue;
                 }
 
@@ -719,26 +792,49 @@ namespace MetinAR.Editor.Audio
                     continue;
                 }
 
-                if (cells.Count != Header.Length)
+                int expected = table == 1 ? Header.Length : AttributionHeader.Length;
+                if (cells.Count != expected)
                 {
-                    ledger.ParseErrors.Add("line " + (i + 1) + ": expected " + Header.Length + " columns, got " + cells.Count);
+                    ledger.ParseErrors.Add("line " + (i + 1) + ": expected " + expected + " columns, got " + cells.Count);
                     continue;
                 }
 
-                var e = new AudioLicenseEntry
+                if (table == 1)
                 {
-                    File = cells[0], Origin = cells[1], Author = cells[2], License = cells[3], Source = cells[4], Sha256 = cells[5].ToLowerInvariant(), Line = i + 1,
-                };
-                if (ledger.Find(e.File) != null)
-                {
-                    ledger.ParseErrors.Add("line " + (i + 1) + ": duplicate entry for " + e.File);
-                    continue;
-                }
+                    var e = new AudioLicenseEntry
+                    {
+                        File = cells[0], Origin = cells[1], Author = cells[2], License = cells[3], Source = cells[4], Sha256 = cells[5].ToLowerInvariant(), Line = i + 1,
+                    };
+                    if (ledger.Find(e.File) != null)
+                    {
+                        ledger.ParseErrors.Add("line " + (i + 1) + ": duplicate entry for " + e.File);
+                        continue;
+                    }
 
-                ledger.Entries.Add(e);
+                    ledger.Entries.Add(e);
+                }
+                else
+                {
+                    var a = new AudioAttributionEntry
+                    {
+                        File = cells[0], Title = cells[1], Author = cells[2], SourceUrl = cells[3], License = cells[4], Changes = cells[5], Line = i + 1,
+                    };
+                    if (ledger.FindAttribution(a.File) != null)
+                    {
+                        ledger.ParseErrors.Add("line " + (i + 1) + ": duplicate attribution for " + a.File);
+                        continue;
+                    }
+
+                    ledger.Attributions.Add(a);
+                }
             }
 
             return ledger;
+        }
+
+        private static bool Blank(string s)
+        {
+            return string.IsNullOrWhiteSpace(s) || s.Trim() == "-" || s.Trim() == "—";
         }
 
         /// <summary>Checks every entry on its own (provenance completeness, allowed licence). File existence is checked by the caller.</summary>
@@ -753,12 +849,12 @@ namespace MetinAR.Editor.Audio
             foreach (AudioLicenseEntry e in Entries)
             {
                 string where = AudioPipelineRules.LicenseLedgerFileName + ":" + e.Line + " " + e.File;
-                if (string.IsNullOrWhiteSpace(e.Author))
+                if (Blank(e.Author))
                 {
                     issues.Add(AudioIssue.Error(where, "author missing"));
                 }
 
-                if (string.IsNullOrWhiteSpace(e.Source))
+                if (Blank(e.Source))
                 {
                     issues.Add(AudioIssue.Error(where, "source missing"));
                 }
@@ -768,9 +864,14 @@ namespace MetinAR.Editor.Audio
                     issues.Add(AudioIssue.Error(where, "SHA-256 must be 64 lowercase hex characters"));
                 }
 
-                if (Array.IndexOf(AudioPipelineRules.AllowedLicenses, e.License) < 0)
+                bool restricted = IsRestrictedCc(e.License);
+                if (restricted)
                 {
-                    issues.Add(AudioIssue.Error(where, "licence '" + e.License + "' not allowed (allowed: " + string.Join(", ", AudioPipelineRules.AllowedLicenses) + "; others need an owner decision)"));
+                    issues.Add(AudioIssue.Error(where, "licence '" + e.License + "' has NC/ND/SA terms - excluded (owner decision #42)"));
+                }
+                else if (!AudioPipelineRules.IsAllowedLicense(e.License))
+                {
+                    issues.Add(AudioIssue.Error(where, "licence '" + e.License + "' not allowed (allowed: " + string.Join(", ", AudioPipelineRules.AllowedLicenses) + ", CC-BY-x.y with attribution; others need an owner decision)"));
                 }
 
                 string lowerAll = ((e.Source ?? string.Empty) + " " + (e.Author ?? string.Empty) + " " + (e.File ?? string.Empty)).ToLowerInvariant();
@@ -803,25 +904,92 @@ namespace MetinAR.Editor.Audio
                         }
 
                         break;
-                    case "third_party":
-                        if (e.License == "MetinAR-Owned")
+                    case "cc_by":
+                        if (!restricted && !IsCcBy(e.License))
                         {
-                            issues.Add(AudioIssue.Error(where, "third_party cannot be MetinAR-Owned"));
+                            issues.Add(AudioIssue.Error(where, "origin 'cc_by' must use licence CC-BY-x.y (e.g. CC-BY-4.0)"));
                         }
 
                         if (!Url.IsMatch(e.Source ?? string.Empty))
                         {
-                            issues.Add(AudioIssue.Error(where, "third_party source must include the download URL"));
+                            issues.Add(AudioIssue.Error(where, "cc_by source must include the download URL"));
                         }
 
+                        ValidateAttribution(e, FindAttribution(e.File), issues);
                         break;
                     default:
-                        issues.Add(AudioIssue.Error(where, "origin '" + e.Origin + "' must be original, cc0 or third_party"));
+                        issues.Add(AudioIssue.Error(where, "origin '" + e.Origin + "' must be original, cc0 or cc_by"));
                         break;
+                }
+
+                if (e.Origin != "cc_by" && IsCcBy(e.License))
+                {
+                    issues.Add(AudioIssue.Error(where, "CC-BY licence requires origin 'cc_by'"));
+                }
+            }
+
+            foreach (AudioAttributionEntry a in Attributions)
+            {
+                AudioLicenseEntry e = Find(a.File);
+                if (e == null || e.Origin != "cc_by")
+                {
+                    issues.Add(AudioIssue.Error(AudioPipelineRules.LicenseLedgerFileName + ":" + a.Line + " " + a.File, "attribution row without a cc_by ledger entry"));
                 }
             }
 
             return issues;
+        }
+
+        private static void ValidateAttribution(AudioLicenseEntry e, AudioAttributionEntry a, List<AudioIssue> issues)
+        {
+            string where = AudioPipelineRules.LicenseLedgerFileName + ":" + e.Line + " " + e.File;
+            if (a == null)
+            {
+                issues.Add(AudioIssue.Error(where, "CC-BY file needs a row in the CC-BY attribution table (title, author, source URL, licence, changes)"));
+                return;
+            }
+
+            string at = AudioPipelineRules.LicenseLedgerFileName + ":" + a.Line + " " + a.File;
+            if (Blank(a.Title))
+            {
+                issues.Add(AudioIssue.Error(at, "attribution title missing"));
+            }
+
+            if (Blank(a.Author))
+            {
+                issues.Add(AudioIssue.Error(at, "attribution author missing"));
+            }
+            else if (!Blank(e.Author) && !string.Equals(a.Author.Trim(), e.Author.Trim(), StringComparison.Ordinal))
+            {
+                issues.Add(AudioIssue.Error(at, "attribution author differs from the ledger author"));
+            }
+
+            if (Blank(a.SourceUrl) || !AbsoluteUrl.IsMatch(a.SourceUrl.Trim()))
+            {
+                issues.Add(AudioIssue.Error(at, "attribution source URL missing or not an http(s) URL"));
+            }
+
+            if (Blank(a.License))
+            {
+                issues.Add(AudioIssue.Error(at, "attribution licence version missing"));
+            }
+            else if (IsRestrictedCc(a.License))
+            {
+                issues.Add(AudioIssue.Error(at, "attribution licence '" + a.License + "' has NC/ND/SA terms - excluded"));
+            }
+            else if (!IsCcBy(a.License))
+            {
+                issues.Add(AudioIssue.Error(at, "attribution licence version must be CC-BY-x.y"));
+            }
+            else if (a.License != e.License)
+            {
+                issues.Add(AudioIssue.Error(at, "attribution licence differs from the ledger licence"));
+            }
+
+            if (Blank(a.Changes))
+            {
+                issues.Add(AudioIssue.Error(at, "attribution changes missing (describe edits, or write 'unmodified')"));
+            }
         }
     }
 
