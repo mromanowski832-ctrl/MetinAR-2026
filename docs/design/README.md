@@ -11,7 +11,7 @@ Wszystkie liczby to proponowane wartości startowe do balansowania.
 | [ECONOMY.md](ECONOMY.md) | talary: źródła, ujścia, ceny |
 | [MOBS_NPC.md](MOBS_NPC.md) | rodziny i rangi mobów, AI, odrodzenia, NPC |
 | [COMBAT_PHYSICS.md](COMBAT_PHYSICS.md) | obrażenia, hitboxy, kolizja miecza, reakcje, wejście dotykowe, dźwięki, budżet A31 |
-| [MODES_DATA_MODEL.md](MODES_DATA_MODEL.md) | AR/FPP vs mapa GPS, model danych, rola serwera |
+| [MODES_DATA_MODEL.md](MODES_DATA_MODEL.md) | AR/FPP vs mapa GPS, model danych, rola serwera, ekran Napisy (licencje) |
 | [OPEN_QUESTIONS_PLAN.md](OPEN_QUESTIONS_PLAN.md) | pytania do właściciela i plan etapów |
 | [tables/README.md](tables/README.md) | tabele CSV/JSON i generator |
 

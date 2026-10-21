@@ -22,7 +22,7 @@ z limitem dobowym, sterowanie umiejętnościami gestami AR.
 | **ten plik** | 5) przedmioty i ekwipunek, drop; zestaw startowy; budżety assetów |
 | [MOBS_NPC.md](MOBS_NPC.md) | 6) moby i NPC, rangi, AI, odrodzenia w strefach GPS |
 | [COMBAT_PHYSICS.md](COMBAT_PHYSICS.md) | 7) obrażenia, trafienie/pudło/krytyk/blok, hitboxy, reakcje, wejście, budżet A31, dźwięki |
-| [MODES_DATA_MODEL.md](MODES_DATA_MODEL.md) | 8) AR/FPP vs mapa GPS, 9) model danych i rola serwera |
+| [MODES_DATA_MODEL.md](MODES_DATA_MODEL.md) | 8) AR/FPP vs mapa GPS, 9) model danych i rola serwera, ekran Napisy i atrybucja licencji |
 | [OPEN_QUESTIONS_PLAN.md](OPEN_QUESTIONS_PLAN.md) | 10) pytania do właściciela i plan etapów |
 | [tables/](tables/README.md) | tabele CSV/JSON (szkice danych) + generator |
 
@@ -146,4 +146,4 @@ bez pomiaru na A31.
 | Muzyka | stereo, strumieniowana, ≤ 3 MB / utwór, maks. 2 w pamięci | | | | | propozycja |
 | Pamięć audio łącznie | ≤ 8 MB | | | | | propozycja |
 
-Licencje: tylko własne lub CC0/otwarte z dokumentacją (`ASSET_SOURCE.txt`, METINAR-009 §5). Płatne źródła: decyzja właściciela.
+Licencje: tylko własne, CC0 lub CC-BY-4.0 (z atrybucją autora, decyzja właściciela 2026-10-21) z dokumentacją (`ASSET_SOURCE.txt`, METINAR-009 §5; rejestr audio `Audio/LICENSES.md`). Atrybucje trafiają na ekran Napisy ([MODES_DATA_MODEL.md](MODES_DATA_MODEL.md) §5). Płatne źródła: decyzja właściciela.

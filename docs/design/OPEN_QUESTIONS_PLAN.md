@@ -30,6 +30,7 @@
 | Q20 | Liczba rzadkości | **5** / 4 / 6 |
 
 Uwagi do decyzji, które nie są pytaniami:
+- **Audio CC-BY-4.0 dozwolone z atrybucją autora** (decyzja właściciela 2026-10-21) → ekran Napisy, [MODES_DATA_MODEL.md](MODES_DATA_MODEL.md) §5.
 - Monetyzacja, waluta premium i płatności są **poza zakresem** tej specyfikacji.
 - Nazwa klasy **Slajter** — decyzja właściciela, bez uwag.
 
@@ -51,5 +52,6 @@ Każdy etap: osobny branch i PR, testy czystego C#, kompilacja Unity i testy na 
 | S10 | Eksploracja GPS i odrodzenia w komórkach | EXP za dystans/komórki z ochroną (CHARACTER_PROGRESSION §4), spawny osobiste | #22, #39, Q10, Q12 |
 | S11 | Autorytet serwera dla nagród | wynik spotkania, łup, saldo, ekwipunek po stronie serwera | #39, decyzja Q1 z PR #27 |
 | S12 | Balans na A31 | pomiary czasu walki i wydajności, korekta tabel | S3+ |
+| S13 | Ekran Napisy i bramka atrybucji | `credits.json` generowany z `Audio/LICENSES.md` (i przyszłych rejestrów), ekran Menu główne / Ustawienia → Napisy, test FAIL dla CC-BY bez atrybucji, kontrola w audycie APK (MODES_DATA_MODEL §5) | #43 (rejestr audio), pierwsze menu/ustawienia; przed pierwszym buildem z assetem CC-BY |
 
 Kolejność S1→S2→S3→S4 daje pierwszy grywalny wycinek (zestaw startowy, ITEMS_COMBAT_SPEC §7).

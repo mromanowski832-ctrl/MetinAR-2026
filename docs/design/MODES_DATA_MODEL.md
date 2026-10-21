@@ -67,3 +67,51 @@ Decyzje architektury należą do właściciela/kontrolera (Q1 z PR #27, #39). Tu
 | Ekwipunek, hartowanie (RNG), sklep | tak | **tak** | ekonomia |
 | Handel, rynek, gildie, PvP | nie | **tak**, jeśli powstaną (Q8, Q9) | |
 | Definicje (tabele) | tak | wersjonowane, wspólne | spójność |
+
+## 5. Ekran „Napisy” (Credits) i atrybucja licencji
+
+Decyzja właściciela (2026-10-21): dozwolone jest audio na licencji **CC-BY-4.0** pod warunkiem podania autora.
+CC-BY wymaga widocznej atrybucji w grze, dlatego gra dostaje ekran **Napisy** (`CreditsScreen`).
+
+### 5.1 Gdzie jest dostępny
+
+- **Menu główne → Napisy** oraz **Ustawienia → Informacje → Napisy i licencje** (ten sam ekran).
+- Dostępny bez logowania i bez połączenia z siecią (dane wbudowane w build), z mapy GPS przez Ustawienia.
+- Nie jest dostępny w trakcie walki AR (pauza → wyjście na mapę), żeby nie przerywać spotkania.
+- Zawartość przewijana, pionowo, czytelna na A31; linki do źródeł/licencji jako tekst (opcjonalnie otwierane w przeglądarce za potwierdzeniem).
+
+### 5.2 Źródło danych i format
+
+- **Źródło prawdy dla audio:** rejestr `client/Assets/MetinAR/Audio/LICENSES.md` (METINAR-018, PR #43): kolumny
+  `File`, `Origin`, `Author`, `License`, `Source`, `SHA-256`. W przyszłości analogiczne rejestry dla innych assetów
+  zewnętrznych (modele, tekstury, czcionki, ikony; METINAR-009 `ASSET_SOURCE.txt`) i bibliotek kodu.
+- Dla wierszy `third_party` z `CC-BY-4.0` rejestr musi zawierać dane atrybucji w stylu „TASL”: **tytuł** utworu,
+  **autor**, **źródło** (URL), **licencja** (nazwa + URL) i **zmiany** (np. „przycięto, znormalizowano”).
+  Propozycja: dodać do rejestru kolumny `Title`, `Attribution` (gotowy tekst do wyświetlenia) i `Changes`
+  albo trzymać je w osobnym pliku obok — decyzja techniczna w etapie S13.
+- **Build:** narzędzie edytora generuje z rejestrów jeden plik `credits.json` (zasób w buildzie, np. `Resources`/`StreamingAssets`):
+
+```json
+{
+  "version": 1,
+  "generatedFromSha": "<commit>",
+  "sections": [
+    { "id": "audio", "titlePl": "Dźwięk", "entries": [
+      { "title": "<tytuł>", "author": "<autor>", "license": "CC-BY-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/", "sourceUrl": "<url>",
+        "changes": "<zmiany lub brak>", "files": ["SFX/..."] } ] },
+    { "id": "project", "titlePl": "Twórcy MetinAR", "entries": [ ] }
+  ]
+}
+```
+
+- Ekran pokazuje: twórców projektu (właściciel, zespół), potem sekcje assetów zewnętrznych pogrupowane wg autora.
+  Pliki `MetinAR-Owned` są zbiorczo opisane jako własne; `CC0-1.0` wymieniane dobrowolnie (uprzejmość, nie wymóg).
+
+### 5.3 Bramka builda (atrybucja wymagana)
+
+- **FAIL** (test w `tests/AssetPipeline.Tests` i krok przed buildem Android): asset `CC-BY-*` bez autora, źródła,
+  URL licencji albo tekstu atrybucji; plik w `credits.json` niezgodny z rejestrem; licencja spoza listy dozwolonej.
+- **FAIL:** asset zewnętrzny w buildzie bez wiersza w rejestrze (już dziś dla audio w `AudioRepositoryTests`).
+- **WARN:** `CC0-1.0` bez autora (dozwolone, ale zalecane), wpis w rejestrze, którego plik nie trafia do buildu.
+- Raport bramki dołączany do raportu QA (METINAR-011). Brak `credits.json` w APK = FAIL w audycie APK.
