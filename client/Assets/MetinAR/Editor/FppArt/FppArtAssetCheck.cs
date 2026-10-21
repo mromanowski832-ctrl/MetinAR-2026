@@ -201,12 +201,12 @@ namespace MetinAR.Editor.FppArt
                 c.Check(t != null, "sword socket " + s + (t != null ? " at " + Fmt(sword.transform.InverseTransformPoint(t.position)) : " missing"));
             }
 
-            Expect(c, sword, "Grip_Right", Vector3.zero);
-            Expect(c, sword, "Grip_Left", LeftGripOffset);
-            Expect(c, sword, "FX_BladeBase", new Vector3(0f, 0.13f, 0f));
-            Expect(c, sword, "FX_BladeTip", new Vector3(0f, 0.94f, 0f));
-            Expect(c, sword, "FX_AuraBurst", new Vector3(0f, 0.38f, 0f));
-            foreach (string s in new[] { "Grip_Right", "FX_BladeTip" })
+            Expect(c, sword, "Socket_GripR", Vector3.zero);
+            Expect(c, sword, "Socket_GripL", LeftGripOffset);
+            Expect(c, sword, "Socket_FxBladeBase", new Vector3(0f, 0.13f, 0f));
+            Expect(c, sword, "Socket_FxBladeTip", new Vector3(0f, 0.94f, 0f));
+            Expect(c, sword, "Socket_FxAuraBurst", new Vector3(0f, 0.38f, 0f));
+            foreach (string s in new[] { "Socket_GripR", "Socket_FxBladeTip" })
             {
                 Transform t = FppArtAssetBuilder.FindDeep(sword.transform, s);
                 if (t != null)

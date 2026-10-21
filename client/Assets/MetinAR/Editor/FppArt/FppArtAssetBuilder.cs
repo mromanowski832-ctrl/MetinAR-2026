@@ -30,7 +30,7 @@ namespace MetinAR.Editor.FppArt
         public const string SwordSocketBone = "B_Socket_Sword";
         public const string LeftGripSocketBone = "B_Socket_GripL";
         public static readonly string[] States = { "Idle", "Attack", "AuraActivate" };
-        public static readonly string[] SwordSockets = { "Grip_Right", "Grip_Left", "FX_BladeBase", "FX_BladeTip", "FX_AuraBurst", "FX_GuardGem" };
+        public static readonly string[] SwordSockets = { "Socket_GripR", "Socket_GripL", "Socket_FxBladeBase", "Socket_FxBladeTip", "Socket_FxAuraBurst", "Socket_FxGuardGem" };
 
         public static string ClipPath(string state) => ArmsFolder + "/Animations/A_" + ArmsId + "_" + state + ".fbx";
 

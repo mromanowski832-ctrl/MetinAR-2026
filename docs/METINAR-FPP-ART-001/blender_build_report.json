@@ -58,32 +58,32 @@
     ]
   },
   "sword_sockets_unity": {
-    "Grip_Right": [
+    "Socket_GripR": [
       0.0,
       0.0,
       0.0
     ],
-    "Grip_Left": [
+    "Socket_GripL": [
       0.0,
       -0.11999999731779099,
       0.0
     ],
-    "FX_BladeBase": [
+    "Socket_FxBladeBase": [
       0.0,
       0.12999999523162842,
       0.0
     ],
-    "FX_BladeTip": [
+    "Socket_FxBladeTip": [
       0.0,
       0.9399999976158142,
       0.0
     ],
-    "FX_AuraBurst": [
+    "Socket_FxAuraBurst": [
       0.0,
       0.3799999952316284,
       0.0
     ],
-    "FX_GuardGem": [
+    "Socket_FxGuardGem": [
       0.0,
       0.116,
       0.0

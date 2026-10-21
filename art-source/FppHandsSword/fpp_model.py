@@ -21,12 +21,12 @@ GUARD_Y = 0.116
 POMMEL_Y = -0.195
 
 SWORD_SOCKETS = {
-    "Grip_Right": (0.0, 0.0, 0.0),
-    "Grip_Left": tuple(C.LEFT_GRIP_OFFSET),
-    "FX_BladeBase": tuple(C.BLADE_BASE),
-    "FX_BladeTip": tuple(C.BLADE_TIP),
-    "FX_AuraBurst": tuple(C.AURA_BURST_CENTRE),
-    "FX_GuardGem": (0.0, GUARD_Y, 0.0),
+    "Socket_GripR": (0.0, 0.0, 0.0),
+    "Socket_GripL": tuple(C.LEFT_GRIP_OFFSET),
+    "Socket_FxBladeBase": tuple(C.BLADE_BASE),
+    "Socket_FxBladeTip": tuple(C.BLADE_TIP),
+    "Socket_FxAuraBurst": tuple(C.AURA_BURST_CENTRE),
+    "Socket_FxGuardGem": (0.0, GUARD_Y, 0.0),
 }
 
 
