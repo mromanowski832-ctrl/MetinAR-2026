@@ -1,5 +1,5 @@
-# METINAR-032 — starter-kit item icons, provenance / licence record (METINAR-009 section 11)
-# Per-icon register: docs/METINAR-032/ICON_LICENSES.md (all 9 icons share this record).
+# METINAR-032 — item icons, provenance / licence record (METINAR-009 section 11)
+# Per-icon register: docs/METINAR-032/ICON_LICENSES.md (all 21 icons share this record).
 asset_id: ItemIcons
 origin: original
 author: MetinAR project (Grok Bot implementation agent for the owner Michał Romanowski)
@@ -7,5 +7,6 @@ license: MetinAR-Owned
 commercial_use: yes
 created_with: Python 3 + numpy + scipy + Pillow, project script art-source/ItemIcons/make_icons.py (procedural 2D painting on a 1024² master, Lanczos downsample to 256²); Unity 6000.6.4f1 for import settings
 date_added: 2026-10-21
-modifications: n/a (first version)
+modifications: 2026-10-21 batch 2 added (12 icons, same script and method); batch 1 unchanged
 notes: icons for starter_jerkin, starter_boots, starter_buckler, amber_earring, starter_gloves, starter_sword, potion_hp_s, antidote, ore_shard (ITEMS_COMBAT_SPEC section 7); no external images, photos, fonts, brushes, icon packs, AI-generated content or files from other games; reproducible with python art-source/ItemIcons/make_icons.py <out_dir>
+notes_batch2: icons for spider_silk, potion_hp_m, potion_mp_s, smith_oil, forget_draught, bag_expansion, treatise_proficiency_warrior, treatise_proficiency_ninja, treatise_proficiency_shaman, treatise_proficiency_slajter, spark_artistry, seal_apex (docs/design/tables: items_starter.csv, shop_starter_merchant.csv, skill_tier_items.csv); same rules: original procedural drawing, no external assets, no AI-generated content, no files or references from other games

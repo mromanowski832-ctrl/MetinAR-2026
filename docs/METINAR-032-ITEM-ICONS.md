@@ -64,3 +64,41 @@ two runs give byte-identical PNGs. No external image, font, brush or icon pack i
 - No Sprite Atlas yet (see above). It comes with the inventory UI integration.
 - Icons are not wired to item data or UI. `InventoryPanel` still uses the prototype visuals.
 - Physical device: UNVERIFIED (no Android build in this issue).
+
+## 5. Batch 2 (branch `feat/032b-item-icons-batch2`, stacked on `feat/032-starter-item-icons`)
+
+Every other item id in `docs/design/tables/` that had no icon yet. `treatise_proficiency_<classId>` gets one icon per class id
+from `classes_skills.json`.
+
+| Item id | Name (game) | Table | File |
+|---|---|---|---|
+| `spider_silk` | Jedwab Pajęczy | `items_starter.csv` (Venomous Spider drop) | `T_ItemIcons_SpiderSilk_BC.png` |
+| `potion_hp_m` | Mikstura Życia | `shop_starter_merchant.csv` | `T_ItemIcons_PotionHpM_BC.png` |
+| `potion_mp_s` | Mała Mikstura Many | `shop_starter_merchant.csv` | `T_ItemIcons_PotionMpS_BC.png` |
+| `smith_oil` | Olej Kowalski | `shop_starter_merchant.csv` | `T_ItemIcons_SmithOil_BC.png` |
+| `forget_draught` | Napar Zapomnienia | `shop_starter_merchant.csv` | `T_ItemIcons_ForgetDraught_BC.png` |
+| `bag_expansion` | Sakwa +8 miejsc | `shop_starter_merchant.csv` | `T_ItemIcons_BagExpansion_BC.png` |
+| `treatise_proficiency_warrior` | Traktat Biegłości (Wojownik) | `skill_tier_items.csv` (§4.1) | `T_ItemIcons_TreatiseProficiencyWarrior_BC.png` |
+| `treatise_proficiency_ninja` | Traktat Biegłości (Ninja) | `skill_tier_items.csv` (§4.1) | `T_ItemIcons_TreatiseProficiencyNinja_BC.png` |
+| `treatise_proficiency_shaman` | Traktat Biegłości (Szaman) | `skill_tier_items.csv` (§4.1) | `T_ItemIcons_TreatiseProficiencyShaman_BC.png` |
+| `treatise_proficiency_slajter` | Traktat Biegłości (Slajter) | `skill_tier_items.csv` (§4.1) | `T_ItemIcons_TreatiseProficiencySlajter_BC.png` |
+| `spark_artistry` | Iskra Kunsztu | `skill_tier_items.csv` (§4.1) | `T_ItemIcons_SparkArtistry_BC.png` |
+| `seal_apex` | Pieczęć Szczytu | `skill_tier_items.csv` (§4.1) | `T_ItemIcons_SealApex_BC.png` |
+
+Preview: [docs/METINAR-032/contact_sheet_batch2.png](METINAR-032/contact_sheet_batch2.png). Licences: section "Partia 2" in
+[ICON_LICENSES.md](METINAR-032/ICON_LICENSES.md) (all original, MetinAR-Owned).
+
+- **Design notes:** the small potions share one round flask (red = life, blue = mana); the medium life potion is a larger gourd
+  flask. The 4 treatises share one book with a class colour and emblem (warrior red/sword, ninja green/star,
+  shaman blue/lightning, Slajter violet/crescent). The spark is a glowing gem and the seal is a gold medallion with a peak.
+- **Import settings:** `.meta` files copied from the batch 1 icons (Sprite Single, sRGB, alpha is transparency, mipmaps on,
+  Read/Write off, clamp, max 256, ASTC 4×4 on Android and iOS) with new GUIDs and sprite ids.
+- **Reproduction:** `python art-source/ItemIcons/make_icons.py <out_dir>` draws all 21 icons and both contact sheets.
+  Batch 1 stays byte-identical. `--only=id1,id2` draws a subset.
+- **Box check (no Unity):** `python art-source/ItemIcons/check_icons.py` checks naming, 256² RGBA, transparent border,
+  coverage, `.meta` settings, repo-wide GUID uniqueness and that every item id in the tables has an icon:
+  **108 checks, 0 failures**.
+- **Unity:** `ItemIconsCheck.ItemIds` now lists all 21 ids, and the preview grid sizes itself to the number of icons.
+  The Unity batch run for batch 2 is **not done yet**: LuzMen/A31 were busy (#33), so it is UNVERIFIED in Unity.
+  It needs one run of `MetinAR.Editor.ItemIcons.ItemIconsCheck.Run` (expected 21 × 6 + 3 = 129 checks).
+- Physical device: UNVERIFIED. No Sprite Atlas and no data wiring (S4 #49), like batch 1.
