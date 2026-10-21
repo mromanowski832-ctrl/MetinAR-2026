@@ -114,8 +114,9 @@ namespace MetinAR.ArEncounter
             Transform camera = _encounter.ArCamera.transform;
             Vector3 a = mob.transform.InverseTransformPoint(camera.TransformPoint(pose.position + pose.rotation * FppHandsView.BladeBase));
             Vector3 b = mob.transform.InverseTransformPoint(camera.TransformPoint(pose.position + pose.rotation * FppHandsView.BladeTip));
-            // Covers the existing abdomen/cephalothorax plus a 2.5 cm prototype tolerance. Legs/label are excluded.
-            return FppHitGeometry.IntersectsBox(Point(a), Point(b), new FppPoint(-0.285, 0.125, -0.605), new FppPoint(0.285, 0.595, 0.345));
+            // Body footprint (abdomen/cephalothorax + 2.5 cm) extruded vertically: the floor spider is reachable from a
+            // handheld phone height (#31 v0 A31 P0-1). Legs/label are excluded; horizontal reach is unchanged.
+            return FppHitGeometry.IntersectsReachColumn(Point(a), Point(b));
         }
 
         private static FppPoint Point(Vector3 p) => new FppPoint(p.x, p.y, p.z);

@@ -13,6 +13,26 @@ namespace MetinAR.ArEncounter
     /// <summary>Blade segment against a body box, all in the target's local coordinate frame.</summary>
     public static class FppHitGeometry
     {
+        /// <summary>Spider body footprint (mob-local metres before the visual scale): abdomen + cephalothorax plus 2.5 cm.</summary>
+        public static readonly FppPoint BodyMin = new FppPoint(-0.285, 0.125, -0.605);
+        /// <summary>Top of the literal body box. Kept for reference: on a phone held at chest height the blade passes above it.</summary>
+        public const double BodyTopY = 0.595;
+
+        /// <summary>
+        /// #31 v0 A31 P0-1: the spider stands on the floor, the virtual sword is held at the phone (about 1.2–1.5 m above the
+        /// floor on a handheld device, 2.9 m above the detected plane in the A31 session). A literal 3D blade-versus-body test
+        /// therefore never hits at the natural 20–40° phone pitch, at any distance. The hit volume is the body footprint
+        /// extruded up to <see cref="ReachColumnTopY"/> (mob-local), so only the horizontal reach (about 1.25–1.4 m from the
+        /// camera to the spider centre, see MOBS_NPC "dystans walki 1,2 m") decides a hit.
+        /// </summary>
+        public const double ReachColumnTopY = 3.5;
+
+        /// <summary>Hit volume used by FPP combat: body footprint extruded vertically (mob-local frame).</summary>
+        public static FppPoint ReachColumnMax => new FppPoint(0.285, ReachColumnTopY, 0.345);
+
+        /// <summary>Blade segment against the vertical reach column of the body footprint (mob-local frame).</summary>
+        public static bool IntersectsReachColumn(FppPoint a, FppPoint b) => IntersectsBox(a, b, BodyMin, ReachColumnMax);
+
         public static bool IntersectsBox(FppPoint a, FppPoint b, FppPoint min, FppPoint max)
         {
             if (!a.IsFinite || !b.IsFinite || !min.IsFinite || !max.IsFinite

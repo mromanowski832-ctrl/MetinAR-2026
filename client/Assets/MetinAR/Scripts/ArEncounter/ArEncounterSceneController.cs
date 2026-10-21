@@ -300,10 +300,30 @@ namespace MetinAR.ArEncounter
             if (_machine.State == ArEncounterState.Placed)
             {
                 HidePlaneVisuals();
+                UpdateMobTrackingVisibility();
                 LogAnchorDiagnostics();
             }
 
             RefreshHud();
+        }
+
+        /// <summary>
+        /// #31 v0 A31 P0-2: when the AR session stops tracking (VIO reset), the camera pose freezes while the camera image
+        /// keeps moving, so a drawn mob looks glued to the phone. Hide it until tracking returns; its world pose is untouched.
+        /// </summary>
+        private void UpdateMobTrackingVisibility()
+        {
+            if (SpawnedMob == null)
+            {
+                return;
+            }
+
+            bool visible = LastSessionStatus == ArSessionStatus.SessionTracking;
+            if (visible != SpawnedMob.IsTrackingVisible)
+            {
+                SpawnedMob.SetTrackingVisible(visible);
+                Debug.Log("[ArEncounter] mob " + (visible ? "shown (tracking)" : "hidden (tracking lost: " + LastSessionStatus + ")"));
+            }
         }
 
         private float _nextAnchorLog;

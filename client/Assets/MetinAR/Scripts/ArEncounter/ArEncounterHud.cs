@@ -212,7 +212,7 @@ namespace MetinAR.ArEncounter
                     break;
                 case ArEncounterState.Placed:
                     status = machine != null && machine.IsTrackingLimited
-                        ? "Śledzenie ograniczone — skieruj aparat na miejsce potwora."
+                        ? "Śledzenie ograniczone — potwór ukryty. Powoli przesuń telefon nad podłogą."
                         : mobName + " stoi na podłożu.";
                     break;
                 default:

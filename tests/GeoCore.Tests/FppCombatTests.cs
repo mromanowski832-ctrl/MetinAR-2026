@@ -184,4 +184,29 @@ public class FppCombatTests
         Assert.False(FppHitGeometry.IntersectsBox(origin, new FppPoint(0, double.PositiveInfinity, 0), Min, Max));
         Assert.False(FppHitGeometry.IntersectsBox(origin, origin, Max, Min));
     }
+
+    // #31 v0 A31 P0-1: the spider stands on the floor, the blade is held about 1.25 m above it.
+    [Theory]
+    [InlineData(0, 1.0, 0.2, 0, 1.6, -0.2, true)]     // blade crosses the footprint high above the body: hit
+    [InlineData(0, 0.3, 0.2, 0, 0.3, -0.2, true)]     // through the body itself: hit
+    [InlineData(0.5, 1.0, 0.0, 0.9, 1.0, 0.0, false)] // beside the footprint: miss
+    [InlineData(0, 1.0, 0.6, 0, 1.6, 0.9, false)]     // in front of the footprint: miss
+    [InlineData(0, 3.6, 0.0, 0, 4.0, 0.0, false)]     // above the reach column: miss
+    public void ReachColumnIsTheBodyFootprintExtrudedUp(double ax, double ay, double az, double bx, double by, double bz, bool hit)
+    {
+        Assert.Equal(hit, FppHitGeometry.IntersectsReachColumn(new FppPoint(ax, ay, az), new FppPoint(bx, by, bz)));
+    }
+
+    [Fact]
+    public void ReachColumnKeepsFootprintAndExtendsAboveBodyTop()
+    {
+        Assert.True(FppHitGeometry.ReachColumnTopY >= 3.0);
+        Assert.Equal(FppHitGeometry.BodyMin.Y, 0.125);
+        Assert.Equal(0.285, FppHitGeometry.ReachColumnMax.X);
+        Assert.Equal(0.345, FppHitGeometry.ReachColumnMax.Z);
+        // A blade segment 1 m above the floor over the spider centre misses the literal body box but hits the column.
+        var a = new FppPoint(-0.2, 1.0, 0); var b = new FppPoint(0.2, 1.0, 0);
+        Assert.False(FppHitGeometry.IntersectsBox(a, b, FppHitGeometry.BodyMin, new FppPoint(0.285, FppHitGeometry.BodyTopY, 0.345)));
+        Assert.True(FppHitGeometry.IntersectsReachColumn(a, b));
+    }
 }
