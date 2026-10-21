@@ -150,3 +150,24 @@ Owner findings and what this change does (damage itself is S2a #47 / PR #67):
 Owner request "an attacked mob must become aggressive, run to the player and attack" is **not** in this PR (audit plan
 D1–D4, 2026-10-21): it is a separate `[READY]` issue, implemented after #67. Hands stay virtual on-screen hands with a
 sword; there is no tracking of the player's real hands through the AR camera.
+
+## Integration APK f194aa9: "AR niedostępne" on A31 — build-environment regression (fixed in the build script)
+
+- Device log (A31, 13:42 Europe/Warsaw): `E Unity: Failed to load session subsystem.` from `ARCoreLoader.Initialize`, then
+  `No active XRSessionSubsystem`, and `[ArEncounter] Starting -> Unsupported`. ARCore 1.57 is installed; feat `8d0acee`
+  works on the same phone.
+- APK diff f194aa9 vs 8d0acee: identical `Packages/`, `ProjectSettings/`, `Assets/XR/` and identical native
+  `UnitySubsystems/UnityARCore/UnitySubsystemsManifest.json` (in both it declares only `inputs` — ARCore's session,
+  camera, plane, raycast and anchor descriptors are **C#-registered**, never in that manifest). The difference is
+  `assets/bin/Data/RuntimeInitializeOnLoads.json`: f194aa9 has **none** of the 11 `Unity.XR.ARCore` registrations
+  (`ARCoreSessionSubsystem.RegisterDescriptor`, `ARCoreCameraSubsystem.Register`, ...); 8d0acee has all of them.
+  f194aa9 also lacked one small Java dex (App UI activity).
+- Cause: the integration checkout (`C:\Users\mroma\MetinAR-FPP-INTEG`, Library created from scratch) was built with
+  `-executeMethod ...BuildArEncounterDevelopmentApk` **without `-buildTarget Android`**, so the editor's active target was
+  Standalone. The build log shows it (`ARCore requires Gradle ... Cannot get path to the Gradle launcher unless the active
+  build platform is Android`); the 8d0acee checkout already had Android active. Not caused by the #36 hands or by the merge.
+- Fix (integration preview): `MetinARAndroidDevBuild` refuses to build when the active target is not Android, and after the
+  build `ArCorePlayerDataValidator` rejects any APK whose `RuntimeInitializeOnLoads.json` lacks the ARCore session /
+  camera / plane / raycast / anchor registrations (QA tests use the real JSON of both APKs as fixtures). Builds run with
+  `-buildTarget Android`. The guard and the validator also live on PR #32 (the v0 APK branch); the validator requires
+  all 11 `Unity.XR.ARCore` registrations and the build log prints `ARCore registrations 11/11`.

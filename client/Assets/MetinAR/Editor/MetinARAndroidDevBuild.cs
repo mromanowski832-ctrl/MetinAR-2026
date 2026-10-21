@@ -51,6 +51,17 @@ namespace MetinAR.Editor
             string apkDir = Path.GetDirectoryName(apkPath)!;
             Directory.CreateDirectory(apkDir);
 
+            // #31: f194aa9 integration APK was built while the editor's ACTIVE target was not Android (no -buildTarget):
+            // Unity.XR.ARCore's subsystem registrations were missing from RuntimeInitializeOnLoads.json and ARCore
+            // failed with "Failed to load session subsystem". Refuse such builds; start Unity with -buildTarget Android.
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
+            {
+                Debug.LogError("[MetinARAndroidDevBuild] FAILED active build target is " + EditorUserBuildSettings.activeBuildTarget
+                               + ", expected Android. Start Unity with -buildTarget Android.");
+                EditorApplication.Exit(1);
+                return;
+            }
+
             EditorUserBuildSettings.buildAppBundle = false;
             EditorUserBuildSettings.androidBuildSystem = AndroidBuildSystem.Gradle;
             EditorUserBuildSettings.androidBuildType = AndroidBuildType.Development;
@@ -124,6 +135,21 @@ namespace MetinAR.Editor
 
             Debug.Log("[MetinARAndroidDevBuild] APK player data check PASS (no whole+split duplicates)");
 
+            IReadOnlyList<string> arCoreProblems = ValidateApkArCore(apkPath);
+            if (arCoreProblems.Count > 0)
+            {
+                foreach (string problem in arCoreProblems)
+                {
+                    Debug.LogError("[MetinARAndroidDevBuild] APK ARCore data invalid: " + problem);
+                }
+
+                Debug.LogError("[MetinARAndroidDevBuild] FAILED ARCore subsystems would not load in " + apkPath);
+                EditorApplication.Exit(1);
+                return;
+            }
+
+            Debug.Log("[MetinARAndroidDevBuild] APK ARCore check PASS (all Unity.XR.ARCore registrations present)");
+
             Debug.Log(
                 "[MetinARAndroidDevBuild] SUCCESS path="
                 + apkPath
@@ -170,6 +196,31 @@ namespace MetinAR.Editor
             }
 
             return AndroidPlayerDataValidator.FindProblems(names);
+        }
+
+        private static IReadOnlyList<string> ValidateApkArCore(string apkPath)
+        {
+            var names = new List<string>();
+            string json = null;
+            using (FileStream stream = File.OpenRead(apkPath))
+            using (var zip = new ZipArchive(stream, ZipArchiveMode.Read))
+            {
+                foreach (ZipArchiveEntry entry in zip.Entries)
+                {
+                    names.Add(entry.FullName);
+                    if (entry.FullName == ArCorePlayerDataValidator.RuntimeInitializeOnLoadsEntry)
+                    {
+                        using (var reader = new StreamReader(entry.Open()))
+                        {
+                            json = reader.ReadToEnd();
+                        }
+                    }
+                }
+            }
+
+            Debug.Log("[MetinARAndroidDevBuild] ARCore registrations " + ArCorePlayerDataValidator.CountRequiredRegistrations(json)
+                      + "/" + ArCorePlayerDataValidator.RequiredRegistrations.Length + " in " + ArCorePlayerDataValidator.RuntimeInitializeOnLoadsEntry);
+            return ArCorePlayerDataValidator.FindProblems(names, json);
         }
 
         private static string[] GetEnabledScenes()
