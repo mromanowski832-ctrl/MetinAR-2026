@@ -15,5 +15,7 @@
   <!-- METINAR-011: tests compile the production QA source directly (engine-free files only). -->
   <ItemGroup>
     <Compile Include="../../client/Assets/MetinAR/Scripts/QA/FrameStatsAccumulator.cs" Link="Production/FrameStatsAccumulator.cs" />
+    <!-- #31: engine-free APK player-data check used by MetinARAndroidDevBuild. -->
+    <Compile Include="../../client/Assets/MetinAR/Editor/Build/AndroidPlayerDataValidator.cs" Link="Production/AndroidPlayerDataValidator.cs" />
   </ItemGroup>
 </Project>
