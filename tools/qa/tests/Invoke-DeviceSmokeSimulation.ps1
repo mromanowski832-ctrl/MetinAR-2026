@@ -30,6 +30,9 @@ Run 'ok' 0 {
     ($md -notmatch 'FAKESERIAL123') -and ($log -notmatch 'FAKESERIAL123') -and ($log -notmatch '52\.2297') -and ($log -notmatch '192\.168\.1\.23')
 }
 Run 'crash' 1 { param($o) (Get-Content -Raw (Join-Path $o 'device-report.md')) -match '\| Crash \| \*\*FAIL\*\*' }
+# Lead decision 2026-10-21 15:28: a Unity exception with a MetinAR. frame FAILs; any other Unity exception stays WARN.
+Run 'metinarexc' 1 { param($o) $md = ReportOf $o; ($md -match '\| Crash \| \*\*FAIL\*\* \| [^|]*\| crash=0 anr=0 fatal=0 metinarExceptions=1 ') -and ($md -match 'MetinAR exception: .*NullReferenceException.*MetinAR\.Combat\.ArDamageDealer\.TryHit') }
+Run 'unityexc' 0 { param($o) $md = ReportOf $o; ($md -match '\| Crash \| \*\*WARN\*\* \| [^|]*\| crash=0 anr=0 fatal=0 metinarExceptions=0 unityErrors=[1-9]') -and ($md -notmatch 'MetinAR exception:') }
 # METINAR-037 (#73): adb health is checked before every step.
 Run 'ok' 0 { param($o) (ReportOf $o) -match 'adb devices checked \d+ times' -and (ReportOf $o) -notmatch '\| Adb \|' } -label 'adbchecks'
 Run 'adblost' 3 {

@@ -496,7 +496,10 @@ function Find-MetinARLogcatProblems {
     <#
       Detects crash / ANR / fatal markers for the app in `adb logcat -v threadtime` output.
       With -Package (and optionally -Pids) only markers that belong to the app are counted, so unrelated system
-      processes do not fail the gate. Unity error/exception lines from the app are reported as WARN.
+      processes do not fail the gate. Unity error/exception lines from the app are reported as WARN, except:
+      a Unity exception whose message or stack (the continuation lines of the same pid/tid/Unity tag) contains a
+      MetinAR. frame is a product exception -> MetinARExceptions -> FAIL (lead decision 2026-10-21 15:28, #66/#33;
+      the Editor-only T15 classifier never applies on the device).
     #>
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines,
@@ -507,7 +510,14 @@ function Find-MetinARLogcatProblems {
     $anr = New-Object System.Collections.Generic.List[string]
     $fatal = New-Object System.Collections.Generic.List[string]
     $unityErrors = New-Object System.Collections.Generic.List[string]
+    $metinarExceptions = New-Object System.Collections.Generic.List[string]
     $pkg = if ($Package) { [regex]::Escape($Package) } else { $null }
+    # Unity exception block: header '<Type>Exception: ...' on a Unity line, then the stack on the following Unity lines
+    # of the same pid/tid. Ends at '(Filename: ...)', an empty message, another header or a line of another thread/tag.
+    $block = $null
+    $closeBlock = {
+        if ($null -ne $block -and $block.MetinAR) { $metinarExceptions.Add(($block.Header + ' | ' + $block.Frame)) }
+    }
     foreach ($l in $Lines) {
         if ($null -eq $l) { continue }
         $linePid = $null; $level = $null
@@ -530,16 +540,36 @@ function Find-MetinARLogcatProblems {
 
         if ($level -eq 'F' -and $ours) { $fatal.Add($l) }
         if ($ours -and ($l -match ' E Unity\s*:' -or $l -match '^E/Unity' -or $l -match 'Unity\s*:\s*\w*Exception')) { $unityErrors.Add($l) }
+
+        # --- MetinAR exception blocks
+        $unityKey = $null; $msg = $null
+        if ($l -match '^\d\d-\d\d \S+\s+(\d+)\s+(\d+) [VDIWEFA] Unity\s*: ?(.*)$') { $unityKey = $Matches[1] + '/' + $Matches[2]; $msg = $Matches[3] }
+        elseif ($l -match '^[VDIWEFA]/Unity\s*\(\s*(\d+)\): ?(.*)$') { $unityKey = $Matches[1]; $msg = $Matches[2] }
+        $isHeader = $ours -and $null -ne $unityKey -and $msg -cmatch '^\s*(Rethrow as )?([A-Za-z_][\w.]*\.)?\w*Exception\b'
+        $continues = $null -ne $block -and $unityKey -eq $block.Key -and -not $isHeader -and
+                     $msg.Trim().Length -gt 0 -and $msg -notmatch '^\s*\(Filename:'
+        if ($continues -or ($isHeader -and $null -ne $block -and $unityKey -eq $block.Key -and $msg -cmatch '^\s*Rethrow as ')) {
+            if (-not $block.MetinAR -and $msg -cmatch '(?<![\w.])MetinAR\.[A-Za-z_]') { $block.MetinAR = $true; $block.Frame = $msg.Trim() }
+            continue
+        }
+        & $closeBlock
+        $block = $null
+        if ($isHeader) {
+            $block = @{ Key = $unityKey; Header = $l; MetinAR = $false; Frame = '' }
+            if ($msg -cmatch '(?<![\w.])MetinAR\.[A-Za-z_]') { $block.MetinAR = $true; $block.Frame = $msg.Trim() }
+        }
     }
+    & $closeBlock
     $status = 'PASS'
     if ($unityErrors.Count -gt 0) { $status = 'WARN' }
-    if ($crash.Count -gt 0 -or $anr.Count -gt 0 -or $fatal.Count -gt 0) { $status = 'FAIL' }
+    if ($crash.Count -gt 0 -or $anr.Count -gt 0 -or $fatal.Count -gt 0 -or $metinarExceptions.Count -gt 0) { $status = 'FAIL' }
     [pscustomobject]@{
         Status      = $status
         Crashes     = @($crash | Select-Object -First 20)
         Anrs        = @($anr | Select-Object -First 20)
         FatalLines  = @($fatal | Select-Object -First 20)
         UnityErrors = @($unityErrors | Select-Object -First 20)
+        MetinARExceptions = @($metinarExceptions | Select-Object -First 20)
     }
 }
 

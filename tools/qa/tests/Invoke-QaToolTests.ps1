@@ -282,6 +282,47 @@ Assert 'config.qa-package-separate' ($qcfg.androidBuild.expectedPackage -eq 'com
     @($qcfg.androidBuild.protectedPackages) -contains 'com.metinar.game' -and @($qcfg.androidBuild.protectedPackages) -notcontains $qcfg.androidBuild.expectedPackage -and
     $qcfg.androidBuild.method -match 'BuildArEncounterQaApk$' -and $qcfg.androidBuild.apk -match '-qa\.apk$')
 
+# --- lead decision 2026-10-21 15:28: a Unity exception with a MetinAR. frame anywhere in its stack FAILs the device smoke
+function LcBlock([int]$sec, [string[]]$msgs, [string]$level = 'E', [string]$tid = '4260', [string]$procId = '4242') {
+    @($msgs | ForEach-Object { "10-21 15:00:0$sec.100  $procId  $tid $level Unity   : $_" })
+}
+$arfStack = @('NullReferenceException: Object reference not set to an instance of an object.',
+              '  at UnityEngine.XR.ARFoundation.ARSession.Update () [0x00000] in <00000000000000000000000000000000>:0 ',
+              '(Filename: currently not available on il2cpp Line: -1)')
+$deepStack = @('InvalidOperationException: Sequence contains no elements',
+               '  at System.Linq.Enumerable.First[TSource] (System.Collections.Generic.IEnumerable`1[T] source) [0x00000] in <00000000000000000000000000000000>:0 ',
+               '  at UnityEngine.Events.InvokableCall.Invoke () [0x00000] in <00000000000000000000000000000000>:0 ',
+               '  at MetinAR.Combat.ArDamageDealer.TryHit (System.Int32 swingId) [0x00000] in <00000000000000000000000000000000>:0 ',
+               '  at UnityEngine.UI.Button.Press () [0x00000] in <00000000000000000000000000000000>:0 ',
+               '(Filename: currently not available on il2cpp Line: -1)')
+$x = Find-MetinARLogcatProblems -Lines (LcBlock 1 $arfStack) -Package 'com.metinar.game.qa' -Pids @(4242)
+Assert 'mex.non-metinar-stays-warn' ($x.Status -eq 'WARN' -and $x.MetinARExceptions.Count -eq 0 -and $x.UnityErrors.Count -ge 1)
+$x = Find-MetinARLogcatProblems -Lines (LcBlock 1 $deepStack) -Package 'com.metinar.game.qa' -Pids @(4242)
+Assert 'mex.frame-deep-in-stack-fails' ($x.Status -eq 'FAIL' -and $x.MetinARExceptions.Count -eq 1 -and $x.MetinARExceptions[0] -match 'InvalidOperationException.*\| at MetinAR\.Combat\.ArDamageDealer\.TryHit') ($x.MetinARExceptions -join ' || ')
+$x = Find-MetinARLogcatProblems -Lines (LcBlock 1 @('MetinAR.Encounter.EncounterStateException: bad transition Placed -> Scanning', '(Filename: x Line: 1)')) -Package 'com.metinar.game.qa' -Pids @(4242)
+Assert 'mex.metinar-exception-type-fails' ($x.Status -eq 'FAIL' -and $x.MetinARExceptions.Count -eq 1)
+$il2cppStyle = @('ArgumentException: bad value', 'MetinAR.Hands.FppHandsRig:LateUpdate()', '')
+Assert 'mex.il2cpp-colon-frame-fails' ((Find-MetinARLogcatProblems -Lines (LcBlock 1 $il2cppStyle) -Package 'com.metinar.game.qa' -Pids @(4242)).MetinARExceptions.Count -eq 1)
+$rethrow = @('Exception: wrapper', 'Rethrow as TargetInvocationException: inner', '  at MetinAR.Map.WorldMapController.Start () [0x00000] in <0>:0 ')
+Assert 'mex.rethrow-same-block' ((Find-MetinARLogcatProblems -Lines (LcBlock 1 $rethrow) -Package 'com.metinar.game.qa' -Pids @(4242)).MetinARExceptions.Count -eq 1)
+# not an exception block: MetinAR text on normal lines, after the block ended, or on another thread
+$noise = @() + (LcBlock 1 $arfStack) + (LcBlock 2 @('MetinAR.QA.MetinARPerfProbe bootstrap', '[MetinARPerf] v=1 event=start', 'package com.metinar.game.qa ready') 'I' '4260') +
+         (LcBlock 3 @('NullReferenceException: x')) + (LcBlock 3 @('  at MetinAR.Combat.ArDamageDealer.TryHit () [0x0] in <0>:0 ') 'E' '4299')
+$x = Find-MetinARLogcatProblems -Lines $noise -Package 'com.metinar.game.qa' -Pids @(4242)
+Assert 'mex.no-false-positive-text-other-thread' ($x.Status -eq 'WARN' -and $x.MetinARExceptions.Count -eq 0) ($x.MetinARExceptions -join ' || ')
+$afterEnd = @() + (LcBlock 1 @('NullReferenceException: x', '(Filename: y Line: 2)')) + (LcBlock 1 @('  MetinAR.Combat.ArDamageDealer:TryHit() mentioned in a later log') 'I')
+Assert 'mex.filename-ends-block' ((Find-MetinARLogcatProblems -Lines $afterEnd -Package 'com.metinar.game.qa' -Pids @(4242)).MetinARExceptions.Count -eq 0)
+$otherProc = LcBlock 1 $deepStack 'E' '5000' '5000'
+Assert 'mex.other-process-ignored' ((Find-MetinARLogcatProblems -Lines $otherProc -Package 'com.metinar.game.qa' -Pids @(4242)).Status -eq 'PASS')
+$lower = LcBlock 1 @('NullReferenceException: x', '  at metinar.combat.Foo.Bar () [0x0] in <0>:0 ', '  at XMetinAR.Foo.Bar () [0x0] in <0>:0 ')
+Assert 'mex.case-and-prefix-exact' ((Find-MetinARLogcatProblems -Lines $lower -Package 'com.metinar.game.qa' -Pids @(4242)).MetinARExceptions.Count -eq 0)
+$brief = @('E/Unity   ( 4242): NullReferenceException: x', 'E/Unity   ( 4242):   at MetinAR.Combat.ArDamageDealer.TryHit () [0x0] in <0>:0 ')
+Assert 'mex.brief-format' ((Find-MetinARLogcatProblems -Lines $brief -Package 'com.metinar.game.qa' -Pids @(4242)).MetinARExceptions.Count -eq 1)
+$x = Find-MetinARLogcatProblems -Lines ((LcBlock 1 $deepStack) + (LcBlock 2 $deepStack)) -Package 'com.metinar.game.qa' -Pids @(4242)
+Assert 'mex.two-blocks-counted' ($x.MetinARExceptions.Count -eq 2)
+$x = Find-MetinARLogcatProblems -Lines ((LcBlock 1 $arfStack) + @('10-21 15:00:05.000  4242  4242 F libc    : Fatal signal 6 (SIGABRT)')) -Package 'com.metinar.game.qa' -Pids @(4242)
+Assert 'mex.non-metinar-but-fatal-fails' ($x.Status -eq 'FAIL' -and $x.MetinARExceptions.Count -eq 0)
+
 # --- METINAR-037 / audit UPDATE_1 N-01: ARCore registrations, platform guard, applicationIdentifier by purpose
 $arRule = $qcfg.androidBuild.arCore
 $arNoReg = Get-Content -Raw (Join-Path $fx 'runtime-init-e18df69-no-arcore.json')     # real QA APK e18df69 (built without -buildTarget Android)

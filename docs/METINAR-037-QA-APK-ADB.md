@@ -56,8 +56,13 @@ Owner: QA (#26). Source: audit `docs/audit/AUDIT_2026-10-21.md` §E.3 T19, probl
   `-AllowReplaceInstalled` after a note in #33. The QA APK (`com.metinar.game.qa`) installs next to the game.
 - **ARCore guard:** an APK failing the ARCore check is never installed (`APK rejected before install: ARCore
   registrations n/11`). There is no override.
+- **MetinAR exceptions FAIL** (lead decision 2026-10-21 15:28): a Unity exception in logcat whose message or stack has
+  a `MetinAR.` frame is reported as `Crash` = **FAIL** (`metinarExceptions=n`, plus the header and the first MetinAR
+  frame in the evidence). The stack is the following `Unity` lines of the same pid/tid, up to `(Filename: ...)`, an
+  empty line or another thread. Other Unity exceptions stay **WARN** (`unityErrors=n`) unless the app crashes or
+  logs a fatal line. The Editor T15 classifier (`KnownEditorInfrastructure`) is never applied on the device.
 - Covered without a phone by `tools/qa/tests/Invoke-DeviceSmokeSimulation.ps1` (fake adb: `adblost`, `adbblip`,
-  guard on/off, QA install) and the unit tests in `tools/qa/tests/Invoke-QaToolTests.ps1`. A simulation is never
+  guard on/off, QA install, `no-arcore`, `metinarexc` = FAIL, `unityexc` = WARN) and the unit tests in `tools/qa/tests/Invoke-QaToolTests.ps1`. A simulation is never
   device evidence.
 
 ## 3. LuzMen rule (from #33, MANAGER DECISION 2026-10-21 14:35)

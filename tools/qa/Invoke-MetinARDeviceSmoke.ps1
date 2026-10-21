@@ -284,8 +284,8 @@ $appLines = @($raw | Where-Object {
 $redacted = ConvertTo-MetinARRedactedText -Lines $appLines -Secrets $secrets
 Set-Content -Path (Join-Path $OutputDir 'logcat-redacted.txt') -Value $redacted -Encoding UTF8
 $raw = $null
-$ev = @() + @($problems.Crashes) + @($problems.Anrs) + @($problems.FatalLines) + @($problems.UnityErrors | Select-Object -First 5)
-Add-Result (New-MetinARGateResult -Name 'Crash' -Status $problems.Status -Detail ("crash={0} anr={1} fatal={2} unityErrors={3} (redacted app log: {4} lines)" -f $problems.Crashes.Count, $problems.Anrs.Count, $problems.FatalLines.Count, $problems.UnityErrors.Count, $redacted.Count) -Evidence (ConvertTo-MetinARRedactedText -Lines $ev -Secrets $secrets))
+$ev = @() + @($problems.Crashes) + @($problems.Anrs) + @($problems.FatalLines) + @($problems.MetinARExceptions | ForEach-Object { "MetinAR exception: $_" }) + @($problems.UnityErrors | Select-Object -First 5)
+Add-Result (New-MetinARGateResult -Name 'Crash' -Status $problems.Status -Detail ("crash={0} anr={1} fatal={2} metinarExceptions={3} unityErrors={4} (redacted app log: {5} lines)" -f $problems.Crashes.Count, $problems.Anrs.Count, $problems.FatalLines.Count, $problems.MetinARExceptions.Count, $problems.UnityErrors.Count, $redacted.Count) -Evidence (ConvertTo-MetinARRedactedText -Lines $ev -Secrets $secrets))
 
 # --- Memory / frames / perf budgets / thermal ----------------------------------------------
 $samples = Get-MetinARPerfSamples -Lines $redacted

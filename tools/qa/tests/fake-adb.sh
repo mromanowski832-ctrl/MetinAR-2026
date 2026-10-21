@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Simulated adb for exercising Invoke-MetinARDeviceSmoke.ps1 without a phone (CI / Linux only).
 # Output is synthetic; a run against this script is NOT physical-device evidence.
-# FAKE_ADB_MODE=ok|nodevice|crash|adblost|adbblip   FAKE_ADB_PACKAGE (default com.metinar.game.qa)
+# FAKE_ADB_MODE=ok|nodevice|crash|adblost|adbblip|metinarexc|unityexc   FAKE_ADB_PACKAGE (default com.metinar.game.qa)
 # adblost: `adb devices` lists the phone for the first FAKE_ADB_LOST_AFTER calls (default 3), then never again.
 # adbblip: the phone is missing from `adb devices` exactly once (call number FAKE_ADB_LOST_AFTER + 1), then back.
 mode="${FAKE_ADB_MODE:-ok}"
@@ -28,6 +28,16 @@ case "$1" in
       echo "10-20 04:30:2$i.200  4242  4260 I Unity   : [MetinARPerf] v=1 scene=WorldMapPrototype windowS=5 frames=300 fpsAvg=60 frameAvgMs=16.67 frameP50Ms=16.6 frameP95Ms=18 frameMaxMs=40 frameSpikes=0 mainAvgMs=8 mainP95Ms=10 mainMaxMs=20 mainSpikes=0 totalUsedMB=250 gcReservedMB=30 systemUsedMB=400"
     done
     echo "10-20 04:30:29.000  4242  4242 I Unity   : GPS fix lat=52.229770 lon=21.011780 from 192.168.1.23 serial FAKESERIAL123"
+    if [ "$mode" = "metinarexc" ] || [ "$mode" = "unityexc" ]; then
+      echo "10-20 04:30:29.500  4242  4260 E Unity   : NullReferenceException: Object reference not set to an instance of an object."
+      echo "10-20 04:30:29.500  4242  4260 E Unity   :   at UnityEngine.Events.InvokableCall.Invoke () [0x00000] in <00000000000000000000000000000000>:0 "
+      if [ "$mode" = "metinarexc" ]; then
+        echo "10-20 04:30:29.500  4242  4260 E Unity   :   at MetinAR.Combat.ArDamageDealer.TryHit (System.Int32 swingId) [0x00000] in <00000000000000000000000000000000>:0 "
+      else
+        echo "10-20 04:30:29.500  4242  4260 E Unity   :   at UnityEngine.XR.ARFoundation.ARSession.Update () [0x00000] in <00000000000000000000000000000000>:0 "
+      fi
+      echo "10-20 04:30:29.500  4242  4260 E Unity   : (Filename: currently not available on il2cpp Line: -1)"
+    fi
     if [ "$mode" = "crash" ]; then
       echo "10-20 04:30:30.000  4242  4242 E AndroidRuntime: FATAL EXCEPTION: main"
       echo "10-20 04:30:30.001  4242  4242 E AndroidRuntime: Process: $pkg, PID: 4242"
