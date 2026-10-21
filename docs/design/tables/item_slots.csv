@@ -1,0 +1,13 @@
+slotId,namePl,itemTypes,visibleInFpp,visibleOnMapAvatar,primaryStatsRolled,notes
+weapon,Broń,sword_1h|sword_2h|axe_2h|dagger_pair|bow|rune_wand,yes,yes,atk|mag,model 3D w FPP; wymaga rekwizytu FPP i animacji dla typu
+off_hand,Druga ręka,shield|quiver|totem|dark_focus,yes,yes,def|block|mag,tarcza tylko wojownik; zablokowany przy broni dwuręcznej i łuku (łuk używa kołczanu)
+helmet,Hełm,helmet,no,yes,def|maxHp,ikona + przyszły awatar mapy
+armor,Zbroja,armor_heavy|armor_light|robe,no,yes,def|maxHp,typ zbroi zależny od klasy
+gloves,Rękawice,gloves,yes,no,def|acc,w FPP widać dłonie: wariant tekstury rąk FPP (bez nowego mesha w v1)
+boots,Buty,boots,no,yes,def|eva,ikona; bonus do EXP z eksploracji możliwy tylko jako affiks
+earrings,Kolczyki,earrings,no,no,res|mp,biżuteria: tylko ikona
+necklace,Naszyjnik,necklace,no,no,maxHp|maxMp,biżuteria: tylko ikona
+bracelet,Bransoleta,bracelet,yes,no,acc|crit,widoczna na nadgarstku w FPP jako opcjonalny prosty mesh
+ring,Pierścień,ring,no,no,crit|res,dodatkowy slot zaproponowany; decyzja właściciela (Q19)
+quick_1,Szybki slot 1,consumable,yes,no,,przycisk mikstury w AR
+quick_2,Szybki slot 2,consumable,yes,no,,przycisk mikstury w AR

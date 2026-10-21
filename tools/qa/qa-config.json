@@ -6,13 +6,21 @@
     "tests/GeoCore.Tests/GeoCore.Tests.csproj",
     "tests/MetinAR.QA.Tests/MetinAR.QA.Tests.csproj",
     "tests/AssetPipeline.Tests/AssetPipeline.Tests.csproj",
+    "tests/MetinAR.Gameplay.Tests/MetinAR.Gameplay.Tests.csproj",
     "server/tests/MetinAR.Server.Tests/MetinAR.Server.Tests.csproj"
+  ],
+  "optionalTestProjectGlobs": [
+    "tests/*/*.Tests.csproj",
+    "server/tests/*/*.Tests.csproj",
+    "client/Tests/*/*.Tests.csproj"
   ],
   "expectedBuildScenes": [
     "Assets/MetinAR/Scenes/WorldMapPrototype.unity",
     "Assets/MetinAR/Scenes/ArEncounterPrototype.unity"
   ],
-  "missingScriptPrefabRoots": [ "Assets/MetinAR" ],
+  "missingScriptPrefabRoots": [
+    "Assets/MetinAR"
+  ],
   "smokeTests": [
     {
       "name": "WorldMapSmoke",
@@ -33,7 +41,11 @@
     "timeoutMinutes": 90,
     "expectedPackage": "com.metinar.game",
     "requiredAbi": "arm64-v8a",
-    "forbiddenAbis": [ "armeabi-v7a", "x86", "x86_64" ],
+    "forbiddenAbis": [
+      "armeabi-v7a",
+      "x86",
+      "x86_64"
+    ],
     "requireDebuggable": true,
     "minSdk": 31
   },
