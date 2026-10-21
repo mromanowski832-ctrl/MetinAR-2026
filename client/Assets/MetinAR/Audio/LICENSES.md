@@ -7,8 +7,9 @@ the SHA-256 does not match the bytes, the licence is not allowed or the file bre
 Rules (see `docs/METINAR-018-AUDIO-PIPELINE.md`):
 
 - `origin`: `original` (made by the project, licence `MetinAR-Owned`), `cc0` (licence `CC0-1.0`, source must contain the
-  download URL and the author), or `third_party` (open licence such as `CC-BY-4.0`, URL + author + attribution required).
-- Allowed licences: `MetinAR-Owned`, `CC0-1.0`, `CC-BY-4.0`. Any other licence needs an owner decision first.
+  download URL and the author). `third_party` with any other licence is currently not allowed.
+- Allowed licences: `MetinAR-Owned`, `CC0-1.0` (production decision 2026-10-21 in #42: CC-BY-4.0 not for now).
+  Any other licence needs an owner decision first.
 - Forbidden: anything from Metin2 / Gameforge / Ymir, paid sound libraries, ripped game audio, unclear licences.
 - `File` is relative to `client/Assets/MetinAR/Audio`.
 

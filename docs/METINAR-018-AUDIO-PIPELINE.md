@@ -59,8 +59,8 @@ Runtime voice count (`AudioManager` real voices 32) is unchanged. Not measured o
 
 ## 5. Licence rules
 
-- Allowed: `original` / `MetinAR-Owned` (made by the project), `cc0` / `CC0-1.0` with download URL and author,
-  `third_party` / `CC-BY-4.0` with URL, author and attribution. Anything else is an owner decision.
+- Allowed: `original` / `MetinAR-Owned` (made by the project) and `cc0` / `CC0-1.0` with download URL and author.
+  Production decision 2026-10-21 (#42): CC-BY-4.0 not for now. Anything else is an owner decision.
 - Forbidden: Metin2 / Gameforge / Ymir content, ripped game audio, paid libraries, unclear licences.
 - The ledger stores the SHA-256 of each file; replacing the bytes without updating provenance fails the test.
 

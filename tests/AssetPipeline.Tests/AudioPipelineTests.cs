@@ -195,6 +195,7 @@ namespace AssetPipeline.Tests
         [InlineData("cc0", "CC0-1.0", "freesound, no link", "URL")]
         [InlineData("cc0", "CC0-1.0", "ripped from Metin2 client https://x.org/a", "proprietary")]
         [InlineData("third_party", "Proprietary-Pack", "https://shop.example/pack", "not allowed")]
+        [InlineData("third_party", "CC-BY-4.0", "Jane Doe, https://example.org/sound/2", "not allowed")]
         [InlineData("bought", "MetinAR-Owned", "store", "must be original, cc0 or third_party")]
         public void LedgerRejectsBadProvenance(string origin, string license, string source, string expected)
         {

@@ -36,8 +36,11 @@ namespace MetinAR.Editor.Audio
 
         public static readonly string[] AudioExtensions = { ".wav", ".ogg", ".mp3", ".aif", ".aiff", ".flac", ".m4a", ".aac" };
 
-        /// <summary>Licences accepted in the ledger. Anything else needs an owner decision first.</summary>
-        public static readonly string[] AllowedLicenses = { "MetinAR-Owned", "CC0-1.0", "CC-BY-4.0" };
+        /// <summary>
+        /// Licences accepted in the ledger. Production decision 2026-10-21 (#42): only own synthesis or CC0 for now;
+        /// CC-BY-4.0 and anything else need a new owner/production decision before they are added here.
+        /// </summary>
+        public static readonly string[] AllowedLicenses = { "MetinAR-Owned", "CC0-1.0" };
 
         /// <summary>Words that must never appear as the source of a MetinAR sound (proprietary game content).</summary>
         public static readonly string[] ForbiddenSourceWords = { "metin2", "metin 2", "gameforge", "ymir" };
