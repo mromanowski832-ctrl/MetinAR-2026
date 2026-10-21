@@ -15,6 +15,7 @@ REG_LEATHER, REG_METAL, REG_GOLD, REG_CLOTH = 1, 2, 3, 4
 REG_BLADE, REG_FULLER, REG_GUARD, REG_SGOLD, REG_GRIP, REG_GEM = 1, 2, 3, 4, 5, 6
 
 # ---------------------------------------------------------------- sword (Unity grip-local: hilt/blade +Y)
+# Model units (scale 1): the arms prefab draws the sword at C.SWORD_SCALE around the grip.
 HILT_RADIUS = 0.0165
 HILT_BOTTOM, HILT_TOP = -0.172, 0.104
 GUARD_Y = 0.116
@@ -22,10 +23,10 @@ POMMEL_Y = -0.195
 
 SWORD_SOCKETS = {
     "Socket_GripR": (0.0, 0.0, 0.0),
-    "Socket_GripL": tuple(C.LEFT_GRIP_OFFSET),
-    "Socket_FxBladeBase": tuple(C.BLADE_BASE),
-    "Socket_FxBladeTip": tuple(C.BLADE_TIP),
-    "Socket_FxAuraBurst": tuple(C.AURA_BURST_CENTRE),
+    "Socket_GripL": tuple(C.MODEL_LEFT_GRIP_OFFSET),
+    "Socket_FxBladeBase": tuple(C.MODEL_BLADE_BASE),
+    "Socket_FxBladeTip": tuple(C.MODEL_BLADE_TIP),
+    "Socket_FxAuraBurst": tuple(C.MODEL_AURA_BURST_CENTRE),
     "Socket_FxGuardGem": (0.0, GUARD_Y, 0.0),
 }
 
@@ -64,7 +65,7 @@ def build_sword():
     def width(y):
         if y <= 0.80:
             return 0.032 - 0.006 * (y - 0.13) / 0.67
-        return 0.026 * max(0.0, 1.0 - (y - 0.80) / (C.BLADE_TIP.y - 0.80)) ** 0.85
+        return 0.026 * max(0.0, 1.0 - (y - 0.80) / (C.MODEL_BLADE_TIP.y - 0.80)) ** 0.85
 
     def thick(y):
         return 0.0065 - 0.003 * min(1.0, (y - 0.13) / 0.75)
@@ -87,7 +88,7 @@ def build_sword():
     for i in range(len(rings) - 1):
         for k in range(n):
             b.poly((rings[i][k], rings[i][(k + 1) % n], rings[i + 1][(k + 1) % n], rings[i + 1][k]))
-    tip = b.vert(_u2b(tuple(C.BLADE_TIP)), {}, REG_BLADE, 1.0, 0.5)
+    tip = b.vert(_u2b(tuple(C.MODEL_BLADE_TIP)), {}, REG_BLADE, 1.0, 0.5)
     for k in range(n):
         b.poly((rings[-1][k], rings[-1][(k + 1) % n], tip))
     base = b.vert(_u2b((0, 0.105, 0)), {}, REG_BLADE, 0.0, 0.5)

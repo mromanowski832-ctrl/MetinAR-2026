@@ -46,8 +46,10 @@ def socket_world(rig, name):
 def attach_sword_world(sword, rig):
     # the bone matrix IS the Blender-space grip frame (see fpp_model.build_armature), so the sword's
     # identity-local frame goes exactly there
+    # identity-local frame goes exactly there; the model is drawn at C.SWORD_SCALE around the grip (as nested in
+    # PF_Player_FppArms)
     sword.parent = None
-    sword.matrix_world = socket_world(rig, "B_Socket_Sword")
+    sword.matrix_world = socket_world(rig, "B_Socket_Sword") @ C.SWORD_SCALE_MATRIX
 
 
 def checkpoint():
@@ -115,7 +117,7 @@ def vertex_sets(arms):
 
 
 def sword_contacts(arms, rig, actions, step=1):
-    """Deformed hand vertices expressed in the sword (RightGrip) frame for every `step`-th frame."""
+    """Deformed hand vertices expressed in sword-model units (RightGrip frame / SWORD_SCALE) for every `step`-th frame."""
     from mathutils import Vector
     sets = vertex_sets(arms)
     result = {}
@@ -128,7 +130,7 @@ def sword_contacts(arms, rig, actions, step=1):
             dg = bpy.context.evaluated_depsgraph_get()
             ev = arms.evaluated_get(dg)
             me = ev.to_mesh()
-            inv = socket_world(rig, "B_Socket_Sword").inverted()
+            inv = (socket_world(rig, "B_Socket_Sword") @ C.SWORD_SCALE_MATRIX).inverted()  # -> sword-model units
             grip_l = C.left_grip_blend("Aura", (f - 1) / C.FPS) if state == "AuraActivate" else 0.0
             for side in (1, -1):
                 for i in sets[side]:
@@ -136,7 +138,8 @@ def sword_contacts(arms, rig, actions, step=1):
                     lu = C.S @ (inv @ wpos)  # Unity sword-local
                     r = math.hypot(lu.x, lu.z)
                     if M.HILT_BOTTOM <= lu.y <= M.HILT_TOP and r < 0.06 and (side > 0 or grip_l >= 0.5):
-                        worst["hilt_min_clearance_m"][side] = min(worst["hilt_min_clearance_m"][side], r - M.HILT_RADIUS)
+                        worst["hilt_min_clearance_m"][side] = min(worst["hilt_min_clearance_m"][side],
+                                                                  (r - M.HILT_RADIUS) * C.SWORD_SCALE)  # metres
                     inside = (M.HILT_BOTTOM <= lu.y <= M.HILT_TOP and r < M.HILT_RADIUS) or \
                              (abs(lu.x) < 0.11 and abs(lu.y - M.GUARD_Y) < 0.010 and abs(lu.z) < 0.012) or \
                              (0.13 <= lu.y <= 0.80 and abs(lu.x) < 0.026 and abs(lu.z) < 0.004) or \
@@ -214,7 +217,11 @@ def full():
         "bones": len(rig.data.bones), "bone_names": [b.name for b in rig.data.bones],
         "materials": {"SK_Player_FppArms": 1, "SM_Weapon_FppSword": 1}, "texture_size": T.SIZE,
         "textures": {"FppArms": sorted(arms_tex), "FppSword": sorted(sword_tex)},
-        "sword_sockets_unity": {k: list(v) for k, v in M.SWORD_SOCKETS.items()},
+        "contract_id": C.CONTRACT_ID, "sword_scale": C.SWORD_SCALE,
+        "contract_unity": {"rest": [list(C.REST_POSITION), list(C.REST_EULER)], "aura_hold": [list(C.AURA_POSE[0]), list(C.AURA_POSE[1])],
+                           "left_rest": [list(C.LEFT_REST), list(C.LEFT_REST_EULER)],
+                           "hit_blade_base": list(C.BLADE_BASE), "hit_blade_tip": list(C.BLADE_TIP), "left_grip": list(C.LEFT_GRIP_OFFSET)},
+        "sword_sockets_unity_model": {k: list(v) for k, v in M.SWORD_SOCKETS.items()},
         "shoulders_unity": {("R" if k > 0 else "L"): [round(v, 3) for v in M.SHOULDERS[k][0]] for k in M.SHOULDERS},
         "upper_forearm_len_m": [M.UPPER_LEN, M.FORE_LEN], "hand_yaw_deg": M.HAND_YAW_DEG,
         "fps": C.FPS, "clips": clip_stats,
@@ -254,7 +261,7 @@ def full():
     cam = R.fpp_camera()
     cam_land = R.fpp_camera("FPP_Landscape", vfov=34.6)
     side = R.camera("Side", (0.95, -0.30, 0.20), (0.02, 0.40, -0.15), 38)
-    close = R.camera("Grip", (0.40, 0.16, -0.03), (0.17, 0.45, -0.18), 65)
+    close = R.camera("Grip", (0.31, 0.15, -0.01), (0.08, 0.44, -0.16), 65)
     shots = [("Idle", 1), ("Attack", 19), ("Attack", 31), ("Attack", 43), ("Attack", 61), ("AuraActivate", 40), ("AuraActivate", 66),
              ("AuraActivate", 101)]
     for state, f in shots:

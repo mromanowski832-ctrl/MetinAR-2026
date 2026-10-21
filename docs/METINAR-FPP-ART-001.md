@@ -1,8 +1,13 @@
 # METINAR-FPP-ART-001 — First-person hands/forearms, sword and Idle/Attack/AuraActivate clips
 
 Issue: #34 (3D models team). Branch `feat/fpp-art-hands-sword` from `main` e236629. Consumer: #31 / PR #32
-(`feat/fpp-hands-aura-prototype`, FppHandsView / FppCombatTimeline, head 52a1375 at the time of writing).
+(`feat/fpp-hands-aura-prototype`, FppHandsView / FppCombatTimeline).
+**Clips baked from contract V3 `v3-a31-retest`** (#31 issuecomment-6314043034 = PR #32 head 8d0acee `FppViewFraming`
+= `FppPoseContract.RetestV3` on `integration/fpp-art-preview`). V1 (PR #32 52a1375, clips up to cd3d02c) and the
+earlier proposal rest (0.06,−0.15,0.44) are obsolete. After this change the art preview can set
+`FppArtPreviewConfig.BakedContractId = "v3-a31-retest"` (that file is on the integration branch, not changed here).
 Status: assets + editor tooling delivered for **isolated preview**. No integration into #31 code, no scene changes.
+The hands are virtual on-screen hands holding the sword; there is no camera hand tracking.
 Phone (Galaxy A31) and performance: **UNVERIFIED**.
 
 ## 0. What is and is not in this change
@@ -31,13 +36,15 @@ model, texture or trace source (visual direction only: dark/gold gauntlets, blue
 | Units | metres, 1 Unity unit = 1 m, FBX Convert Units on, Scale Factor 1 |
 | Space of the arms prefab | **AR-camera local**: origin = camera, +X right, +Y up, +Z forward (put `PF_Player_FppArms` under the AR camera with identity local transform) |
 | Authoring space | Blender x = Unity x, Blender y = Unity z, Blender z = Unity y (Unity's Bake Axis Conversion maps it back; verified numerically in Unity, section 7) |
-| Right grip | bone `B_Socket_Sword` = PR #32 `RightGrip` frame; hilt axis = local +Y, blade towards +Y |
-| Left grip | bone `B_Socket_GripL` = PR #32 `LeftHand` frame (rest `(-0.19,-0.25,0.43)`, Euler(0,0,12); on the hilt at `RightGrip·(0,-0.12,0)`) |
+| Contract | V3 `v3-a31-retest`: rest `RightGrip (0.09,−0.17,0.46)` Euler(15,−30,−22); AuraActivate hold `(0.10,−0.14,0.50)` Euler(10,−30,−18); left hand rest `(−0.08,−0.23,0.42)` Euler(0,0,12) (unchanged); sword scale **0.75** around the grip; windup/end, timings, hit window unchanged |
+| Right grip | bone `B_Socket_Sword` = `RightGrip` frame (unscaled); hilt axis = local +Y, blade towards +Y |
+| Left grip | bone `B_Socket_GripL` = `LeftHand` frame (rest above; on the hilt at `RightGrip·(0,−0.09,0)` = model (0,−0.12,0) × 0.75) |
+| Sword scale | the sword **model** (`SM_Weapon_FppSword`, `PF_Weapon_FppSword`, its sockets) stays at scale 1 (model units below); `PF_Player_FppArms` nests it under `B_Socket_Sword` with uniform local scale 0.75, so in the RightGrip frame every sword point is model × 0.75 (hands stay life-size) |
 | Sword prefab pivot | `Socket_GripR` = (0,0,0) = right-hand grip centre, identity rotation |
-| Sword sockets (sword-local) | `Socket_GripR` (0,0,0) · `Socket_GripL` (0,-0.12,0) · `Socket_FxBladeBase` (0,0.13,0) · `Socket_FxBladeTip` (0,0.94,0) · `Socket_FxAuraBurst` (0,0.38,0) · `Socket_FxGuardGem` (0,0.116,0) |
-| Blade | y 0.13 … 0.94 (= PR #32 `BladeBase`/`BladeTip`, the code-driven hit segment) |
-| Hilt | radius 16.5 mm, y −0.172 … 0.104; guard at y 0.116 (±0.11 m wide); pommel at y −0.195 |
-| Nesting | `PF_Player_FppArms` contains `PF_Weapon_FppSword` under `B_Socket_Sword` with identity local transform |
+| Sword sockets (sword-model local, scale 1) | `Socket_GripR` (0,0,0) · `Socket_GripL` (0,-0.12,0) · `Socket_FxBladeBase` (0,0.13,0) · `Socket_FxBladeTip` (0,0.94,0) · `Socket_FxAuraBurst` (0,0.38,0) · `Socket_FxGuardGem` (0,0.116,0) |
+| Blade | model y 0.13 … 0.94; in the RightGrip frame 0.0975 … 0.705 (= `FppPoseContract.HitBladeBase/HitBladeTip`, the code-driven hit segment, 25 % shorter reach than V1) |
+| Hilt | model radius 16.5 mm, y −0.172 … 0.104; guard at y 0.116 (±0.11 m wide); pommel at y −0.195 (drawn: radius 12.4 mm, y −0.129 … 0.078, guard ±0.0825 m) |
+| Nesting | `PF_Player_FppArms` contains `PF_Weapon_FppSword` under `B_Socket_Sword` with identity local position/rotation and local scale 0.75 |
 
 ### 1.1 Bones (29, Generic rig)
 
@@ -53,14 +60,16 @@ forearm 0.285 m. The arms are solved with an analytic two-bone IK so the hand fr
 |---|---|---|---|
 | `Idle` / `A_FppArms_Idle` | 2.00 s (201 keys) | yes | rest pose ± ≤4 mm / 1.2° sway; first and last frame are exactly the rest pose |
 | `Attack` / `A_FppArms_Attack` | 0.72 s (73 keys) | no | rest → windup (0.25,−0.08,0.48) E(0,−10,−65) at 0.18 s → cut to (−0.15,−0.22,0.50) E(70,30,60) at 0.42 s (hit window 0.18–0.42) → return to rest at 0.72 s |
-| `AuraActivate` / `A_FppArms_AuraActivate` | 1.15 s (116 keys) | no | sword to (0.02,−0.18,0.52) E(12,0,0) over 0–0.25 s; left hand reaches the hilt over 0–0.35 s (fingers open, close in the last 20 % of the reach); two-hand hold incl. burst at 0.65 s; release 0.90–1.15 s |
+| `AuraActivate` / `A_FppArms_AuraActivate` | 1.15 s (116 keys) | no | sword to (0.10,−0.14,0.50) E(10,−30,−18) over 0–0.25 s; left hand reaches the hilt over 0–0.35 s (fingers open, close in the last 20 % of the reach); two-hand hold incl. burst at 0.65 s; release 0.90–1.15 s |
 
-Easing is `Mathf.SmoothStep`, rotations `Quaternion.Euler`/`Slerp` exactly as in PR #32. Because the clips reproduce
+Easing is `Mathf.SmoothStep`, rotations `Quaternion.Euler`/`Slerp` exactly as in `FppPoseContract`. Because the clips reproduce
 the code's pose functions, #31 can either keep driving the sockets from code or play these clips; both put the
 sword in the same place. `AC_FppArms` has the three states (Idle default) and **no parameters/transitions**:
-driving them from the combat timeline belongs to #31.
+driving them from the combat timeline belongs to #31. `FppArtAssetBuilder` updates an existing `AC_FppArms.controller`
+in place (same GUID and state fileIDs; it no longer deletes and recreates it), so a rebuild on unchanged clips leaves
+the checkout clean.
 
-Left-hand fingers: in Attack (≈0.38–0.48 s, the end of the cut sweeps the hilt past the resting left hand) and
+Left-hand fingers: in Attack (the end of the cut sweeps the hilt past the resting left hand) and
 during the Aura reach/release the left fingers would intersect the hilt. `fpp_anim.fit_left_fingers` searches a
 per-frame finger opening/closing that removes all intersections and smooths it (hold ±6 frames + 7-tap box).
 
@@ -102,16 +111,34 @@ never LOD-switched (constant screen size) and drawn on top of AR camera tracking
   `Armature/B_Root/...` must match the model's).
 - `tests/AssetPipeline.Tests`: Player naming/category/budget/state tests.
 
-## 6. Finding for #31: framing of the rest pose (contract, not the asset)
+## 6. Findings for #31 on contract V3 (contract, not the asset)
 
-With the estimated Galaxy A31 rear-camera field of view (≈69.4° vertical in portrait, ≈34.6° horizontal; an
-**estimate**, not measured on the device) the PR #32 rest pose `RightGrip (0.18,−0.19,0.46)` puts the grip, guard,
-blade and left hand **outside the portrait frame**; in landscape only the guard is visible. The sword enters the
-frame only mid-swing and during the Aura hold (renders in `docs/METINAR-FPP-ART-001/`). Suggested check on the
-device: measure the AR camera FOV and/or move the rest pose towards the centre, e.g. `(0.09,−0.17,0.42)`.
-This change does **not** alter the contract; if #31 changes it, re-run `fpp_build.py` (it reads `fpp_contract.py`).
+**6.1 Attack: the right hilt sweeps through the resting left hand.** With V3 the left hand rests at
+`(−0.08,−0.23,0.42)` and stays there during Attack (`LeftGripBlend` = 0), while the cut ends at `(−0.15,−0.22,0.50)`
+E(70,30,60) and returns to the new rest. The hilt axis passes **5.7 mm** from the left-hand socket centre at
+t = 0.38 s (inside the hit window); with V1 the minimum distance was 74 mm (`fpp_contract.py` poses, measured with
+both sets of values). The baked clips follow the contract exactly (0 mm / 0°), so the left palm and fingers are inside
+the drawn hilt in frames 35–54 (0.35–0.54 s; Blender report `penetrating_vertices` 591 over the 73 Attack frames,
+mostly `B_Hand_L`; the finger fit cannot move the palm). The code-driven procedural view uses the same poses, so its
+left glove sits in the same place (not measured here). The
+asset cannot fix this without leaving the contract; options for #31: (a) move the left hand out of the cut during
+Attack (e.g. a left-hand dodge offset in `FppPoseContract.LeftHandPose` for 0.25–0.55 s), (b) a left rest further left
+/ lower (V1's `(−0.19,−0.25,0.43)` gives 74 mm with the V3 rest), or (c) a different attack end pose. After a
+decision, change `fpp_contract.py` and re-run `fpp_build.py`.
+
+**6.2 Grip gap.** The hands stay life-size and were shaped around the scale-1 hilt (radius 16.5 mm); the drawn hilt
+is 12.4 mm, so the minimum hand–hilt clearance grows from 3.1 to 7.2 mm (right) and 2.8 to 5.7 mm (left on the hilt in
+the Aura hold). Visible in the grip close-up; at FPP distance it reads as a looser grip. Fix if wanted: a tighter
+finger pose/hand shape for the 0.75 hilt (art change, no contract change).
+
+**6.3 Framing.** With the estimated A31 portrait FOV (69.4° vertical, an estimate, not measured on the device) the V3
+rest pose has the grip, guard, blade and left hand in the lower part of the frame (renders in
+`docs/METINAR-FPP-ART-001/renders/`).
 
 ## 7. Verification
+
+**V3 regeneration:** results of the V3 clips are in section 7.0 (added with the Unity run). The tables below 7.0
+are the V1 run (`a5d7e27`/`cd3d02c`) and are kept as history.
 
 Unity 6000.6.4f1 on LuzMen, separate checkout `C:\Users\mroma\MetinAR-FPPART` (local clone + Library copied
 from `MetinAR-009-verify`; nothing in other checkouts touched), batch mode, tested SHA `a5d7e27`
@@ -159,9 +186,11 @@ Unity -batchmode -projectPath client -executeMethod MetinAR.Editor.AssetPipeline
   ≈0.29 m from the camera).
 - Finger opening in Attack/Aura is an automatic fit, not hand-keyed animation; it reads as a reflexive opening.
 - The FOV numbers in section 6 are estimates.
+- Attack hand/hilt overlap of contract V3 (section 6.1) is a contract decision for #31.
 - The Player budget is a proposal (owner decision).
 
 ## 10. Owner / #31 decisions
 
 1. Accept the `Player` category and its budget (section 4) or set different limits.
-2. #31: keep code-driven sockets or play the baked clips (both match); framing of the rest pose (section 6).
+2. #31: keep code-driven sockets or play the baked clips (both match).
+3. #31: contract V3 Attack/left-hand overlap (section 6.1) and the grip gap of the 0.75 sword (section 6.2).

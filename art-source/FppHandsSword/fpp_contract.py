@@ -1,8 +1,14 @@
 """METINAR-FPP-ART-001 — technical contract shared with #31 / PR #32 (FppHandsView, FppCombatTimeline).
 
-Every value here is copied from PR #32 head 52a1375 (technical prototype values, not final balance) and the
-pose maths is a line-by-line port of FppHandsView.SwordPose / LeftGripBlend, so the baked clips put the
-sword exactly where the code-driven hit geometry expects it.
+Contract V3 "v3-a31-retest" (#31 issuecomment-6314043034, A31 owner retest; PR #32 head 8d0acee FppViewFraming,
+integration/fpp-art-preview FppPoseContract.RetestV3). Technical prototype values, not final balance. The pose maths
+is a line-by-line port of FppPoseContract.SwordPose / LeftGripBlend / LeftHandPose, so the baked clips put the sword
+exactly where the code-driven hit geometry expects it. Superseded: V1 (PR #32 52a1375, clips up to cd3d02c) and the
+earlier proposal rest (0.06, -0.15, 0.44).
+
+Sword scale: the sword MODEL (SM_Weapon_FppSword, its sockets and mesh) is authored at scale 1 in MODEL_* units;
+PF_Player_FppArms nests it under B_Socket_Sword with a uniform localScale SWORD_SCALE around the grip (hands stay
+life-size). Contract points in the RightGrip frame (hit blade, left grip, aura burst) are MODEL_* x SWORD_SCALE.
 
 Spaces
 - "Unity" = Unity camera-local space of the AR camera: metres, +X right, +Y up, +Z forward (left-handed).
@@ -26,18 +32,37 @@ AURA_BURST_SECONDS = 0.65
 AURA_DURATION_SECONDS = 6.0
 IDLE_SECONDS = 2.0  # asset-only loop (the code has no idle motion); starts/ends exactly on the rest pose
 
-# FppHandsView (PR #32)
-REST_POSITION = Vector((0.18, -0.19, 0.46))
-REST_EULER = (15.0, 0.0, -14.0)
-LEFT_REST = Vector((-0.19, -0.25, 0.43))
-LEFT_REST_EULER = (0.0, 0.0, 12.0)
-BLADE_BASE = Vector((0.0, 0.13, 0.0))
-BLADE_TIP = Vector((0.0, 0.94, 0.0))
-LEFT_GRIP_OFFSET = Vector((0.0, -0.12, 0.0))  # left hand on the hilt, in the RightGrip frame
-AURA_BURST_CENTRE = Vector((0.0, 0.38, 0.0))
+CONTRACT_ID = "v3-a31-retest"  # FppPoseContract.RetestV3.Id / FppArtPreviewConfig.BakedContractId
+
+# FppViewFraming (PR #32 8d0acee) / FppPoseContract.RetestV3
+SWORD_SCALE = 0.75  # uniform scale of hilt, guard, pommel, blade (and aura ribbons) around the grip
+REST_POSITION = Vector((0.09, -0.17, 0.46))
+REST_EULER = (15.0, -30.0, -22.0)
+LEFT_REST = Vector((-0.08, -0.23, 0.42))
+LEFT_REST_EULER = (0.0, 0.0, 12.0)  # unchanged from V1
+AURA_POSE = (Vector((0.10, -0.14, 0.50)), (10.0, -30.0, -18.0))  # AuraActivate hold
+# shared by every contract (hit window 0.18-0.42 s blends only windup -> end)
 ATTACK_WINDUP = (Vector((0.25, -0.08, 0.48)), (0.0, -10.0, -65.0))
 ATTACK_END = (Vector((-0.15, -0.22, 0.50)), (70.0, 30.0, 60.0))
-AURA_POSE = (Vector((0.02, -0.18, 0.52)), (12.0, 0.0, 0.0))
+
+# unscaled sword-model points (RightGrip frame at scale 1; the sword FBX sockets carry these)
+MODEL_BLADE_BASE = Vector((0.0, 0.13, 0.0))
+MODEL_BLADE_TIP = Vector((0.0, 0.94, 0.0))
+MODEL_LEFT_GRIP_OFFSET = Vector((0.0, -0.12, 0.0))
+MODEL_AURA_BURST_CENTRE = Vector((0.0, 0.38, 0.0))
+MODEL_GUARD_CENTRE = Vector((0.0, 0.116, 0.0))
+
+# contract points in the (unscaled) RightGrip frame = model x SWORD_SCALE
+BLADE_BASE = MODEL_BLADE_BASE * SWORD_SCALE          # hit segment base (FppPoseContract.HitBladeBase)
+BLADE_TIP = MODEL_BLADE_TIP * SWORD_SCALE            # hit segment tip (HitBladeTip)
+LEFT_GRIP_OFFSET = MODEL_LEFT_GRIP_OFFSET * SWORD_SCALE  # left hand on the scaled hilt (LeftGrip)
+AURA_BURST_CENTRE = MODEL_AURA_BURST_CENTRE * SWORD_SCALE
+GUARD_CENTRE = MODEL_GUARD_CENTRE * SWORD_SCALE      # GripGuardCentre
+
+# V1 (PR #32 52a1375) for reference only; not used by the build
+V1_REST = (Vector((0.18, -0.19, 0.46)), (15.0, 0.0, -14.0))
+V1_LEFT_REST = (Vector((-0.19, -0.25, 0.43)), (0.0, 0.0, 12.0))
+V1_AURA_POSE = (Vector((0.02, -0.18, 0.52)), (12.0, 0.0, 0.0))
 
 S = Matrix(((1, 0, 0), (0, 0, 1), (0, 1, 0)))  # Unity <-> Blender (its own inverse)
 
@@ -65,7 +90,7 @@ def blend(pa, ra, pb, rb, t):
 
 
 def sword_pose(action, time):
-    """Port of FppHandsView.SwordPose: RightGrip pose (Unity camera-local position, quaternion)."""
+    """Port of FppPoseContract.SwordPose: RightGrip pose (Unity camera-local position, quaternion)."""
     rest = (REST_POSITION.copy(), u_euler(*REST_EULER))
     if action == "Attack":
         wp, wr = ATTACK_WINDUP[0], u_euler(*ATTACK_WINDUP[1])
@@ -115,6 +140,9 @@ def to_blender_matrix(pos, quat):
 # therefore carry NODE_FIX = S * diag(1,1,-1) = +90 deg about Blender X on top of to_blender_matrix(frame).
 NODE_FIX = Matrix.Rotation(math.radians(90.0), 4, "X")
 NODE_FIX_INV = NODE_FIX.inverted()
+
+# sword model -> RightGrip frame (uniform, so it commutes with the axis maps)
+SWORD_SCALE_MATRIX = Matrix.Scale(SWORD_SCALE, 4)
 
 
 def to_blender_node_matrix(pos, quat):

@@ -32,6 +32,11 @@ namespace MetinAR.Editor.FppArt
         public static readonly string[] States = { "Idle", "Attack", "AuraActivate" };
         public static readonly string[] SwordSockets = { "Socket_GripR", "Socket_GripL", "Socket_FxBladeBase", "Socket_FxBladeTip", "Socket_FxAuraBurst", "Socket_FxGuardGem" };
 
+        /// <summary>Contract the clips are baked from (art-source/FppHandsSword/fpp_contract.py CONTRACT_ID = FppPoseContract.RetestV3.Id).</summary>
+        public const string ContractId = "v3-a31-retest";
+        /// <summary>Uniform scale of the nested sword model around B_Socket_Sword (FppViewFraming.SwordScale, #31 V3).</summary>
+        public const float SwordScale = 0.75f;
+
         public const float ClipRotationError = 0.05f;
         public const float ClipPositionError = 0.05f;
         public const float ClipScaleError = 0.05f;
@@ -176,26 +181,64 @@ namespace MetinAR.Editor.FppArt
             return mat;
         }
 
+        /// <summary>
+        /// Idempotent: an existing AC_FppArms.controller is updated in place (same asset GUID, same state sub-assets and
+        /// fileIDs); only a missing controller is created. Re-running the builder on unchanged clips leaves the file
+        /// byte-identical (no fileID churn, see #36).
+        /// </summary>
         private static AnimatorController BuildController()
         {
-            if (AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath) != null)
+            AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+            if (controller == null) controller = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
+            bool dirty = false;
+            if (controller.layers.Length == 0)
             {
-                AssetDatabase.DeleteAsset(ControllerPath); // regenerated build output of this tool only
+                controller.AddLayer("Base Layer");
+                dirty = true;
             }
 
-            AnimatorController controller = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
             AnimatorStateMachine sm = controller.layers[0].stateMachine;
+            foreach (ChildAnimatorState child in sm.states)
+            {
+                if (System.Array.IndexOf(States, child.state.name) < 0)
+                {
+                    sm.RemoveState(child.state);
+                    dirty = true;
+                }
+            }
+
             for (int i = 0; i < States.Length; i++)
             {
                 AnimationClip clip = LoadClip(States[i]);
                 if (clip == null) throw new FileNotFoundException("Missing clip " + ClipPath(States[i]));
-                AnimatorState state = sm.AddState(States[i], new Vector3(300f, 60f * i, 0f));
-                state.motion = clip;
-                if (States[i] == "Idle") sm.defaultState = state;
+                AnimatorState state = sm.states.Select(c => c.state).FirstOrDefault(s => s.name == States[i]);
+                if (state == null)
+                {
+                    state = sm.AddState(States[i], new Vector3(300f, 60f * i, 0f));
+                    dirty = true;
+                }
+
+                if (state.motion != clip)
+                {
+                    state.motion = clip;
+                    dirty = true;
+                }
+
+                if (state.transitions.Length > 0)
+                {
+                    state.transitions = new AnimatorStateTransition[0];
+                    dirty = true;
+                }
+
+                if (States[i] == "Idle" && sm.defaultState != state)
+                {
+                    sm.defaultState = state;
+                    dirty = true;
+                }
             }
 
             // No parameters/transitions: driving the states from FppCombatTimeline belongs to the #31 integration.
-            EditorUtility.SetDirty(controller);
+            if (dirty) EditorUtility.SetDirty(controller);
             return controller;
         }
 
@@ -262,7 +305,7 @@ namespace MetinAR.Editor.FppArt
                 sword.transform.SetParent(socket, false);
                 sword.transform.localPosition = Vector3.zero;
                 sword.transform.localRotation = Quaternion.identity;
-                sword.transform.localScale = Vector3.one;
+                sword.transform.localScale = Vector3.one * SwordScale; // contract V3: sword drawn at 0.75 around the grip
 
                 PrefabUtility.SaveAsPrefabAsset(root, ArmsPrefabPath);
             }

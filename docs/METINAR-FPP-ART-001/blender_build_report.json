@@ -57,7 +57,62 @@
       "N"
     ]
   },
-  "sword_sockets_unity": {
+  "contract_id": "v3-a31-retest",
+  "sword_scale": 0.75,
+  "contract_unity": {
+    "rest": [
+      [
+        0.09000000357627869,
+        -0.17000000178813934,
+        0.46000000834465027
+      ],
+      [
+        15.0,
+        -30.0,
+        -22.0
+      ]
+    ],
+    "aura_hold": [
+      [
+        0.10000000149011612,
+        -0.14000000059604645,
+        0.5
+      ],
+      [
+        10.0,
+        -30.0,
+        -18.0
+      ]
+    ],
+    "left_rest": [
+      [
+        -0.07999999821186066,
+        -0.23000000417232513,
+        0.41999998688697815
+      ],
+      [
+        0.0,
+        0.0,
+        12.0
+      ]
+    ],
+    "hit_blade_base": [
+      0.0,
+      0.09749999642372131,
+      0.0
+    ],
+    "hit_blade_tip": [
+      0.0,
+      0.7049999833106995,
+      0.0
+    ],
+    "left_grip": [
+      0.0,
+      -0.08999999612569809,
+      0.0
+    ]
+  },
+  "sword_sockets_unity_model": {
     "Socket_GripR": [
       0.0,
       0.0,
@@ -96,9 +151,9 @@
       0.025
     ],
     "L": [
-      -0.16,
+      -0.14,
       -0.295,
-      -0.1
+      -0.125
     ]
   },
   "upper_forearm_len_m": [
@@ -124,10 +179,10 @@
       "seconds": 0.72,
       "loop": false,
       "max_wrist_gap_m": 0.0,
-      "left_finger_fit_frames": 29,
+      "left_finger_fit_frames": 45,
       "left_finger_fit_range": [
-        -0.6,
-        0.0
+        -1.2,
+        1.0
       ]
     },
     "AuraActivate": {
@@ -135,10 +190,10 @@
       "seconds": 1.15,
       "loop": false,
       "max_wrist_gap_m": 0.0,
-      "left_finger_fit_frames": 56,
+      "left_finger_fit_frames": 43,
       "left_finger_fit_range": [
-        -0.043,
-        0.4
+        0.0,
+        0.2
       ]
     }
   },
@@ -159,27 +214,27 @@
   "hand_sword_contact": {
     "Idle": {
       "hilt_min_clearance_m": {
-        "R": 0.0031,
+        "R": 0.0072,
         "L": 9.0
       },
       "penetrating_vertices": 0,
-      "nearest_camera_m": 0.297
+      "nearest_camera_m": 0.294
     },
     "Attack": {
       "hilt_min_clearance_m": {
-        "R": 0.0031,
+        "R": 0.0072,
         "L": 9.0
       },
-      "penetrating_vertices": 0,
+      "penetrating_vertices": 591,
       "nearest_camera_m": 0.288
     },
     "AuraActivate": {
       "hilt_min_clearance_m": {
-        "R": 0.0031,
-        "L": 0.0028
+        "R": 0.0072,
+        "L": 0.0057
       },
       "penetrating_vertices": 0,
-      "nearest_camera_m": 0.291
+      "nearest_camera_m": 0.277
     }
   }
 }

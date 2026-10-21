@@ -142,7 +142,7 @@ def hand_vertex_sets(arms):
 
 
 def sword_part_hit(lu):
-    """Name of the sword volume containing the sword-local Unity point lu, or None (conservative proxies)."""
+    """Name of the sword volume containing the sword-MODEL-local Unity point lu (scale 1), or None (conservative proxies)."""
     r = math.hypot(lu.x, lu.z)
     if M.HILT_BOTTOM <= lu.y <= M.HILT_TOP and r < M.HILT_RADIUS:
         return "hilt"
@@ -158,7 +158,7 @@ def sword_part_hit(lu):
 def count_hits(arms, rig, verts):
     ev = arms.evaluated_get(bpy.context.evaluated_depsgraph_get())
     me = ev.to_mesh()
-    inv = (rig.matrix_world @ rig.pose.bones["B_Socket_Sword"].matrix @ C.NODE_FIX_INV).inverted() @ ev.matrix_world
+    inv = (rig.matrix_world @ rig.pose.bones["B_Socket_Sword"].matrix @ C.NODE_FIX_INV @ C.SWORD_SCALE_MATRIX).inverted() @ ev.matrix_world
     n = 0
     for i in verts:
         if sword_part_hit(C.S @ (inv @ me.vertices[i].co)):

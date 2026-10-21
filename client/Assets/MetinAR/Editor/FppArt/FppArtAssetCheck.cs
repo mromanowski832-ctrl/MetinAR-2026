@@ -15,7 +15,7 @@ namespace MetinAR.Editor.FppArt
     /// METINAR-FPP-ART-001: read-only check of the FPP hands + sword assets in Unity.
     /// - prefabs load, no missing scripts / materials, URP shaders, shadows off, sockets present;
     /// - every clip sampled at 100 Hz: B_Socket_Sword vs the PR #32 RightGrip pose and B_Socket_GripL vs the
-    ///   PR #32 left-hand pose (reference values copied below, see docs/METINAR-FPP-ART-001.md §2);
+    ///   PR #32 left-hand pose of contract V3 "v3-a31-retest" (reference values copied below, see docs/METINAR-FPP-ART-001.md §2);
     /// - hand/sword intersection on the skinned mesh (BakeMesh) against the sword proxies;
     /// - visibility of grip/guard/blade/left hand in the estimated A31 portrait + landscape view;
     /// - preview screenshots (FPP portrait/landscape, outside, grip close-up) into Builds/metinar-fpp-art/.
@@ -31,15 +31,23 @@ namespace MetinAR.Editor.FppArt
         public const float MaxPositionError = 0.002f;
         public const float MaxRotationErrorDeg = 1.0f;
 
-        // ---- PR #32 (head 52a1375) FppHandsView / FppCombatTimeline technical values, copied for verification only
-        public static readonly Vector3 RestPosition = new Vector3(0.18f, -0.19f, 0.46f);
-        public static readonly Vector3 RestEuler = new Vector3(15f, 0f, -14f);
-        public static readonly Vector3 LeftRest = new Vector3(-0.19f, -0.25f, 0.43f);
+        // ---- Contract V3 "v3-a31-retest" (#31 issuecomment-6314043034; PR #32 8d0acee FppViewFraming =
+        //      FppPoseContract.RetestV3) / FppCombatTimeline technical values, copied for verification only
+        public static readonly Vector3 RestPosition = new Vector3(0.09f, -0.17f, 0.46f);
+        public static readonly Vector3 RestEuler = new Vector3(15f, -30f, -22f);
+        public static readonly Vector3 LeftRest = new Vector3(-0.08f, -0.23f, 0.42f);
         public static readonly Vector3 LeftRestEuler = new Vector3(0f, 0f, 12f);
-        public static readonly Vector3 LeftGripOffset = new Vector3(0f, -0.12f, 0f);
+        public const float SwordScale = 0.75f;
+        /// <summary>Unscaled sword-model points (sockets of SM_Weapon_FppSword / PF_Weapon_FppSword).</summary>
+        public static readonly Vector3 ModelLeftGripOffset = new Vector3(0f, -0.12f, 0f);
+        public static readonly Vector3 ModelBladeBase = new Vector3(0f, 0.13f, 0f), ModelBladeTip = new Vector3(0f, 0.94f, 0f);
+        public static readonly Vector3 ModelAuraBurst = new Vector3(0f, 0.38f, 0f);
+        /// <summary>Contract points in the RightGrip frame = model x SwordScale (hit blade, left hand on the hilt).</summary>
+        public static readonly Vector3 LeftGripOffset = ModelLeftGripOffset * SwordScale;
+        public static readonly Vector3 BladeTip = ModelBladeTip * SwordScale;
         public static readonly Vector3 WindupPos = new Vector3(0.25f, -0.08f, 0.48f), WindupEuler = new Vector3(0f, -10f, -65f);
         public static readonly Vector3 EndPos = new Vector3(-0.15f, -0.22f, 0.50f), EndEuler = new Vector3(70f, 30f, 60f);
-        public static readonly Vector3 AuraPos = new Vector3(0.02f, -0.18f, 0.52f), AuraEuler = new Vector3(12f, 0f, 0f);
+        public static readonly Vector3 AuraPos = new Vector3(0.10f, -0.14f, 0.50f), AuraEuler = new Vector3(10f, -30f, -18f);
         public const float AttackSeconds = 0.72f, HitStart = 0.18f, HitEnd = 0.42f, AuraCastSeconds = 1.15f, IdleSeconds = 2.0f;
 
         private static float Ease(float t) => Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t));
@@ -202,10 +210,10 @@ namespace MetinAR.Editor.FppArt
             }
 
             Expect(c, sword, "Socket_GripR", Vector3.zero);
-            Expect(c, sword, "Socket_GripL", LeftGripOffset);
-            Expect(c, sword, "Socket_FxBladeBase", new Vector3(0f, 0.13f, 0f));
-            Expect(c, sword, "Socket_FxBladeTip", new Vector3(0f, 0.94f, 0f));
-            Expect(c, sword, "Socket_FxAuraBurst", new Vector3(0f, 0.38f, 0f));
+            Expect(c, sword, "Socket_GripL", ModelLeftGripOffset);
+            Expect(c, sword, "Socket_FxBladeBase", ModelBladeBase);
+            Expect(c, sword, "Socket_FxBladeTip", ModelBladeTip);
+            Expect(c, sword, "Socket_FxAuraBurst", ModelAuraBurst);
             foreach (string s in new[] { "Socket_GripR", "Socket_FxBladeTip" })
             {
                 Transform t = FppArtAssetBuilder.FindDeep(sword.transform, s);
@@ -219,7 +227,21 @@ namespace MetinAR.Editor.FppArt
 
             Transform swordInArms = FppArtAssetBuilder.FindDeep(arms.transform, "PF_Weapon_FppSword");
             c.Check(swordInArms != null && swordInArms.parent != null && swordInArms.parent.name == FppArtAssetBuilder.SwordSocketBone && swordInArms.localPosition == Vector3.zero && swordInArms.localRotation == Quaternion.identity,
-                "sword nested under " + FppArtAssetBuilder.SwordSocketBone + " with identity local transform");
+                "sword nested under " + FppArtAssetBuilder.SwordSocketBone + " with identity local position/rotation");
+            c.Check(swordInArms != null && (swordInArms.localScale - Vector3.one * SwordScale).magnitude < 1e-5f && Mathf.Approximately(FppArtAssetBuilder.SwordScale, SwordScale),
+                "sword nested at uniform scale " + SwordScale + " around the grip (contract " + FppArtAssetBuilder.ContractId + "; local scale " + (swordInArms != null ? Fmt(swordInArms.localScale) : "n/a") + ")");
+            if (swordInArms != null)
+            {
+                // sockets of the nested sword in the RightGrip (B_Socket_Sword) frame = contract points (model x scale)
+                Transform grip = swordInArms.parent;
+                foreach (var (socket, expected) in new[] { ("Socket_GripL", LeftGripOffset), ("Socket_FxBladeBase", ModelBladeBase * SwordScale), ("Socket_FxBladeTip", BladeTip), ("Socket_FxAuraBurst", ModelAuraBurst * SwordScale) })
+                {
+                    Transform t = FppArtAssetBuilder.FindDeep(swordInArms, socket);
+                    if (t == null) continue;
+                    float d = (grip.InverseTransformPoint(t.position) - expected).magnitude;
+                    c.Check(d < 0.001f, "PF_Player_FppArms " + socket + " in RightGrip frame within 1 mm of contract " + Fmt(expected) + " (off " + (d * 1000f).ToString("0.00") + " mm)");
+                }
+            }
             Animator anim = arms.GetComponentInChildren<Animator>(true);
             c.Check(anim != null && anim.runtimeAnimatorController != null && !anim.applyRootMotion, "Animator with AC_FppArms, no root motion");
             if (anim != null && anim.runtimeAnimatorController != null)
@@ -298,7 +320,7 @@ namespace MetinAR.Editor.FppArt
 
                         // visibility (camera at the prefab root = AR camera)
                         if (InView(cam, p)) visGrip++;
-                        if (InView(cam, p + r * new Vector3(0f, 0.94f, 0f))) visTip++;
+                        if (InView(cam, p + r * BladeTip)) visTip++;
                         if (InView(cam, pl)) visLeft++;
 
                         // hand/sword intersection on the deformed mesh (every 2nd sample)
@@ -306,7 +328,8 @@ namespace MetinAR.Editor.FppArt
                         {
                             smr.BakeMesh(baked, true);
                             Vector3[] v = baked.vertices;
-                            Matrix4x4 toSword = sock.worldToLocalMatrix * Matrix4x4.TRS(smr.transform.position, smr.transform.rotation, Vector3.one);
+                            // -> sword-model units (proxies below are the unscaled model; the sword is drawn at SwordScale)
+                            Matrix4x4 toSword = Matrix4x4.Scale(Vector3.one / SwordScale) * sock.worldToLocalMatrix * Matrix4x4.TRS(smr.transform.position, smr.transform.rotation, Vector3.one);
                             float g = LeftGripBlend(state, t);
                             for (int k = 0; k < v.Length; k++)
                             {
@@ -319,14 +342,14 @@ namespace MetinAR.Editor.FppArt
                                               || (rad < 0.026f && Mathf.Abs(q.y + 0.195f) < 0.018f);
                                 if (inside) penetrations++;
                                 bool gripping = handBoneOf[k] == 1 || g >= 0.5f;
-                                if (gripping && q.y >= -0.172f && q.y <= 0.104f && rad < 0.06f) minClear = Mathf.Min(minClear, rad - 0.0165f);
+                                if (gripping && q.y >= -0.172f && q.y <= 0.104f && rad < 0.06f) minClear = Mathf.Min(minClear, (rad - 0.0165f) * SwordScale);
                             }
 
                             samples++;
                         }
                     }
 
-                    string what = state == "Idle" ? "start/end vs rest pose" : "vs PR #32 pose (" + (n + 1) + " samples)";
+                    string what = state == "Idle" ? "start/end vs rest pose" : "vs contract " + FppArtAssetBuilder.ContractId + " pose (" + (n + 1) + " samples)";
                     c.Check(maxP <= MaxPositionError && maxR <= MaxRotationErrorDeg, state + ": B_Socket_Sword " + what + ": max " + (maxP * 1000f).ToString("0.00") + " mm / " + maxR.ToString("0.00") + " deg (worst local delta euler " + Fmt(worstDelta.eulerAngles) + ")");
                     c.Check(maxPL <= MaxPositionError && maxRL <= MaxRotationErrorDeg, state + ": B_Socket_GripL " + what + ": max " + (maxPL * 1000f).ToString("0.00") + " mm / " + maxRL.ToString("0.00") + " deg");
                     if (state == "Idle") c.Check(idleAmp <= 0.006f, "Idle: sway amplitude " + (idleAmp * 1000f).ToString("0.0") + " mm (<= 6 mm)");
