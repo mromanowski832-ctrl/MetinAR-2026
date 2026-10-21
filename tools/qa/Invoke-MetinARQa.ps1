@@ -10,6 +10,8 @@
     UnityQaChecks  missing-script scan (build scenes + prefabs) and expected build scenes / indices
     WorldMapSmoke  existing world-map Play Mode smoke (JUnit XML)
     ArSmoke        existing AR encounter Play Mode smoke (XR Simulation, JUnit XML)
+    ArSmokeInjection  (explicit only, not in All) runs the AR smoke three times with METINAR_SMOKE_INJECT=metinar|unknown|searchdb
+                   and passes only if the injected MetinAR and unknown exceptions FAIL T15 and the known Search signature does not
     AndroidBuild   Android ARM64 / IL2CPP development APK
     ApkAudit       APK size + SHA-256, ABI, IL2CPP, debuggable, minSdk, manifest permission audit
                    (FAIL if ACCESS_BACKGROUND_LOCATION or any other forbidden permission is declared)
@@ -27,7 +29,7 @@
 #>
 [CmdletBinding()]
 param(
-    # Comma-separated or array: All, Hygiene, DotNetTests, UnityCompile, UnityQaChecks, WorldMapSmoke, ArSmoke, AndroidBuild, ApkAudit
+    # Comma-separated or array: All, Hygiene, DotNetTests, UnityCompile, UnityQaChecks, WorldMapSmoke, ArSmoke, AndroidBuild, ApkAudit, ArSmokeInjection
     [string[]]$Gates = @('All'),
     [string]$UnityPath,
     [string]$OutputDir,
@@ -53,10 +55,22 @@ $project = Join-Path $repo $config.unityProject
 
 $all = @('Hygiene', 'DotNetTests', 'UnityCompile', 'UnityQaChecks', 'WorldMapSmoke', 'ArSmoke', 'AndroidBuild', 'ApkAudit')
 $Gates = @($Gates | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-$unknown = @($Gates | Where-Object { $_ -ne 'All' -and $all -notcontains $_ })
+$explicitOnly = @('ArSmokeInjection')
+$unknown = @($Gates | Where-Object { $_ -ne 'All' -and $all -notcontains $_ -and $explicitOnly -notcontains $_ })
 if ($unknown.Count) { Write-Host "Unknown gate(s): $($unknown -join ', '). Valid: All, $($all -join ', ')" -ForegroundColor Red; exit 2 }
 $selected = if ($Gates -contains 'All') { $all } else { @($all | Where-Object { $Gates -contains $_ }) }
-$unityGates = @('UnityCompile', 'UnityQaChecks', 'WorldMapSmoke', 'ArSmoke', 'AndroidBuild')
+# ArSmokeInjection runs right after the Editor smokes and before AndroidBuild: the Android build switches the Library to the
+# Android target, and the injected Editor smokes must run on the same Editor state as ArSmoke.
+if ($Gates -contains 'ArSmokeInjection') {
+    $ordered = New-Object System.Collections.Generic.List[string]
+    foreach ($g in @($selected | Where-Object { $_ -ne 'ArSmokeInjection' })) {
+        if ($g -eq 'AndroidBuild' -and -not $ordered.Contains('ArSmokeInjection')) { $ordered.Add('ArSmokeInjection') }
+        $ordered.Add($g)
+    }
+    if (-not $ordered.Contains('ArSmokeInjection')) { $ordered.Add('ArSmokeInjection') }
+    $selected = $ordered.ToArray()
+}
+$unityGates = @('UnityCompile', 'UnityQaChecks', 'WorldMapSmoke', 'ArSmoke', 'AndroidBuild', 'ArSmokeInjection')
 
 $results = New-Object System.Collections.Generic.List[object]
 $unityLogs = New-Object System.Collections.Generic.List[string]
@@ -86,6 +100,11 @@ if ($dirtyBefore.Count -gt 0) { $notes.Add("Working tree had tracked modificatio
 
 $unity = $null
 $needUnity = @($selected | Where-Object { $unityGates -contains $_ }).Count -gt 0 -and -not $SkipUnity
+# ApkAudit never launches Unity but finds aapt/aapt2 in the Unity Android module, so resolve the path for it too.
+if (-not $needUnity -and $selected -contains 'ApkAudit') {
+    $unity = Find-MetinARUnity -Version $config.unityVersion -Override $UnityPath
+    if (-not $unity) { $notes.Add('Unity Android module not found; aapt/aapt2 must be on PATH or ANDROID_HOME for ApkAudit.') }
+}
 if ($needUnity) {
     $unity = Find-MetinARUnity -Version $config.unityVersion -Override $UnityPath
     if (-not $unity) { $notes.Add("Unity $($config.unityVersion) not found (set -UnityPath or METINAR_UNITY).") }
@@ -129,7 +148,10 @@ try {
                     $notes.Add('No .NET 8 runtime found; tests ran with DOTNET_ROLL_FORWARD=Major on a newer runtime.')
                 }
                 $ev = @(); $failed = $false; $total = 0; $passed = 0
-                foreach ($proj in $config.testProjects) {
+                $discovered = Get-MetinARTestProjects -RepoRoot $repo -Config $config
+                foreach ($tp in @($discovered | Where-Object { -not $_.Exists })) { $ev += "$($tp.Path) MISSING (required in qa-config.json testProjects)"; $failed = $true }
+                $ev += "discovered: " + ((@($discovered | Where-Object { $_.Exists }) | ForEach-Object { "$($_.Path)$(if (-not $_.Required) { ' (optional)' })" }) -join ', ')
+                foreach ($proj in @($discovered | Where-Object { $_.Exists } | ForEach-Object { $_.Path })) {
                     $log = Join-Path $OutputDir ("logs/dotnet-" + [IO.Path]::GetFileNameWithoutExtension($proj) + ".log")
                     & dotnet test (Join-Path $repo $proj) --configuration Release --logger 'console;verbosity=normal' *> $log
                     $code = $LASTEXITCODE
@@ -195,6 +217,30 @@ try {
                 Add-Result (New-MetinARGateResult -Name $gate -Status $(if ($ok) { 'PASS' } else { 'FAIL' }) -Detail ("{0} tests, {1} failures, exit={2}" -f $j.Tests, $j.Failures, $u.Run.ExitCode) `
                     -Evidence (@($j.Failed) + @("results: " + (Rel $xmlPath), "log: " + (Rel $u.Log))) -Seconds $u.Run.Seconds)
             }
+            'ArSmokeInjection' {
+                $cfg = @($config.smokeTests | Where-Object { $_.name -eq 'ArSmoke' })[0]
+                $xmlPath = Join-Path $repo $cfg.results
+                $ev = @(); $allOk = $true; $secs = 0.0; $skipped = $false
+                foreach ($mode in @('metinar', 'unknown', 'searchdb')) {
+                    if (Test-Path $xmlPath) { Remove-Item $xmlPath -Force }
+                    $env:METINAR_SMOKE_INJECT = $mode
+                    try { $u = Invoke-UnityGate ("ArSmokeInjection-" + $mode) $cfg.method @() ([int]$cfg.timeoutMinutes) }
+                    finally { Remove-Item Env:\METINAR_SMOKE_INJECT -ErrorAction SilentlyContinue }
+                    if ($u -isnot [pscustomobject] -or -not $u.PSObject.Properties['Run']) {
+                        if ($u.Status -eq 'SKIP') { $skipped = $true } else { $allOk = $false }
+                        $ev += "$($mode): $($u.Status) $($u.Detail)"; continue
+                    }
+                    $secs += $u.Run.Seconds
+                    $j = Get-MetinARJUnitSummary -Path $xmlPath
+                    if ($j) { Copy-Item $xmlPath (Join-Path $OutputDir ("inject-" + $mode + "-" + (Split-Path $xmlPath -Leaf))) -Force }
+                    $v = Get-MetinARSmokeInjectionVerdict -Mode $mode -JUnit $j
+                    if (-not $v.Ok) { $allOk = $false }
+                    $ev += "$($mode): $(if ($v.Ok) { 'OK' } else { 'WRONG' }) - $($v.Detail) (exit=$($u.Run.ExitCode), log: $(Rel $u.Log))"
+                }
+                if (Test-Path $xmlPath) { Remove-Item $xmlPath -Force }   # never leave an injected result where ArSmoke looks
+                if ($skipped -and $allOk) { Add-Result (New-MetinARGateResult -Name 'ArSmokeInjection' -Status 'SKIP' -Detail 'skipped (-SkipUnity)'); break }
+                Add-Result (New-MetinARGateResult -Name 'ArSmokeInjection' -Status $(if ($allOk) { 'PASS' } else { 'FAIL' }) -Detail $(if ($allOk) { 'injected MetinAR + unknown exceptions fail T15; known Search signature does not' } else { 'exception gate did not behave as expected' }) -Evidence $ev -Seconds $secs)
+            }
             'AndroidBuild' {
                 if ($SkipAndroid) { Add-Result (New-MetinARGateResult -Name 'AndroidBuild' -Status 'SKIP' -Detail 'skipped (-SkipAndroid)'); break }
                 $apk = Join-Path $repo $config.androidBuild.apk
@@ -202,6 +248,8 @@ try {
                 $u = Invoke-UnityGate 'AndroidBuild' $config.androidBuild.method @() -noGraphics ([int]$config.androidBuild.timeoutMinutes)
                 if ($u -isnot [pscustomobject] -or -not $u.PSObject.Properties['Run']) { Add-Result $u; break }
                 $okLine = @($u.Lines | Where-Object { $_ -match '\[MetinARAndroidDevBuild\] (SUCCESS|FAILED|scenes=)' })
+                # Surface environment causes seen on LuzMen (full disk -> LLVM IO failure / Gradle daemon death) instead of a bare FAIL.
+                $okLine += @($u.Lines | Where-Object { $_ -match 'No space left on device|There is not enough space on the disk|daemon disappeared unexpectedly' } | Select-Object -First 2)
                 $ok = ($u.Run.ExitCode -eq 0 -and (Test-Path $apk) -and $u.Summary.CompilerErrors -eq 0)
                 Add-Result (New-MetinARGateResult -Name 'AndroidBuild' -Status $(if ($ok) { 'PASS' } else { 'FAIL' }) -Detail ("exit={0} apk={1} method={2}" -f $u.Run.ExitCode, $(if (Test-Path $apk) { Rel $apk } else { 'missing' }), $config.androidBuild.method) `
                     -Evidence (@($okLine | ForEach-Object { ConvertTo-MetinARRedactedText -Lines @($_) }) + @($u.Summary.BlockingLines) + @("log: " + (Rel $u.Log))) -Seconds $u.Run.Seconds)
@@ -229,6 +277,7 @@ try {
                 if ($badAbi.Count) { $problems += "unexpected ABIs: $($badAbi -join ', ')" }
                 if (-not $rep.HasIl2Cpp -or -not $rep.HasGlobalMetadata) { $problems += 'IL2CPP markers missing (libil2cpp.so / global-metadata.dat)' }
                 if ($rep.HasMonoAssemblies) { $problems += 'Mono managed assemblies present (expected IL2CPP)' }
+                foreach ($pd in @($rep.PlayerData.Problems)) { $problems += "PLAYER DATA: $pd" }   # #31 stale .split chunks
                 if ($rep.SizeMB -gt [double]$budgets.apk.maxDevApkMB) { $problems += "APK $($rep.SizeMB) MB > prototype budget $($budgets.apk.maxDevApkMB) MB" }
                 elseif ($rep.SizeMB -gt [double]$budgets.apk.warnDevApkMB) { $warnings += "APK $($rep.SizeMB) MB > warn level $($budgets.apk.warnDevApkMB) MB" }
                 $st = if ($problems.Count) { 'FAIL' } elseif ($warnings.Count) { 'WARN' } else { 'PASS' }
@@ -236,7 +285,10 @@ try {
                     "apk: $(Rel $rep.Path)",
                     "size: $($rep.SizeBytes) bytes ($($rep.SizeMB) MB)",
                     "sha256: $($rep.Sha256)",
-                    "abis: $($rep.Abis -join ',')  il2cpp: $($rep.HasIl2Cpp)  global-metadata: $($rep.HasGlobalMetadata)"
+                    "abis: $($rep.Abis -join ',')  il2cpp: $($rep.HasIl2Cpp)  global-metadata: $($rep.HasGlobalMetadata)",
+                    ("player data (assets/bin/Data): {0} whole, split: {1}; consistency {2}" -f @($rep.PlayerData.WholeFiles).Count,
+                        ((@($rep.PlayerData.SplitFiles.PSObject.Properties) | ForEach-Object { "$($_.Name) x$($_.Value)" }) -join ', '),
+                        $(if (@($rep.PlayerData.Problems).Count) { 'FAIL' } else { 'OK' }))
                 )
                 if ($b) {
                     $ev += "package: $($b.Package)  version: $($b.VersionName) ($($b.VersionCode))  minSdk: $($b.MinSdk)  targetSdk: $($b.TargetSdk)  debuggable: $($b.Debuggable)"

@@ -115,6 +115,139 @@ Assert 'overall.unverified-only' ((Get-MetinAROverallStatus -Results @((New-Meti
 $md = ConvertTo-MetinARMarkdownReport -Title 'T' -Results $res -Header @{ Head = 'abc' }
 Assert 'report.table' ($md -match '\| B \| \*\*UNVERIFIED\*\* \|' -and $md -match 'no / device' -and $md -match '### B')
 
+# --- METINAR-014: branch-aware test discovery
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ("metinar-qa-disc-" + [guid]::NewGuid().ToString('N'))
+try {
+    foreach ($d in @('tests/GeoCore.Tests', 'tests/MapCore.Tests', 'tests/Helpers', 'server/tests/MetinAR.Server.Tests', 'client/Tests/HandTracking.Tests')) { New-Item -ItemType Directory -Force -Path (Join-Path $tmp $d) | Out-Null }
+    foreach ($f in @('tests/GeoCore.Tests/GeoCore.Tests.csproj', 'tests/MapCore.Tests/MapCore.Tests.csproj', 'tests/Helpers/Helpers.csproj', 'server/tests/MetinAR.Server.Tests/MetinAR.Server.Tests.csproj', 'client/Tests/HandTracking.Tests/HandTracking.Tests.csproj')) { Set-Content -Path (Join-Path $tmp $f) -Value '<Project />' }
+    $cfgD = [pscustomobject]@{ testProjects = @('tests/GeoCore.Tests/GeoCore.Tests.csproj', 'tests/Gone.Tests/Gone.Tests.csproj'); optionalTestProjectGlobs = @('tests/*/*.Tests.csproj', 'server/tests/*/*.Tests.csproj', 'client/Tests/*/*.Tests.csproj', 'nothere/*/*.Tests.csproj') }
+    $disc = @(Get-MetinARTestProjects -RepoRoot $tmp -Config $cfgD)
+    $paths = @($disc | ForEach-Object { $_.Path })
+    Assert 'discover.required-first' ($disc[0].Path -eq 'tests/GeoCore.Tests/GeoCore.Tests.csproj' -and $disc[0].Required -and $disc[0].Exists) ($paths -join ',')
+    Assert 'discover.required-missing-kept' (@($disc | Where-Object { $_.Path -eq 'tests/Gone.Tests/Gone.Tests.csproj' -and $_.Required -and -not $_.Exists }).Count -eq 1)
+    Assert 'discover.optional-found' (($paths -contains 'tests/MapCore.Tests/MapCore.Tests.csproj') -and ($paths -contains 'server/tests/MetinAR.Server.Tests/MetinAR.Server.Tests.csproj') -and ($paths -contains 'client/Tests/HandTracking.Tests/HandTracking.Tests.csproj')) ($paths -join ',')
+    Assert 'discover.no-duplicates' (@($paths | Where-Object { $_ -eq 'tests/GeoCore.Tests/GeoCore.Tests.csproj' }).Count -eq 1)
+    Assert 'discover.pattern-only' (-not ($paths -contains 'tests/Helpers/Helpers.csproj'))
+    Assert 'discover.count' ($disc.Count -eq 5) ($paths -join ',')
+    $none = @(Get-MetinARTestProjects -RepoRoot $tmp -Config ([pscustomobject]@{ testProjects = @('tests/GeoCore.Tests/GeoCore.Tests.csproj') }))
+    Assert 'discover.no-globs' ($none.Count -eq 1)
+} finally { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
+$repoCfg = Read-MetinARJson -Path (Join-Path $PSScriptRoot '../qa-config.json')
+$repoDisc = @(Get-MetinARTestProjects -RepoRoot (Join-Path $PSScriptRoot '../../..') -Config $repoCfg)
+Assert 'discover.repo-required-exist' (@($repoDisc | Where-Object { $_.Required -and -not $_.Exists }).Count -eq 0) (($repoDisc | ForEach-Object { "$($_.Path)=$($_.Exists)" }) -join ',')
+
+# --- METINAR-014: multiple latency metrics
+$latSamples = @(
+    [pscustomobject]@{ scene = 'WorldMapPrototype'; fpsAvg = 60.0 },
+    [pscustomobject]@{ scene = 'WorldMapPrototype'; fpsAvg = 59.0; 'lat.map.tile.decode.avgMs' = 12.0; 'lat.map.tile.decode.p95Ms' = 95.0 },
+    [pscustomobject]@{ scene = 'WorldMapPrototype'; fpsAvg = 58.0; 'lat.map.tile.decode.avgMs' = 10.0; 'lat.map.tile.decode.p95Ms' = 40.0 }
+)
+$latBudget = [pscustomobject]@{ minFpsAvg = 28; latencyMetrics = @(
+    [pscustomobject]@{ metric = 'map.tile.decode'; maxAvgMs = 30; maxP95Ms = 80; required = $false },
+    [pscustomobject]@{ metric = 'map.tile.mesh'; maxAvgMs = 20; maxP95Ms = 50; required = $false }) }
+$lr = Test-MetinARPerfBudget -Samples $latSamples -Budget $latBudget -BudgetName 'WorldMapPrototype'
+Assert 'lat.multi.fail-on-p95' ($lr.Status -eq 'FAIL' -and @($lr.Checks | Where-Object { $_.Metric -like 'lat.map.tile.decode.p95Ms*' -and $_.Status -eq 'FAIL' -and $_.Observed -eq 95 }).Count -eq 1) "$($lr.Status)"
+Assert 'lat.optional-absent-skipped' (@($lr.Checks | Where-Object { $_.Metric -like 'lat.map.tile.mesh*' }).Count -eq 0)
+$latBudget.latencyMetrics[1].required = $true
+$lr2 = Test-MetinARPerfBudget -Samples $latSamples -Budget $latBudget -BudgetName 'WorldMapPrototype'
+Assert 'lat.required-absent-unverified' (@($lr2.Checks | Where-Object { $_.Metric -like 'lat.map.tile.mesh*' -and $_.Status -eq 'UNVERIFIED' }).Count -eq 2)
+$handBudget = [pscustomobject]@{ anyScene = $true; latencyMetrics = @([pscustomobject]@{ metric = 'lat.hand.inference'; maxAvgMs = 45; maxP95Ms = 70 }) }
+$hr = Test-MetinARPerfBudget -Samples @([pscustomobject]@{ scene = 'A' }, [pscustomobject]@{ scene = 'B'; 'lat.hand.inference.avgMs' = 30.0; 'lat.hand.inference.p95Ms' = 60.0 }) -Budget $handBudget -BudgetName 'HandTracking'
+Assert 'lat.hand-pass' ($hr.Status -eq 'PASS' -and @($hr.Checks).Count -eq 2) "$($hr.Status)"
+$legacy = Test-MetinARPerfBudget -Samples @([pscustomobject]@{ scene = 'X'; 'lat.hand.inference.avgMs' = 50.0; 'lat.hand.inference.p95Ms' = 60.0 }) -Budget ([pscustomobject]@{ latencyMetric = 'lat.hand.inference'; maxLatencyAvgMs = 45; maxLatencyP95Ms = 70 })
+Assert 'lat.legacy-schema' ($legacy.Status -eq 'FAIL')
+$budgetFile = Read-MetinARJson -Path (Join-Path $PSScriptRoot '../perf-budgets.json')
+Assert 'lat.budget-file-metrics' ((@($budgetFile.scenes.WorldMapPrototype.latencyMetrics | ForEach-Object { $_.metric }) -join ',') -eq 'map.tile.decode,map.tile.mesh' -and $budgetFile.scenes.HandTracking.latencyMetrics[0].metric -eq 'hand.inference')
+
+# --- METINAR-014: AR smoke exception injection verdicts
+$jOk = [pscustomobject]@{ Tests = 15; Failures = 0; Failed = @() }
+$jT15 = [pscustomobject]@{ Tests = 15; Failures = 1; Failed = @('T15_NoExceptionsLogged: exceptions: InvalidOperationException: Injected project-code smoke exception') }
+$jOther = [pscustomobject]@{ Tests = 15; Failures = 2; Failed = @('T03_Foo: x', 'T15_NoExceptionsLogged: exceptions: injected') }
+Assert 'inject.metinar-fail-ok' (Get-MetinARSmokeInjectionVerdict -Mode 'metinar' -JUnit $jT15).Ok
+Assert 'inject.metinar-pass-wrong' (-not (Get-MetinARSmokeInjectionVerdict -Mode 'metinar' -JUnit $jOk).Ok)
+Assert 'inject.unknown-other-fail-wrong' (-not (Get-MetinARSmokeInjectionVerdict -Mode 'unknown' -JUnit $jOther).Ok)
+Assert 'inject.searchdb-pass-ok' (Get-MetinARSmokeInjectionVerdict -Mode 'searchdb' -JUnit $jOk).Ok
+Assert 'inject.searchdb-fail-wrong' (-not (Get-MetinARSmokeInjectionVerdict -Mode 'searchdb' -JUnit $jT15).Ok)
+Assert 'inject.no-results' (-not (Get-MetinARSmokeInjectionVerdict -Mode 'unknown' -JUnit $null).Ok)
+
+# --- #31 / METINAR-014: APK player data (stale .split chunks)
+$D = 'assets/bin/Data/'
+$crash52 = @('AndroidManifest.xml', 'lib/arm64-v8a/libil2cpp.so', "$($D)boot.config", "$($D)globalgamemanagers") +
+    @(0..3 | ForEach-Object { "$($D)globalgamemanagers.assets.split$_" }) + @("$($D)level0", "$($D)level1", "$($D)sharedassets0.assets.split0", "$($D)sharedassets0.assets.split1", "$($D)sharedassets1.assets") +
+    @(0..14 | ForEach-Object { "$($D)sharedassets1.assets.split$_" }) + @("$($D)Managed/Metadata/global-metadata.dat")
+$pd = Test-MetinARApkPlayerData -Entries $crash52
+Assert 'playerdata.crash-52a1375-rejected' (@($pd.Problems).Count -eq 1 -and $pd.Problems[0] -match 'sharedassets1\.assets exists both whole and as 15 \.split') "$($pd.Problems -join ' | ')"
+$clean = @($crash52 | Where-Object { $_ -notmatch 'sharedassets1\.assets\.split' })
+$pdc = Test-MetinARApkPlayerData -Entries $clean
+Assert 'playerdata.clean-e18df69-layout-ok' (@($pdc.Problems).Count -eq 0 -and $pdc.SplitFiles.'globalgamemanagers.assets' -eq 4 -and $pdc.SplitFiles.'sharedassets0.assets' -eq 2)
+Assert 'playerdata.missing-chunk' ((@((Test-MetinARApkPlayerData -Entries @("$($D)a.assets.split0", "$($D)a.assets.split2")).Problems) -join '|') -match 'missing \.split1')
+Assert 'playerdata.not-from-zero' ((@((Test-MetinARApkPlayerData -Entries @("$($D)a.assets.split1")).Problems) -join '|') -match 'missing \.split0')
+Assert 'playerdata.backslash' (@((Test-MetinARApkPlayerData -Entries @('assets\bin\Data\x.assets', 'assets\bin\Data\x.assets.split0')).Problems).Count -eq 1)
+Assert 'playerdata.subfolders-ignored' (@((Test-MetinARApkPlayerData -Entries @("$($D)Managed/x.split0", "$($D)Resources/y.assets", "$($D)Resources/y.assets.split0", 'other/z.assets', 'other/z.assets.split0')).Problems).Count -eq 0)
+Assert 'playerdata.empty' (@((Test-MetinARApkPlayerData -Entries @()).Problems).Count -eq 0)
+# end-to-end over real zip files (what ApkAudit / Test-ApkPlayerData.ps1 / the device harness read)
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+$zdir = Join-Path ([IO.Path]::GetTempPath()) ("metinar-qa-apk-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $zdir | Out-Null
+function New-FakeApk([string]$path, [string[]]$names) {
+    $fs = [IO.File]::Open($path, [IO.FileMode]::Create)
+    $za = New-Object System.IO.Compression.ZipArchive($fs, [System.IO.Compression.ZipArchiveMode]::Create)
+    foreach ($n in $names) { $e = $za.CreateEntry($n); $w = New-Object IO.StreamWriter($e.Open()); $w.Write('x'); $w.Dispose() }
+    $za.Dispose(); $fs.Dispose()
+}
+try {
+    $bad = Join-Path $zdir 'bad.apk'; $good = Join-Path $zdir 'good.apk'
+    New-FakeApk $bad $crash52; New-FakeApk $good $clean
+    $rb = Get-MetinARApkReport -ApkPath $bad
+    Assert 'playerdata.apkreport-bad' (@($rb.PlayerData.Problems).Count -eq 1 -and $rb.HasIl2Cpp)
+    Assert 'playerdata.apkreport-good' (@((Get-MetinARApkReport -ApkPath $good).PlayerData.Problems).Count -eq 0)
+    $tool = Join-Path $PSScriptRoot '../Test-ApkPlayerData.ps1'
+    $psExe = (Get-Process -Id $PID).Path
+    & $psExe -NoProfile -File $tool -ApkPath $good *> $null; $codeGood = $LASTEXITCODE
+    & $psExe -NoProfile -File $tool -ApkPath $bad *> $null; $codeBad = $LASTEXITCODE
+    Assert 'playerdata.cli-exit-codes' ($codeGood -eq 0 -and $codeBad -eq 1) "good=$codeGood bad=$codeBad"
+} finally { Remove-Item -Recurse -Force $zdir -ErrorAction SilentlyContinue }
+
+# --- #31 follow-up: serialized fields under #if UNITY_EDITOR / DEVELOPMENT_BUILD
+$cs = @(
+    'public class A : MonoBehaviour {',
+    '    [SerializeField] private float _ok = 1f;',
+    '    public int Visible;',
+    '#if UNITY_EDITOR',
+    '    [SerializeField] private string _editorNote;',
+    '    public GameObject EditorOnlyRef;',
+    '    private void OnValidate() { _ok = 2f; }',
+    '    public static int Counter;',
+    '    public bool Prop => true;',
+    '    public int Auto { get; set; }',
+    '#endif',
+    '#if UNITY_ANDROID',
+    '    [SerializeField] private int _androidOnly;',
+    '#endif',
+    '#if !UNITY_EDITOR && DEVELOPMENT_BUILD',
+    '    [SerializeField]',
+    '    private bool _devFlag;',
+    '#else',
+    '    [SerializeReference] private object _poly;',
+    '#endif',
+    '    void Update() {',
+    '#if UNITY_EDITOR || DEVELOPMENT_BUILD',
+    '        int local = 3;',
+    '        Debug.Log(local);',
+    '#endif',
+    '    }',
+    '}')
+$cf = @(Find-MetinARConditionalSerializedFields -Lines $cs)
+$cfl = @($cf | ForEach-Object { $_.Line })
+Assert 'condfields.detects-editor-fields' (($cfl -contains 5) -and ($cfl -contains 6)) ($cfl -join ',')
+Assert 'condfields.attr-on-previous-line' ($cfl -contains 17) ($cfl -join ',')
+Assert 'condfields.else-branch-counts' ($cfl -contains 19) ($cfl -join ',')
+Assert 'condfields.ignores-methods-static-unrelated-locals' (-not ($cfl -contains 7 -or $cfl -contains 8 -or $cfl -contains 9 -or $cfl -contains 10 -or $cfl -contains 13 -or $cfl -contains 23 -or $cfl -contains 2 -or $cfl -contains 3)) ($cfl -join ',')
+Assert 'condfields.count' ($cf.Count -eq 4) ($cfl -join ',')
+$hyg = @(& (Join-Path $PSScriptRoot '../Test-RepoHygiene.ps1') -RepoRoot (Join-Path $PSScriptRoot '../../..') -PassThru)
+Assert 'condfields.repo-clean' (@($hyg | Where-Object { $_.Name -eq 'EditorOnlySerializedFields' -and $_.Status -eq 'PASS' }).Count -eq 1) (($hyg | Where-Object { $_.Name -match 'EditorOnly|ManagedStripping' } | ForEach-Object { "$($_.Name)=$($_.Status): $($_.Detail)" }) -join ' || ')
+Assert 'stripping.reported' (@($hyg | Where-Object { $_.Name -eq 'ManagedStripping' -and $_.Detail -match 'Android stripping=' }).Count -eq 1)
+
 Write-Host ''
 Write-Host "QA tool tests: $script:passed passed, $script:failed failed"
 if ($script:failed -gt 0) { exit 1 } else { exit 0 }
