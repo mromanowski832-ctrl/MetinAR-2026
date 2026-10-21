@@ -185,3 +185,26 @@ sword; there is no tracking of the player's real hands through the AR camera.
   camera / plane / raycast / anchor registrations (QA tests use the real JSON of both APKs as fixtures). Builds run with
   `-buildTarget Android`. The guard and the validator also live on PR #32 (the v0 APK branch); the validator requires
   all 11 `Unity.XR.ARCore` registrations and the build log prints `ARCore registrations 11/11`.
+
+## v0-candidate-1 on A31 (2026-10-21 17:53–18:03 Europe/Warsaw): P0-1 no damage, P0-2 spider "moves with the phone"
+
+Protocol and causes: #31 (session protocol 6320633550, causes 6321030003). Summary:
+
+- **P0-2 is not an anchor or AI bug.** All 265 `[ArAnchor]` lines: `parent=Anchor`, constant `mob=`, `followsCam=0`,
+  `verdict=STAYS`. The mob has no locomotion in v0 (aggro is #74). ARCore reset VIO at 17:55:09 and the session stayed
+  `SessionInitializing` for 8 min 15 s with a **frozen camera pose**; the camera image kept moving while the mob was
+  still drawn with the stale pose, so it looked glued to the screen. Fix: while `Placed` and the session is not
+  `SessionTracking`, the mob and its nameplate are hidden (`ArEncounterMob.SetTrackingVisible`,
+  `[ArEncounter] mob hidden (tracking lost: …)` / `mob shown (tracking)`); pose and anchor are untouched.
+  Not done (product decision): automatic AR session reset after N s without tracking.
+- **P0-1: hits never happened** (0 `[FppCombat] hit`, 0 `[ArDamage] swing=`, 0 `hit ignored`). The literal blade
+  segment was tested against the body box at floor level (mob-local y 0.125–0.595). From a phone held ~1.25 m above the
+  floor at the natural 20–40° pitch the blade passes above the spider at every distance; T10b/T10c passed only because they
+  move the spider into the blade at camera height. Fix: `FppHitGeometry.IntersectsReachColumn`: the body footprint
+  (X/Z unchanged) extruded up to `ReachColumnTopY` = 3.5 (mob-local). Horizontal reach ≈ 1.25–1.4 m camera→spider
+  centre (MOBS_NPC "dystans walki 1,2 m"); no hit from ≥ 3 m (L5). On the device the spider was also placed at 3.82 m
+  (out of reach) and combat is disabled while tracking is lost.
+- Regression: Play Mode `T10d_DeviceGeometry_CameraWalkAndHandheldHit` moves the **camera** (XR Simulation pose
+  provider), not the spider: walk 3.82→2.82→1.82→3.82→4.82→3.82 m at 1.25 m height / 30° pitch (mob world pose
+  unchanged, distance follows), no reach at 3.82 m, approach to 1.0 m + real HUD ATAK must lower HP, and with tracking
+  lost the mob must not be drawn. Engine-free: `FppCombatTests.ReachColumn*`.
