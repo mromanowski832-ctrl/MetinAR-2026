@@ -8,7 +8,7 @@ Gałąź od `feat/046-gameplay-core` (PR #65, S1). Liczby: spec `docs/design/` (
 ## Przepływ
 
 ```text
-FppCombatController.HitDetected(mob, swingId)   (#31, PR #32 — podpięcie po merge, patrz niżej)
+FppCombatController.HitDetected(mob, swingId)   (#31, PR #32 na `main`; podpięte w ArEncounterSceneController.Start)
   → ArEncounterCombat.HandleHitDetected(mob, swingId)          Unity, dodawany w ArEncounterSceneController.Awake
     → EncounterCombatSession.RegisterHit(swingId)              czysty C#, MetinAR.Gameplay.Combat
        → DamageResolver.Resolve (COMBAT_PHYSICS §1: trafienie → blok → rozrzut → krytyk → Def → odporność → min 1)
@@ -57,9 +57,11 @@ moba 6–10 s), nagroda **101 EXP** (84 × 1,20 za +4 poziomy) i **10–18 talar
 ## Poza zakresem S2a
 
 - **S2b:** test na A31 (logcat `[ArDamage]`, nagranie/zrzut) po zamknięciu #31 i w kolejce A31 w #33 — `UNVERIFIED`.
-- **Podpięcie FPP:** `FppCombatController` jest w PR #32 (#31, jeszcze nie na `main`). Po jego merge'u wystarczy jedna linia
-  w `ArEncounterSceneController.Start`: `FppCombat.HitDetected += Combat.HandleHitDetected;` (podpis zgodny:
-  `Action<ArEncounterMob, int>`). Do tego czasu trafienia dostarcza test (symulacja) — w buildzie bez #31 nie ma ataku.
+- ~~Podpięcie FPP~~ **zrobione po merge #32**: `ArEncounterSceneController.Start` ma
+  `FppCombat.HitDetected += Combat.HandleHitDetected;` (odpinane w `OnDestroy`). Test Play Mode
+  `ArEncounterSmokeTest.T10c_RealSwingsKillSpider_RewardOnce` robi **prawdziwe** zamachy przyciskiem ATAK przez geometrię
+  ostrza: HP 120 → 0, „Pokonany”, nagroda 101 EXP i 10–18 talarów **dokładnie raz** (dalsze zamachy i surowe
+  trafienie po śmierci nie dają nic), a T11 po powrocie na mapę sprawdza HUD (Lv 1, 2,525 z 4 kul, talary = nagroda).
 - Ataki moba, HP gracza, kara za śmierć (S3), łup (S4), rozdawanie punktów (S6), zapis postępu i autorytet serwera (S11).
 - Trafienie w słaby punkt: sesja to obsługuje (`weakPoint`), ale `HitDetected` z #31 nie podaje jeszcze strefy trafienia.
 

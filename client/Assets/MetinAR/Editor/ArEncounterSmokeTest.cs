@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using MetinAR.ArEncounter;
+using MetinAR.Gameplay.Combat;
+using MetinAR.Progression;
 using MetinAR.Location;
 using MetinAR.UI;
 using MetinAR.WorldMap;
@@ -127,6 +129,9 @@ namespace MetinAR.Editor
             private Vector3 _syntheticTarget;
             private ArSessionStatus _syntheticStatus = ArSessionStatus.SessionTracking;
             private Vector3 _realPlacedPosition;
+            private bool _killed;
+            private MobKillReward _killReward;
+            private int _killDefeatedEvents;
             private bool _realPlaced;
 
             private void Check(bool condition, string message)
@@ -222,6 +227,7 @@ namespace MetinAR.Editor
                     ("T09_RepeatedPlaceNeverDuplicatesAndStaysStable", T09_RepeatedPlaceNeverDuplicatesAndStaysStable),
                     ("T10_FppActionsAndRemainingPlaceholders", T10_FppActionsAndRemainingPlaceholders),
                     ("T10b_FppAttackAuraAndHitGeometry", T10b_FppAttackAuraAndHitGeometry),
+                    ("T10c_RealSwingsKillSpider_RewardOnce", T10c_RealSwingsKillSpider_RewardOnce),
                     ("T11_ExitButtonReturnsToWorldMap", T11_ExitButtonReturnsToWorldMap),
                     ("T12_SyntheticFrames_ScanReadyPlacedSingleSpawn", T12_SyntheticFrames_ScanReadyPlacedSingleSpawn),
                     ("T13_UnsupportedStateIsClearAndNonCrashing", T13_UnsupportedStateIsClearAndNonCrashing),
@@ -769,6 +775,102 @@ namespace MetinAR.Editor
                 }
             }
 
+            /// <summary>
+            /// v0 / T07 acceptance (METINAR-020 x #31): REAL sword swings through the HUD ATAK button and the FPP blade
+            /// geometry — FppCombatController.HitDetected → ArEncounterCombat.HandleHitDetected → DamageResolver — take the
+            /// placed spider from HP 120/120 to 0, the nameplate shows "Pokonany", and the reward (101 EXP, 10–18 talary)
+            /// is granted exactly once even when swings continue after death. The fight is re-bound to a fresh local
+            /// player (level 1, 0 EXP) so the numbers are deterministic after T10b's single test hit.
+            /// </summary>
+            private IEnumerator T10c_RealSwingsKillSpider_RewardOnce()
+            {
+                FppCombatController fpp = _ar != null ? _ar.FppCombat : null;
+                ArEncounterCombat combat = _ar != null ? _ar.Combat : null;
+                ArEncounterMob mob = _ar != null ? _ar.SpawnedMob : null;
+                Check(fpp != null && combat != null && mob != null, "FPP, combat or spider missing");
+                if (fpp == null || combat == null || mob == null) yield break;
+                var savedFrameSource = _ar.FrameSourceOverride;
+                Transform target = mob.transform;
+                Vector3 savedPosition = target.position;
+                Quaternion savedRotation = target.rotation;
+                int defeatedEvents = 0;
+                MobKillReward reward = default;
+                Action<ArEncounterMob, MobKillReward> onDefeated = (m, r) => { defeatedEvents++; reward = r; };
+                combat.MobDefeated += onDefeated;
+                _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionTracking;
+                try
+                {
+                    LocalPlayerSession.Reset();
+                    combat.SeedOverride = 20261021UL;
+                    combat.Bind(mob);
+                    yield return Frames(3);
+                    Check(fpp.Ready, "FPP not ready");
+                    Check(combat.Session != null && combat.Session.MobHp == 120 && combat.Session.MobMaxHp == 120, "fight not at 120/120");
+                    Check(mob.HpLabel == "HP 120/120", "start label " + mob.HpLabel);
+                    PlayerProgress p0 = LocalPlayerSession.Progress;
+                    Check(p0.Level == 1 && p0.TotalExp == 0 && p0.Talary == 0, "player not fresh");
+
+                    // Hold the spider where the blade passes during the attack (as in T10b), facing the camera.
+                    Pose pose = FppHandsView.SwordPose(FppCombatAction.Attack, 0.30f);
+                    Vector3 localMid = pose.position + pose.rotation * Vector3.Lerp(FppHandsView.BladeBase, FppHandsView.BladeTip, 0.5f);
+                    int swings = 0, hitsBefore = fpp.HitCount, previousHp = 120;
+                    while (!combat.Session.MobDefeated && swings < 40)
+                    {
+                        target.rotation = _ar.ArCamera.transform.rotation;
+                        target.position = _ar.ArCamera.transform.TransformPoint(localMid) - target.TransformVector(new Vector3(0, 0.33f, -0.13f));
+                        yield return WaitUntil(() => fpp.Ready && fpp.Timeline.Action == FppCombatAction.Idle, 3f);
+                        _ar.Hud.ActionButtons[0].onClick.Invoke();
+                        swings++;
+                        yield return WaitUntil(() => fpp.Timeline.Action == FppCombatAction.Idle, 3f);
+                        int hp = combat.Session.MobHp;
+                        Check(hp <= previousHp, "HP increased " + previousHp + "->" + hp);
+                        Check(mob.IsDefeated || mob.HpLabel == "HP " + hp + "/120", "label lag " + mob.HpLabel + " vs " + hp);
+                        previousHp = hp;
+                    }
+
+                    int realHits = fpp.HitCount - hitsBefore;
+                    Check(combat.Session.MobDefeated && combat.Session.MobHp == 0, "spider not defeated after " + swings + " real swings (hp " + combat.Session.MobHp + ")");
+                    Check(realHits == swings, "not every real swing hit the spider: hits " + realHits + " / swings " + swings);
+                    Check(combat.Session.SwingsResolved == swings, "resolved " + combat.Session.SwingsResolved + " / swings " + swings);
+                    Check(mob.IsDefeated && mob.HpLabel == ArEncounterMob.DefeatedLabel && Mathf.Approximately(mob.HpFillFraction, 0f), "death label " + mob.HpLabel);
+                    Check(defeatedEvents == 1, "defeated events " + defeatedEvents);
+                    Check(reward.Exp == 101, "EXP reward " + reward.Exp);
+                    Check(reward.Talary >= 10 && reward.Talary <= 18, "talary reward " + reward.Talary);
+                    PlayerProgress p = LocalPlayerSession.Progress;
+                    Check(p.TotalExp == 101 && p.Talary == reward.Talary && p.Level == 1, "progress exp " + p.TotalExp + " talary " + p.Talary + " lvl " + p.Level);
+
+                    // No double reward: more real swings at the dead spider, and a raw hit event with a new swing id.
+                    long exp = p.TotalExp, talary = p.Talary;
+                    for (int i = 0; i < 3; i++)
+                    {
+                        target.rotation = _ar.ArCamera.transform.rotation;
+                        target.position = _ar.ArCamera.transform.TransformPoint(localMid) - target.TransformVector(new Vector3(0, 0.33f, -0.13f));
+                        yield return WaitUntil(() => fpp.Ready && fpp.Timeline.Action == FppCombatAction.Idle, 3f);
+                        _ar.Hud.ActionButtons[0].onClick.Invoke();
+                        yield return WaitUntil(() => fpp.Timeline.Action == FppCombatAction.Idle, 3f);
+                    }
+
+                    combat.HandleHitDetected(mob, 100000);
+                    Check(combat.LastReport != null && combat.LastReport.Status == CombatHitStatus.MobAlreadyDefeated, "hit after death " + (combat.LastReport != null ? combat.LastReport.Status.ToString() : "-"));
+                    Check(defeatedEvents == 1 && p.TotalExp == exp && p.Talary == talary, "second reward: events " + defeatedEvents + " exp " + p.TotalExp + " talary " + p.Talary);
+                    Check(mob.HpLabel == ArEncounterMob.DefeatedLabel, "label after extra swings " + mob.HpLabel);
+                    yield return WaitUntil(() => mob.IsBodyHidden, 3f);
+                    Check(mob.IsBodyHidden, "spider body not hidden after death");
+                    _killed = true;
+                    _killReward = reward;
+                    _killDefeatedEvents = defeatedEvents;
+                    Debug.Log("[ArSmoke] T10c kill swings=" + swings + " hits=" + realHits + " exp=+" + reward.Exp + " talary=+" + reward.Talary
+                              + " progress lvl=" + p.Level + " exp=" + p.TotalExp + " talary=" + p.Talary);
+                }
+                finally
+                {
+                    combat.MobDefeated -= onDefeated;
+                    fpp.CancelActions();
+                    target.SetPositionAndRotation(savedPosition, savedRotation);
+                    _ar.FrameSourceOverride = savedFrameSource;
+                }
+            }
+
             private IEnumerator T11_ExitButtonReturnsToWorldMap()
             {
                 if (_ar == null)
@@ -788,6 +890,24 @@ namespace MetinAR.Editor
                 yield return WaitUntil(() => placement != null && placement.IsInitialized, 10f);
                 Check(placement != null && placement.IsInitialized, "world map did not re-initialize");
                 Check(FindAnyObjectByType<ArEncounterLauncher>() != null, "launcher missing after return");
+                if (_killed)
+                {
+                    // v0: the map HUD shows the reward of the single kill (101 / 160 EXP of level 1 = 2.525 of 4 orbs).
+                    WorldMapHud hud = FindAnyObjectByType<WorldMapHud>();
+                    yield return Frames(2);
+                    PlayerProgress p = LocalPlayerSession.Progress;
+                    Check(hud != null && hud.BindToLocalPlayer, "world map HUD missing or not bound");
+                    Check(p.TotalExp == 101 && p.Talary == _killReward.Talary && p.Level == 1 && _killDefeatedEvents == 1,
+                        "progress after return exp " + p.TotalExp + " talary " + p.Talary + " lvl " + p.Level);
+                    if (hud != null)
+                    {
+                        Check(hud.LevelLabel == "Lv 1", "map HUD level " + hud.LevelLabel);
+                        Check(Mathf.Abs(hud.FilledExpOrbs - 2.525f) < 1e-3f, "map HUD orbs " + hud.FilledExpOrbs);
+                        Check(hud.TalaryLabel == _killReward.Talary.ToString(), "map HUD talary " + hud.TalaryLabel + " vs " + _killReward.Talary);
+                        Debug.Log("[ArSmoke] T11 map HUD " + hud.LevelLabel + " orbs=" + hud.FilledExpOrbs + " talary=" + hud.TalaryLabel);
+                    }
+                }
+
                 _ar = null;
             }
 
