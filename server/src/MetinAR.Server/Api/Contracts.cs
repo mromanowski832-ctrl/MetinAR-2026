@@ -34,6 +34,7 @@ public sealed record WorldEntityDto(
     bool Active,
     DateTimeOffset SpawnedAt,
     DateTimeOffset? DespawnAt,
+    DateTimeOffset? ActiveUntil,
     double DistanceMeters);
 
 public sealed record NearbyWorldResponse(
@@ -46,19 +47,28 @@ public sealed record NearbyWorldResponse(
     int? NextOffset,
     IReadOnlyList<WorldEntityDto> Entities);
 
-public sealed record StartEncounterRequest(string? PlayerId, string? WorldEntityId, GeoPositionDto? ClientPosition);
+/// <summary>
+/// Client GPS fix used for the server-side proximity check. <c>HorizontalAccuracyMeters</c> is the platform's
+/// accuracy radius; <c>CapturedAt</c> (UTC) is optional and, when sent, must be recent.
+/// </summary>
+public sealed record ClientFixDto(double? Latitude, double? Longitude, double? HorizontalAccuracyMeters, DateTimeOffset? CapturedAt);
 
-public sealed record CompleteEncounterRequest(string? EncounterId, string? PlayerId);
+public sealed record StartEncounterRequest(string? PlayerId, string? WorldEntityId, ClientFixDto? ClientPosition);
+
+public sealed record CompleteEncounterRequest(string? EncounterId, string? PlayerId, string? Nonce);
 
 public sealed record EncounterSessionDto(
     string Id,
     string PlayerId,
     string WorldEntityId,
     DateTimeOffset StartedAt,
+    DateTimeOffset ExpiresAt,
     DateTimeOffset? CompletedAt,
+    DateTimeOffset? ExpiredAt,
     string Status);
 
-public sealed record StartEncounterResponse(EncounterSessionDto Encounter, bool Created);
+/// <summary><c>Nonce</c> is returned only here, once per start call; the server stores only its hash.</summary>
+public sealed record StartEncounterResponse(EncounterSessionDto Encounter, bool Created, string Nonce);
 
 public sealed record CompleteEncounterResponse(EncounterSessionDto Encounter, bool FirstCompletion);
 

@@ -26,7 +26,12 @@ public sealed partial class SchemaMigrator
     public static IReadOnlyList<string> KnownMigrations { get; } = LoadScripts().Select(s => s.Id).ToArray();
 
     /// <returns>The migration ids applied by this call (empty when the schema was already current).</returns>
-    public async Task<IReadOnlyList<string>> MigrateAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> MigrateAsync(CancellationToken cancellationToken = default) =>
+        MigrateAsync(stopAfter: null, cancellationToken);
+
+    /// <param name="stopAfter">Apply scripts only up to and including this id (used by upgrade-path tests).</param>
+    /// <param name="cancellationToken">Cancels the migration.</param>
+    internal async Task<IReadOnlyList<string>> MigrateAsync(string? stopAfter, CancellationToken cancellationToken)
     {
         EnsureDataDirectory(_connections.DataSource);
 
@@ -70,6 +75,10 @@ public sealed partial class SchemaMigrator
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             newlyApplied.Add(id);
             LogApplied(_logger, id);
+            if (string.Equals(id, stopAfter, StringComparison.Ordinal))
+            {
+                break;
+            }
         }
 
         return newlyApplied;
