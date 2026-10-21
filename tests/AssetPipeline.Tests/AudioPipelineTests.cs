@@ -60,6 +60,11 @@ namespace AssetPipeline.Tests
         [InlineData("Assets/MetinAR/Audio/SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Hit_01.wav", AudioCategory.MobSfx)]
         [InlineData("Assets/MetinAR/Audio/Music/MUS_Overworld.ogg", AudioCategory.Music)]
         [InlineData("Assets/MetinAR/Audio/Ambience/AMB_Forest_01.ogg", AudioCategory.Ambience)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Item/SFX_Item_Potion_01.wav", AudioCategory.ItemSfx)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Loot/SFX_Loot_Common_01.wav", AudioCategory.LootSfx)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Status/SFX_Status_PoisonTick_01.wav", AudioCategory.StatusSfx)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Shop/SFX_Shop_Buy_01.wav", AudioCategory.None)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Item/Extra/SFX_Item_Potion_01.wav", AudioCategory.None)]
         [InlineData("Assets/MetinAR/Audio/SFX/Mobs/VenomousSpider/Extra/x.wav", AudioCategory.None)]
         [InlineData("Assets/MetinAR/Audio/x.wav", AudioCategory.None)]
         [InlineData("Assets/Samples/Audio/Button Pop.wav", AudioCategory.None)]
@@ -72,6 +77,13 @@ namespace AssetPipeline.Tests
         [InlineData("Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_SwordHit_01.wav", true)]
         [InlineData("Assets/MetinAR/Audio/SFX/Combat/SFX_UI_Click_01.wav", false)]
         [InlineData("Assets/MetinAR/Audio/SFX/Combat/sword_hit.wav", false)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Item/SFX_Item_EquipMetal_01.wav", true)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Item/SFX_UI_EquipMetal_01.wav", false)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Loot/SFX_Loot_Common_01.wav", true)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Loot/SFX_Item_Common_01.wav", false)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Status/SFX_Status_PoisonTick_01.wav", true)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Status/SFX_Status_poisonTick_01.wav", false)]
+        [InlineData("Assets/MetinAR/Audio/SFX/UI/SFX_Status_PoisonTick_01.wav", false)]
         [InlineData("Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_SwordHit_01.ogg", false)]
         [InlineData("Assets/MetinAR/Audio/SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Step_03.wav", true)]
         [InlineData("Assets/MetinAR/Audio/SFX/Mobs/VenomousSpider/SFX_Mob_Wolf_Step_03.wav", false)]
@@ -136,7 +148,38 @@ namespace AssetPipeline.Tests
             Assert.Contains(b.Check(AudioFormatInfo.ParseWav(Wav(1, 22050, 16, 22050 * 3)), 132344), p => p.Contains("duration"));
             Assert.Contains(b.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 24, 1000)), 3044), p => p.Contains("bits"));
             AudioBudget ui = AudioPipelineRules.GetBudget(AudioCategory.UiSfx);
-            Assert.Contains(ui.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 16, 30000)), 60044), p => p.Contains("duration"));
+            Assert.Empty(ui.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 16, 61740)), 123524));          // 1.4 s level-up jingle
+            Assert.Contains(ui.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 16, 70560)), 141164), p => p.Contains("duration"));
+        }
+
+        [Theory]
+        [InlineData(AudioCategory.UiSfx)]
+        [InlineData(AudioCategory.ItemSfx)]
+        [InlineData(AudioCategory.LootSfx)]
+        [InlineData(AudioCategory.StatusSfx)]
+        public void StarterKitCategoriesUseTheSfxProfileAndTheSpecLength(AudioCategory c)
+        {
+            Assert.True(AudioPipelineRules.IsSfx(c));
+            AudioImportProfile p = AudioPipelineRules.GetProfile(c);
+            Assert.Empty(p.Compare(AudioMetaSettings.Parse(Meta(0, 2))));          // ADPCM + Decompress On Load
+            Assert.NotEmpty(p.Compare(AudioMetaSettings.Parse(Meta(1, 1))));       // Vorbis / Compressed In Memory rejected
+            AudioBudget b = AudioPipelineRules.GetBudget(c);
+            Assert.Equal(AudioPipelineRules.SpecSfxMaxSeconds, b.MaxSeconds, 6);
+            Assert.Empty(b.Check(AudioFormatInfo.ParseWav(Wav(1, 48000, 16, 72000)), 144044));
+            Assert.Contains(b.Check(AudioFormatInfo.ParseWav(Wav(1, 44100, 16, 66200)), 132444), p2 => p2.Contains("duration"));
+            Assert.Contains(b.Check(AudioFormatInfo.ParseWav(Wav(2, 44100, 16, 1000)), 4044), p2 => p2.Contains("mono"));
+        }
+
+        [Fact]
+        public void AdpcmEstimateIsAboutFourBitsPerSample()
+        {
+            Assert.Equal(0, AudioPipelineRules.EstimateAdpcmBytes(0, 1));
+            Assert.Equal(4 + 1, AudioPipelineRules.EstimateAdpcmBytes(1, 1));
+            Assert.Equal(512 + 4, AudioPipelineRules.EstimateAdpcmBytes(1024, 1));
+            long oneAndHalfSeconds = AudioPipelineRules.EstimateAdpcmBytes(66150, 1);
+            Assert.InRange(oneAndHalfSeconds, 33000, 33400);
+            Assert.True(oneAndHalfSeconds <= AudioPipelineRules.SpecSfxCompressedBytesLimit);
+            Assert.True(AudioPipelineRules.EstimateAdpcmBytes(88200, 1) > AudioPipelineRules.SpecSfxCompressedBytesLimit);   // 2 s is over
         }
 
         [Fact]
@@ -611,6 +654,57 @@ namespace AssetPipeline.Tests
             };
             var existing = new HashSet<string>(AudioFiles().Select(AudioPipelineRules.LedgerPath));
             Assert.All(required, r => Assert.Contains(r, existing));
+        }
+
+        private static readonly string[] StarterKitSet =
+        {
+            // METINAR-033 (#60): equip / unequip (metal, leather), potion, antidote, loot pickup, talers, shop, level up, poison tick.
+            "SFX/Item/SFX_Item_EquipMetal_01.wav",
+            "SFX/Item/SFX_Item_UnequipMetal_01.wav",
+            "SFX/Item/SFX_Item_EquipLeather_01.wav",
+            "SFX/Item/SFX_Item_UnequipLeather_01.wav",
+            "SFX/Item/SFX_Item_Potion_01.wav",
+            "SFX/Item/SFX_Item_Antidote_01.wav",
+            "SFX/Loot/SFX_Loot_Common_01.wav",
+            "SFX/UI/SFX_UI_CoinPickup_01.wav",
+            "SFX/UI/SFX_UI_LevelUp_01.wav",
+            "SFX/UI/SFX_UI_ShopOpen_01.wav",
+            "SFX/UI/SFX_UI_Buy_01.wav",
+            "SFX/UI/SFX_UI_Sell_01.wav",
+            "SFX/UI/SFX_UI_Denied_01.wav",
+            "SFX/Status/SFX_Status_PoisonTick_01.wav",
+        };
+
+        [Fact]
+        public void StarterKitSetIsCompleteAndOneShot()
+        {
+            var existing = new HashSet<string>(AudioFiles().Select(AudioPipelineRules.LedgerPath));
+            Assert.All(StarterKitSet, r => Assert.Contains(r, existing));
+            Assert.All(StarterKitSet, r => Assert.False(AudioPipelineRules.IsLoopClip(r), r + " must be a one-shot"));
+            Assert.All(StarterKitSet, r => Assert.Equal("MetinAR-Owned", AudioLicenseLedger.Parse(File.ReadAllText(Path.Combine(AudioRoot(), AudioPipelineRules.LicenseLedgerFileName))).Entries.Single(e => e.File == r).License));
+        }
+
+        [Fact]
+        public void PoisonTickIsShorterThanTheDotInterval()
+        {
+            // COMBAT_PHYSICS.md section 2: DoT ticks every 1 s. One tick sound per tick must end before the next one
+            // starts (no overlap, no voice build-up) - with room to spare for pitch variation.
+            AudioFormatInfo i = AudioFormatInfo.ParseWav(File.ReadAllBytes(Path.Combine(AudioRoot(), "SFX", "Status", "SFX_Status_PoisonTick_01.wav")));
+            Assert.Null(i.Error);
+            Assert.True(i.Seconds <= 0.5, "poison tick " + i.Seconds + " s (expected <= 0.5 s for a 1 s tick)");
+        }
+
+        [Fact]
+        public void OneShotSfxMeetTheSpecLengthAndCompressedSize()
+        {
+            // ITEMS_COMBAT_SPEC.md (#44): SFX mono, <= 1.5 s, <= 40 KB. Loop clips (Aura, 2 s) are the documented exception.
+            foreach (string f in AudioFiles().Where(x => AudioPipelineRules.IsSfx(AudioPipelineRules.ClassifyPath(x)) && !AudioPipelineRules.IsLoopClip(x)))
+            {
+                AudioFormatInfo i = AudioFormatInfo.ParseWav(File.ReadAllBytes(f));
+                Assert.True(i.Seconds <= AudioPipelineRules.SpecSfxMaxSeconds + 1e-9, f + ": " + i.Seconds + " s > spec 1.5 s");
+                long est = AudioPipelineRules.EstimateAdpcmBytes(i.Frames, i.Channels);
+                Assert.True(est <= AudioPipelineRules.SpecSfxCompressedBytesLimit, f + ": ADPCM estimate " + est + " B > 40 KB");
+            }
         }
 
         [Fact]

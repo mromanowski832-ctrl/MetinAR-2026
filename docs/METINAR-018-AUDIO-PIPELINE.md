@@ -23,6 +23,9 @@ Owner of this area: the "Dźwięk i muzyka" bot. Unity / A31 time only through r
 | `SFX/Combat/` | player weapon / shield sounds | `SFX_Combat_<Event>_<NN>.wav` |
 | `SFX/Mobs/<MobId>/` | per-mob sounds, `<MobId>` = METINAR-009 asset id | `SFX_Mob_<MobId>_<Event>_<NN>.wav` |
 | `SFX/UI/` | interface | `SFX_UI_<Event>_<NN>.wav` |
+| `SFX/Item/` | equipment and consumables (METINAR-033, #60) | `SFX_Item_<Event>_<NN>.wav` |
+| `SFX/Loot/` | loot pickup (METINAR-033, #60) | `SFX_Loot_<Event>_<NN>.wav` |
+| `SFX/Status/` | status effects, e.g. poison tick (METINAR-033, #60) | `SFX_Status_<Event>_<NN>.wav` |
 | `Music/` | music (future) | `MUS_<Name>[_<NN>].ogg` |
 | `Ambience/` | loops/beds (future) | `AMB_<Name>_<NN>.ogg` |
 
@@ -32,7 +35,7 @@ Owner of this area: the "Dźwięk i muzyka" bot. Unity / A31 time only through r
 
 | Category | Source | Load Type | Compression | Mono | Preload | Load in background |
 |---|---|---|---|---|---|---|
-| SFX (Combat, Mobs, UI) | 16-bit PCM WAV, ≤ 48 kHz | Decompress On Load | ADPCM | yes | yes | no |
+| SFX (Combat, Mobs, UI, Item, Loot, Status) | 16-bit PCM WAV, ≤ 48 kHz | Decompress On Load | ADPCM | yes | yes | no |
 | Music | Ogg Vorbis | Streaming | Vorbis q 0.50 | no | no | yes |
 | Ambience | Ogg Vorbis | Compressed In Memory | Vorbis q 0.40 | no | no | yes |
 
@@ -50,7 +53,8 @@ source is accepted for music (source quality ≥ q 6 recommended).
 | Category | Max duration | Max source file | Sample rate | Channels | Bits |
 |---|---|---|---|---|---|
 | Combat / Mob SFX | 2.0 s | 256 KiB | 8–48 kHz | mono | 16 |
-| UI SFX | 0.5 s | 64 KiB | 8–48 kHz | mono | 16 |
+| UI / Item / Loot / Status SFX | 1.5 s (spec #44; UI was 0.5 s before METINAR-033) | 160 KiB | 8–48 kHz | mono | 16 |
+| Every one-shot SFX (spec ITEMS_COMBAT_SPEC, #44) | 1.5 s | ≤ 40 KB ADPCM estimate | | mono | |
 | Music | 240 s | 6 MiB | 8–48 kHz | ≤ 2 | Vorbis |
 | Ambience | 60 s | 2 MiB | 8–48 kHz | ≤ 2 | Vorbis |
 | All SFX sources together | — | 2 MiB | | | |

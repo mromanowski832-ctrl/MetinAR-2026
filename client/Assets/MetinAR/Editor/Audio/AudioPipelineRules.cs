@@ -20,6 +20,11 @@ namespace MetinAR.Editor.Audio
         public const string CombatSfxFolder = SfxFolder + "/Combat";
         public const string MobSfxFolder = SfxFolder + "/Mobs";
         public const string UiSfxFolder = SfxFolder + "/UI";
+
+        /// <summary>METINAR-033 (#60): equipment and consumables, loot pickup, status effects (e.g. poison tick).</summary>
+        public const string ItemSfxFolder = SfxFolder + "/Item";
+        public const string LootSfxFolder = SfxFolder + "/Loot";
+        public const string StatusSfxFolder = SfxFolder + "/Status";
         public const string MusicFolder = Root + "/Music";
         public const string AmbienceFolder = Root + "/Ambience";
         public const string LicenseLedgerFileName = "LICENSES.md";
@@ -52,7 +57,7 @@ namespace MetinAR.Editor.Audio
         public static readonly string[] ForbiddenSourceWords = { "metin2", "metin 2", "gameforge", "ymir" };
 
         private const string IdPattern = "[A-Z][A-Za-z0-9]*";
-        private static readonly Regex SfxCombatUiRegex = new Regex("^SFX_(Combat|UI)_(" + IdPattern + ")_(\\d{2})\\.wav$");
+        private static readonly Regex SfxCombatUiRegex = new Regex("^SFX_(Combat|UI|Item|Loot|Status)_(" + IdPattern + ")_(\\d{2})\\.wav$");
         private static readonly Regex SfxMobRegex = new Regex("^SFX_Mob_(" + IdPattern + ")_(" + IdPattern + ")_(\\d{2})\\.wav$");
         private static readonly Regex MusicRegex = new Regex("^MUS_(" + IdPattern + ")(?:_(\\d{2}))?\\.ogg$");
         private static readonly Regex AmbienceRegex = new Regex("^AMB_(" + IdPattern + ")_(\\d{2})\\.ogg$");
@@ -109,6 +114,21 @@ namespace MetinAR.Editor.Audio
                 return AudioCategory.UiSfx;
             }
 
+            if (folder == ItemSfxFolder)
+            {
+                return AudioCategory.ItemSfx;
+            }
+
+            if (folder == LootSfxFolder)
+            {
+                return AudioCategory.LootSfx;
+            }
+
+            if (folder == StatusSfxFolder)
+            {
+                return AudioCategory.StatusSfx;
+            }
+
             if (folder.StartsWith(MobSfxFolder + "/", StringComparison.Ordinal) && folder.IndexOf('/', MobSfxFolder.Length + 1) < 0)
             {
                 return AudioCategory.MobSfx;
@@ -129,7 +149,8 @@ namespace MetinAR.Editor.Audio
 
         public static bool IsSfx(AudioCategory c)
         {
-            return c == AudioCategory.CombatSfx || c == AudioCategory.MobSfx || c == AudioCategory.UiSfx;
+            return c == AudioCategory.CombatSfx || c == AudioCategory.MobSfx || c == AudioCategory.UiSfx ||
+                   c == AudioCategory.ItemSfx || c == AudioCategory.LootSfx || c == AudioCategory.StatusSfx;
         }
 
         /// <summary>Returns null when the file name follows the convention for its folder, else the reason.</summary>
@@ -142,9 +163,12 @@ namespace MetinAR.Editor.Audio
             {
                 case AudioCategory.CombatSfx:
                 case AudioCategory.UiSfx:
+                case AudioCategory.ItemSfx:
+                case AudioCategory.LootSfx:
+                case AudioCategory.StatusSfx:
                 {
                     Match m = SfxCombatUiRegex.Match(file);
-                    string expected = c == AudioCategory.CombatSfx ? "Combat" : "UI";
+                    string expected = GroupPrefix(c);
                     if (!m.Success || m.Groups[1].Value != expected)
                     {
                         return "expected SFX_" + expected + "_<Event>_<NN>.wav";
@@ -171,7 +195,21 @@ namespace MetinAR.Editor.Audio
                 case AudioCategory.Ambience:
                     return AmbienceRegex.IsMatch(file) ? null : "expected AMB_<Name>_<NN>.ogg";
                 default:
-                    return "audio file outside the pipeline folders (SFX/Combat, SFX/Mobs/<MobId>, SFX/UI, Music, Ambience)";
+                    return "audio file outside the pipeline folders (SFX/Combat, SFX/Mobs/<MobId>, SFX/UI, SFX/Item, SFX/Loot, SFX/Status, Music, Ambience)";
+            }
+        }
+
+        /// <summary>Name prefix that must match the folder: SFX/&lt;Group&gt;/SFX_&lt;Group&gt;_&lt;Event&gt;_&lt;NN&gt;.wav.</summary>
+        private static string GroupPrefix(AudioCategory c)
+        {
+            switch (c)
+            {
+                case AudioCategory.CombatSfx: return "Combat";
+                case AudioCategory.UiSfx: return "UI";
+                case AudioCategory.ItemSfx: return "Item";
+                case AudioCategory.LootSfx: return "Loot";
+                case AudioCategory.StatusSfx: return "Status";
+                default: return null;
             }
         }
 
@@ -187,6 +225,9 @@ namespace MetinAR.Editor.Audio
                 case AudioCategory.CombatSfx:
                 case AudioCategory.MobSfx:
                 case AudioCategory.UiSfx:
+                case AudioCategory.ItemSfx:
+                case AudioCategory.LootSfx:
+                case AudioCategory.StatusSfx:
                     return new AudioImportProfile(AudioLoadTypeValue.DecompressOnLoad, AudioCompressionValue.Adpcm, 1f, true, false, true);
                 case AudioCategory.Music:
                     return new AudioImportProfile(AudioLoadTypeValue.Streaming, AudioCompressionValue.Vorbis, 0.5f, false, true, false);
@@ -205,7 +246,12 @@ namespace MetinAR.Editor.Audio
                 case AudioCategory.MobSfx:
                     return new AudioBudget(".wav", 2.0, 256 * 1024, 48000, true, 16);
                 case AudioCategory.UiSfx:
-                    return new AudioBudget(".wav", 0.5, 64 * 1024, 48000, true, 16);
+                case AudioCategory.ItemSfx:
+                case AudioCategory.LootSfx:
+                case AudioCategory.StatusSfx:
+                    // Spec ITEMS_COMBAT_SPEC (#44): SFX mono, <= 1.5 s. UI was 0.5 s in METINAR-018; raised for the
+                    // level-up and shop jingles of METINAR-033 (#60). 1.5 s mono 16-bit 48 kHz = 144 044 B.
+                    return new AudioBudget(".wav", 1.5, 160 * 1024, 48000, true, 16);
                 case AudioCategory.Music:
                     return new AudioBudget(".ogg", 240.0, 6 * 1024 * 1024, 48000, false, 0);
                 case AudioCategory.Ambience:
@@ -300,6 +346,29 @@ namespace MetinAR.Editor.Audio
 
         /// <summary>Budget for all SFX source files together (lossless WAV in the repo, before Unity compression).</summary>
         public const long TotalSfxSourceBytesBudget = 2L * 1024 * 1024;
+
+        /// <summary>
+        /// Spec limit for one SFX in the build (docs/design/ITEMS_COMBAT_SPEC.md, #44): mono, at most 1.5 s and 40 KB
+        /// compressed. Checked against <see cref="EstimateAdpcmBytes"/> for every one-shot SFX; loop clips (Aura) are a
+        /// documented exception pending an owner decision.
+        /// </summary>
+        public const double SpecSfxMaxSeconds = 1.5;
+        public const long SpecSfxCompressedBytesLimit = 40000;
+
+        /// <summary>
+        /// Estimated size of a clip after Unity ADPCM import (IMA ADPCM: 4 bits per sample plus a 4-byte header per channel
+        /// and 1024-frame block). An estimate for budgets, not a measurement of a Unity build.
+        /// </summary>
+        public static long EstimateAdpcmBytes(long frames, int channels)
+        {
+            if (frames <= 0 || channels <= 0)
+            {
+                return 0;
+            }
+
+            long blocks = (frames + 1023) / 1024;
+            return (frames * channels + 1) / 2 + 4L * channels * blocks;
+        }
 
         public static string Sha256Hex(byte[] data)
         {
@@ -402,6 +471,9 @@ namespace MetinAR.Editor.Audio
         CombatSfx,
         MobSfx,
         UiSfx,
+        ItemSfx,
+        LootSfx,
+        StatusSfx,
         Music,
         Ambience,
     }

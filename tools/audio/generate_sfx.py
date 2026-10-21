@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""METINAR-018: deterministic procedural synthesis of the starter combat SFX.
+"""METINAR-018 / METINAR-033: deterministic procedural synthesis of the starter combat and starter-kit SFX.
 
 Every sound is generated from scratch (oscillators, filtered noise, envelopes) with numpy and the
 Python standard library. No samples, recordings, sound libraries or AI audio are used, so the output
@@ -305,6 +305,278 @@ def aura_stop():
     return fade_out(normalize(x, -4.0), 0.05)
 
 
+# ---------------------------------------------------------------- starter kit (METINAR-033 / #60), seeds 3301..3314
+# Equipment, consumables, loot, talers, shop, level up, poison tick. Spec: docs/design (PR #44), names from
+# COMBAT_PHYSICS.md section 5 where given. All one-shots (no loops), mono, <= 1.5 s.
+def metal_hit(r, n, base, decay, bright=1.0):
+    """Inharmonic metal partials (plate / buckle / ring) with a tiny noise transient."""
+    t = np.arange(n) / SR
+    ratios = [(1.0, 1.0), (1.48, 0.7), (2.27, 0.5), (3.09, 0.35 * bright), (4.12, 0.2 * bright)]
+    x = sum(a * tone(t, base * k * r.uniform(0.995, 1.005), r.uniform(0, 2 * np.pi)) * env_ad(n, 0.0006, decay / (1 + 0.5 * i))
+            for i, (k, a) in enumerate(ratios))
+    return x + 0.4 * bandpass(r.standard_normal(n), 2000, 9000) * env_ad(n, 0.0003, 0.004)
+
+
+def coin_clink(r, n, base=None):
+    """One small coin: bright, short, slightly detuned inharmonic ring."""
+    base = base if base is not None else r.uniform(2900, 3600)
+    return metal_hit(r, n, base, 0.05, bright=0.8)
+
+
+def creak(r, n, lo, hi, grain_rate):
+    """Leather creak: band noise chopped into dense friction grains."""
+    t = np.arange(n) / SR
+    grains = chitter(r, n, grain_rate, dur_click=0.006, f_lo=lo, f_hi=hi)
+    return bandpass(r.standard_normal(n), lo, hi) * (0.35 + 0.65 * (0.5 + 0.5 * np.sin(2 * np.pi * 23 * t))) * 0.5 + grains
+
+
+def bell(t, f, decay, start=0.0):
+    """Soft bell / chime note starting at `start` s (fundamental + octave + inharmonic 2.76)."""
+    tt = np.maximum(t - start, 0.0)
+    on = t >= start
+    att = np.clip(tt / 0.003, 0, 1)
+    x = (np.sin(2 * np.pi * f * tt) + 0.35 * np.sin(2 * np.pi * 2 * f * tt) * np.exp(-tt / (decay * 0.5)) +
+         0.15 * np.sin(2 * np.pi * 2.76 * f * tt) * np.exp(-tt / (decay * 0.3)))
+    return x * att * np.exp(-tt / decay) * on
+
+
+def dc_block(x):
+    """Remove DC / sub-sonic offset (25 Hz one-pole high-pass) before normalising."""
+    return onepole_hp(x, 25.0)
+
+
+def equip_metal():
+    """Putting on metal gear: cloth thump, two plate/buckle clanks, short chain jingle."""
+    dur = 0.45
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(3301)
+    thump = onepole_lp(r.standard_normal(n), 400) * env_ad(n, 0.004, 0.03) * 2.0
+    x = 0.6 * thump
+    place(x, 0.8 * metal_hit(r, int(0.35 * SR), 1180, 0.09), 0.02)
+    place(x, 0.6 * metal_hit(r, int(0.3 * SR), 1520, 0.07), 0.11)
+    jingle = chitter(r, n, 90, dur_click=0.006, f_lo=3500, f_hi=7000) * np.clip((t - 0.12) / 0.02, 0, 1) * np.exp(-np.maximum(t - 0.12, 0) / 0.08)
+    x += 0.35 * jingle
+    x[: int(0.002 * SR)] *= np.linspace(0, 1, int(0.002 * SR))
+    return fade_out(normalize(dc_block(x), -3.0), 0.03)
+
+
+def unequip_metal():
+    """Taking off metal gear: rattle first, then a single lower, softer clank as it is set down."""
+    dur = 0.4
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(3302)
+    rattle = chitter(r, n, 120, dur_click=0.005, f_lo=3000, f_hi=6500) * np.clip(t / 0.03, 0, 1) * np.exp(-t / 0.07)
+    x = 0.4 * rattle
+    place(x, 0.7 * metal_hit(r, int(0.3 * SR), 940, 0.08, bright=0.6), 0.12)
+    place(x, 0.5 * onepole_lp(r.standard_normal(int(0.08 * SR)), 500) * env_ad(int(0.08 * SR), 0.002, 0.02), 0.12)
+    return fade_out(normalize(dc_block(x), -5.0), 0.03)
+
+
+def equip_leather():
+    """Putting on leather: short creak while pulling the strap, then a dull buckle click."""
+    dur = 0.4
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(3303)
+    env = np.clip(t / 0.04, 0, 1) * np.exp(-np.maximum(t - 0.18, 0) / 0.04)
+    x = creak(r, n, 350, 1800, 140) * env
+    place(x, 0.7 * metal_hit(r, int(0.1 * SR), 2100, 0.015, bright=0.4), 0.27)
+    place(x, 0.5 * onepole_lp(r.standard_normal(int(0.05 * SR)), 900) * env_ad(int(0.05 * SR), 0.001, 0.01), 0.27)
+    return fade_out(normalize(dc_block(x), -4.0), 0.03)
+
+
+def unequip_leather():
+    """Taking off leather: buckle release tick, rustle and a soft flap as it drops."""
+    dur = 0.35
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(3304)
+    x = np.zeros(n)
+    place(x, 0.5 * metal_hit(r, int(0.06 * SR), 2300, 0.01, bright=0.3), 0.0)
+    rustle = creak(r, n, 500, 3000, 60) * np.clip((t - 0.03) / 0.03, 0, 1) * np.exp(-np.maximum(t - 0.05, 0) / 0.06)
+    x += 0.7 * rustle
+    place(x, 0.9 * onepole_lp(r.standard_normal(int(0.1 * SR)), 350) * env_ad(int(0.1 * SR), 0.003, 0.025), 0.2)
+    x[: int(0.002 * SR)] *= np.linspace(0, 1, int(0.002 * SR))
+    return fade_out(normalize(dc_block(x), -5.0), 0.03)
+
+
+def cork_pop(r, n):
+    t = np.arange(n) / SR
+    return (tone(t, 900 * np.exp(-t / 0.01) + 380) * env_ad(n, 0.0005, 0.012) +
+            0.5 * onepole_lp(r.standard_normal(n), 3000) * env_ad(n, 0.0003, 0.004))
+
+
+def gulp(r, n, f0):
+    """Swallow: low formant sweep up with a wet filtered noise burst."""
+    t = np.arange(n) / SR
+    f = f0 + f0 * 0.9 * np.clip(t / 0.08, 0, 1)
+    body = tone(t, f) * env_ad(n, 0.008, 0.035)
+    wet = onepole_lp(r.standard_normal(n), 1100) * env_ad(n, 0.004, 0.02)
+    return body + 0.6 * wet
+
+
+def bubbles(r, n, rate, f_lo, f_hi):
+    """Rising-pitch bubble blips (liquid)."""
+    out = np.zeros(n)
+    pos = 0.0
+    while True:
+        pos += r.exponential(1.0 / rate)
+        i = int(pos * SR)
+        m = int(0.02 * SR)
+        if i + m >= n:
+            break
+        tt = np.arange(m) / SR
+        f = r.uniform(f_lo, f_hi) * (1 + 3.0 * tt / 0.02)
+        out[i:i + m] += np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-tt / 0.006) * r.uniform(0.3, 1.0)
+    return out
+
+
+def potion_drink():
+    """Health potion (SFX_Item_Potion_01): cork pop, three gulps with a little liquid, short warm rise."""
+    dur = 0.9
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(3305)
+    x = np.zeros(n)
+    place(x, 0.8 * cork_pop(r, int(0.06 * SR)), 0.005)
+    for start, f0 in [(0.2, 170), (0.4, 160), (0.6, 180)]:
+        place(x, 1.0 * gulp(r, int(0.15 * SR), f0), start)
+    x += 0.25 * bubbles(r, n, 25, 500, 1100) * np.clip((t - 0.15) / 0.05, 0, 1) * np.exp(-np.maximum(t - 0.5, 0) / 0.15)
+    warm = (tone(t, 523.25) + 0.5 * tone(t, 784.0)) * np.clip((t - 0.62) / 0.1, 0, 1) * np.exp(-np.maximum(t - 0.72, 0) / 0.09)
+    x += 0.25 * warm
+    return fade_out(normalize(dc_block(x), -3.0), 0.05)
+
+
+def antidote_drink():
+    """Antidote: cork pop, one quick gulp, then a bright cleansing shimmer (hiss sweeping up + rising chime)."""
+    dur = 0.9
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(3306)
+    x = np.zeros(n)
+    place(x, 0.8 * cork_pop(r, int(0.06 * SR)), 0.005)
+    place(x, 1.0 * gulp(r, int(0.15 * SR), 190), 0.18)
+    p = np.clip((t - 0.35) / 0.4, 0, 1)
+    sweep_env = np.clip((t - 0.33) / 0.05, 0, 1) * np.exp(-np.maximum(t - 0.6, 0) / 0.12)
+    hiss = onepole_lp(onepole_hp(r.standard_normal(n), 2000 + 3000 * p), 6000 + 4000 * p) * sweep_env
+    x += 0.5 * hiss
+    for k, (f, st) in enumerate([(1046.5, 0.36), (1318.5, 0.44), (1568.0, 0.52)]):
+        x += 0.35 * bell(t, f, 0.14, st)
+    return fade_out(normalize(dc_block(x), -3.0), 0.05)
+
+
+def loot_pickup():
+    """Picking up a (common) item: short cloth/leather swish and a small two-note chime."""
+    dur = 0.35
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(3307)
+    p = np.clip(t / 0.12, 0, 1)
+    swish = onepole_lp(onepole_hp(r.standard_normal(n), 800 + 1500 * p), 2500 + 3000 * p) * np.sin(np.pi * p) ** 2
+    x = 0.6 * swish + 0.45 * bell(t, 1046.5, 0.08, 0.06) + 0.4 * bell(t, 1568.0, 0.1, 0.1)
+    return fade_out(normalize(dc_block(x), -4.0), 0.03)
+
+
+def coin_pickup():
+    """Picking up talers (SFX_UI_CoinPickup_01): three quick coin clinks."""
+    dur = 0.4
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(3308)
+    x = np.zeros(n)
+    for start, a in [(0.0, 1.0), (0.055, 0.8), (0.12, 0.65)]:
+        place(x, a * coin_clink(r, int(0.25 * SR)), start + 0.002)
+    return fade_out(normalize(dc_block(x), -3.0), 0.03)
+
+
+def level_up():
+    """Level up: rising major arpeggio (C5 E5 G5 C6) into a sustained chord with a sparkle swell."""
+    dur = 1.4
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(3309)
+    x = np.zeros(n)
+    for f, st in [(523.25, 0.0), (659.25, 0.11), (783.99, 0.22), (1046.5, 0.33)]:
+        x += 0.5 * bell(t, f, 0.5, st + 0.002)
+    chord_env = np.clip((t - 0.33) / 0.05, 0, 1) * np.exp(-np.maximum(t - 0.45, 0) / 0.35)
+    chord = sum(a * tone(t, f) for f, a in [(523.25, 0.4), (659.25, 0.3), (783.99, 0.3), (1046.5, 0.25)])
+    x += 0.35 * chord * chord_env * (0.85 + 0.15 * np.sin(2 * np.pi * 5.5 * t))
+    sparkle = chitter(r, n, 60, dur_click=0.004, f_lo=4000, f_hi=9000) * np.clip((t - 0.3) / 0.15, 0, 1) * np.exp(-np.maximum(t - 0.5, 0) / 0.3)
+    x += 0.25 * sparkle
+    return fade_out(normalize(dc_block(x), -6.0), 0.15)
+
+
+def shop_open():
+    """Opening the merchant's shop: wooden latch knock and a two-tone shop bell."""
+    dur = 0.7
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(3310)
+    knock = onepole_lp(r.standard_normal(n), 1000) * env_ad(n, 0.001, 0.02)
+    wood = sum(a * tone(t, f) * env_ad(n, 0.001, d) for f, a, d in [(240, 0.6, 0.05), (450, 0.35, 0.03)])
+    x = 0.8 * knock + 0.6 * wood
+    x += 0.45 * bell(t, 1244.5, 0.22, 0.07) + 0.4 * bell(t, 1661.2, 0.25, 0.16)
+    return fade_out(normalize(dc_block(x), -6.0), 0.05)
+
+
+def buy():
+    """Buying: two coins paid out, then a confirming rising two-note (G5 -> D6)."""
+    dur = 0.45
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(3311)
+    x = np.zeros(n)
+    place(x, 0.8 * coin_clink(r, int(0.2 * SR), 3100), 0.002)
+    place(x, 0.6 * coin_clink(r, int(0.2 * SR), 2800), 0.05)
+    x += 0.5 * bell(t, 783.99, 0.1, 0.1) + 0.5 * bell(t, 1174.7, 0.14, 0.19)
+    return fade_out(normalize(dc_block(x), -3.0), 0.03)
+
+
+def sell():
+    """Selling: a small shower of coins received, then a bright rising two-note (C6 -> G6)."""
+    dur = 0.45
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(3312)
+    x = np.zeros(n)
+    for start, a in [(0.0, 0.7), (0.035, 0.9), (0.07, 0.6), (0.1, 0.5)]:
+        place(x, a * coin_clink(r, int(0.2 * SR)), start + 0.002)
+    x += 0.45 * bell(t, 1046.5, 0.1, 0.14) + 0.45 * bell(t, 1568.0, 0.14, 0.22)
+    return fade_out(normalize(dc_block(x), -3.0), 0.03)
+
+
+def denied():
+    """Refusal (e.g. not enough talers): soft, low falling two-note buzz (E4 -> B3), filtered square-ish."""
+    dur = 0.35
+    t = t_axis(dur)
+    n = len(t)
+    x = np.zeros(n)
+    for f, st, ln in [(329.63, 0.0, 0.13), (246.94, 0.15, 0.18)]:
+        m = int(ln * SR)
+        tt = np.arange(m) / SR
+        sq = sum(np.sin(2 * np.pi * f * k * tt) / k for k in (1, 3, 5, 7))
+        e = np.clip(tt / 0.005, 0, 1) * np.clip((ln - tt) / 0.03, 0, 1)
+        place(x, onepole_lp(sq * e, 1800), st + 0.001)
+    return fade_out(normalize(dc_block(x), -14.0), 0.02)
+
+
+def poison_tick():
+    """Spider poison tick (SFX_Status_PoisonTick_01): one short wet, sickly bubble blip. One-shot played once per
+    DoT tick (every 1 s, COMBAT_PHYSICS.md section 2), not a loop; kept quiet because it repeats."""
+    dur = 0.25
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(3314)
+    f = 260 * np.exp(-t / 0.06) + 150
+    body = (tone(t, f) + 0.4 * tone(t, f * 1.5)) * env_ad(n, 0.004, 0.05)
+    hiss = bandpass(r.standard_normal(n), 1500, 5000) * env_ad(n, 0.003, 0.03)
+    bl = bubbles(r, n, 40, 350, 700) * np.exp(-t / 0.08)
+    x = 1.0 * body + 0.25 * hiss + 0.4 * bl
+    return fade_out(normalize(dc_block(x), -8.0), 0.03)
+
+
 SOUNDS = [
     ("Combat/SFX_Combat_SwordSwing_01.wav", sword_swing),
     ("Combat/SFX_Combat_SwordHit_01.wav", sword_hit),
@@ -319,6 +591,21 @@ SOUNDS = [
     ("Combat/SFX_Combat_AuraStart_01.wav", aura_start),
     ("Combat/SFX_Combat_AuraLoop_01.wav", aura_loop),
     ("Combat/SFX_Combat_AuraStop_01.wav", aura_stop),
+    # METINAR-033 (#60) starter kit
+    ("Item/SFX_Item_EquipMetal_01.wav", equip_metal),
+    ("Item/SFX_Item_UnequipMetal_01.wav", unequip_metal),
+    ("Item/SFX_Item_EquipLeather_01.wav", equip_leather),
+    ("Item/SFX_Item_UnequipLeather_01.wav", unequip_leather),
+    ("Item/SFX_Item_Potion_01.wav", potion_drink),
+    ("Item/SFX_Item_Antidote_01.wav", antidote_drink),
+    ("Loot/SFX_Loot_Common_01.wav", loot_pickup),
+    ("UI/SFX_UI_CoinPickup_01.wav", coin_pickup),
+    ("UI/SFX_UI_LevelUp_01.wav", level_up),
+    ("UI/SFX_UI_ShopOpen_01.wav", shop_open),
+    ("UI/SFX_UI_Buy_01.wav", buy),
+    ("UI/SFX_UI_Sell_01.wav", sell),
+    ("UI/SFX_UI_Denied_01.wav", denied),
+    ("Status/SFX_Status_PoisonTick_01.wav", poison_tick),
 ]
 
 
