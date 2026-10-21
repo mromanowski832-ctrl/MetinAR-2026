@@ -1,0 +1,26 @@
+{
+  "status": "PROPOSAL — METINAR-017 (#40), wartości startowe do balansowania",
+  "dropTableId": "dt_venomous_spider_l5",
+  "mobId": "mob_venomous_spider",
+  "displayNamePl": "Trujący Pająk",
+  "loot": "personal",
+  "gold": {"min": 10, "max": 18, "chance": 1.0},
+  "rolls": [
+    {"chance": 0.35, "pool": [
+      {"itemId": "ore_shard", "weight": 70, "qty": [1, 2]},
+      {"itemId": "spider_silk", "weight": 30, "qty": [1, 1]}
+    ]},
+    {"chance": 0.18, "pool": [
+      {"itemId": "starter_jerkin", "weight": 25},
+      {"itemId": "starter_boots", "weight": 25},
+      {"itemId": "starter_gloves", "weight": 25},
+      {"itemId": "amber_earring", "weight": 15},
+      {"itemId": "starter_buckler", "weight": 10}
+    ], "itemLevelOffset": [-1, 1], "rarityTable": "normal"},
+    {"chance": 0.12, "pool": [
+      {"itemId": "potion_hp_s", "weight": 60, "qty": [1, 2]},
+      {"itemId": "antidote", "weight": 40, "qty": [1, 1]}
+    ]}
+  ],
+  "notes": "Wszystkie rzuty niezależne. Docelowo losowanie na serwerze (#22/#39); w prototypie lokalnie z seedem do testów."
+}
