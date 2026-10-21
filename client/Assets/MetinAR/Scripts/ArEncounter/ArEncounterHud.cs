@@ -9,7 +9,7 @@ namespace MetinAR.ArEncounter
     /// Prototype AR encounter HUD (original procedural styling): player card top-left, circular radar
     /// top-right, quest tracker lower-left, circular action buttons right, bottom navigation bar,
     /// scanning/placement status and failure panel. The center of the screen stays clear.
-    /// Action and navigation buttons have no assigned function yet; they only show a prototype notice.
+    /// The first two actions are Attack and Aura; other buttons show a prototype notice.
     /// </summary>
     public sealed class ArEncounterHud : MonoBehaviour
     {
@@ -121,9 +121,20 @@ namespace MetinAR.ArEncounter
             Wire(_failureBackButton, OnExitClicked);
             if (_actionButtons != null)
             {
-                foreach (Button b in _actionButtons)
+                for (int i = 0; i < _actionButtons.Length; i++)
                 {
-                    Wire(b, OnUnassignedClicked);
+                    Button b = _actionButtons[i];
+                    if (b == null) continue;
+                    b.onClick.RemoveListener(OnUnassignedClicked);
+                    if (i == 0) Wire(b, OnAttackClicked);
+                    else if (i == 1) Wire(b, OnAuraClicked);
+                    else Wire(b, OnUnassignedClicked);
+                    if (i < 2)
+                    {
+                        TextMeshProUGUI label = b.GetComponentInChildren<TextMeshProUGUI>();
+                        if (label != null) { label.text = i == 0 ? "ATAK" : "AURA"; label.fontSize = 24; }
+                        b.interactable = false;
+                    }
                 }
             }
 
@@ -162,8 +173,23 @@ namespace MetinAR.ArEncounter
             ShowToast(UnassignedNotice);
         }
 
+        private void OnAttackClicked() { _controller?.FppCombat?.RequestAttack(); }
+        private void OnAuraClicked() { _controller?.FppCombat?.RequestAura(); }
+
+        public void RefreshCombatButtons(bool ready, FppCombatTimeline timeline)
+        {
+            if (_actionButtons == null) return;
+            bool idle = timeline != null && timeline.Action == FppCombatAction.Idle;
+            if (_actionButtons.Length > 0 && _actionButtons[0] != null)
+                _actionButtons[0].interactable = ready && idle;
+            if (_actionButtons.Length > 1 && _actionButtons[1] != null)
+                _actionButtons[1].interactable = ready && idle && !timeline.AuraActive;
+        }
+
         /// <summary>Updates status / place button / failure panel / radar from the controller state.</summary>
-        public void Refresh(ArEncounterState state, ArEncounterStateMachine machine, bool hasPlacementTarget, float notTrackingSeconds, string mobName, Transform mob, Transform viewer)
+        public const string PlacementTooCloseNotice = "Za blisko. Odsuń się albo wyceluj dalej w podłoże (min. 1,5 m).";
+
+        public void Refresh(ArEncounterState state, ArEncounterStateMachine machine, bool hasPlacementTarget, float notTrackingSeconds, string mobName, Transform mob, Transform viewer, bool targetTooClose = false)
         {
             string status;
             switch (state)
@@ -182,7 +208,7 @@ namespace MetinAR.ArEncounter
                 case ArEncounterState.ReadyToPlace:
                     status = hasPlacementTarget
                         ? "Podłoże wykryte. Naciśnij \"Postaw potwora\"."
-                        : "Podłoże wykryte. Wyceluj w podłoże.";
+                        : targetTooClose ? PlacementTooCloseNotice : "Podłoże wykryte. Wyceluj w podłoże.";
                     break;
                 case ArEncounterState.Placed:
                     status = machine != null && machine.IsTrackingLimited
@@ -301,3 +327,4 @@ namespace MetinAR.ArEncounter
         }
     }
 }
+
