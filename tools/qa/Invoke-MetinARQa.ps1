@@ -59,7 +59,13 @@ $explicitOnly = @('ArSmokeInjection')
 $unknown = @($Gates | Where-Object { $_ -ne 'All' -and $all -notcontains $_ -and $explicitOnly -notcontains $_ })
 if ($unknown.Count) { Write-Host "Unknown gate(s): $($unknown -join ', '). Valid: All, $($all -join ', ')" -ForegroundColor Red; exit 2 }
 $selected = if ($Gates -contains 'All') { $all } else { @($all | Where-Object { $Gates -contains $_ }) }
-$selected = @($selected) + @($explicitOnly | Where-Object { $Gates -contains $_ })
+# ArSmokeInjection runs right after the Editor smokes and before AndroidBuild: the Android build switches the Library to the
+# Android target, and the injected Editor smokes must run on the same Editor state as ArSmoke.
+if ($Gates -contains 'ArSmokeInjection') {
+    $at = [Array]::IndexOf([string[]]$selected, 'AndroidBuild')
+    if ($at -ge 0) { $selected = @($selected[0..($at - 1)]) + @('ArSmokeInjection') + @($selected[$at..($selected.Count - 1)]) }
+    else { $selected = @($selected) + @('ArSmokeInjection') }
+}
 $unityGates = @('UnityCompile', 'UnityQaChecks', 'WorldMapSmoke', 'ArSmoke', 'AndroidBuild', 'ArSmokeInjection')
 
 $results = New-Object System.Collections.Generic.List[object]
@@ -229,6 +235,8 @@ try {
                 $u = Invoke-UnityGate 'AndroidBuild' $config.androidBuild.method @() -noGraphics ([int]$config.androidBuild.timeoutMinutes)
                 if ($u -isnot [pscustomobject] -or -not $u.PSObject.Properties['Run']) { Add-Result $u; break }
                 $okLine = @($u.Lines | Where-Object { $_ -match '\[MetinARAndroidDevBuild\] (SUCCESS|FAILED|scenes=)' })
+                # Surface environment causes seen on LuzMen (full disk -> LLVM IO failure / Gradle daemon death) instead of a bare FAIL.
+                $okLine += @($u.Lines | Where-Object { $_ -match 'No space left on device|There is not enough space on the disk|daemon disappeared unexpectedly' } | Select-Object -First 2)
                 $ok = ($u.Run.ExitCode -eq 0 -and (Test-Path $apk) -and $u.Summary.CompilerErrors -eq 0)
                 Add-Result (New-MetinARGateResult -Name 'AndroidBuild' -Status $(if ($ok) { 'PASS' } else { 'FAIL' }) -Detail ("exit={0} apk={1} method={2}" -f $u.Run.ExitCode, $(if (Test-Path $apk) { Rel $apk } else { 'missing' }), $config.androidBuild.method) `
                     -Evidence (@($okLine | ForEach-Object { ConvertTo-MetinARRedactedText -Lines @($_) }) + @($u.Summary.BlockingLines) + @("log: " + (Rel $u.Log))) -Seconds $u.Run.Seconds)

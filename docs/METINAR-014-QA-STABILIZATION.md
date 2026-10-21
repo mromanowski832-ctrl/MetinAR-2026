@@ -73,6 +73,17 @@ The hook is inert when the variable is unset. After the gate runs, the AR result
   scene. The legacy single `latencyMetric` schema is still accepted.
 - Scene FPS and memory budgets are unchanged (`WorldMapPrototype`, `ArEncounterPrototype`, `CombinedArHandSword`).
 
-## 4. Verification
+## 4. Notes from PR #32 (FPP) and LuzMen
+
+- PR #32 reported T15 failing on `SearchDatabase+<EnumerateAll>.MoveNext` ← `SearchInit.IndexationOnStartup`. That is the same signature
+  as above (the full frame chain includes `GetDefaultSearchDatabase`). This branch classifies it; PR #32 gets the fix only after #26 merges.
+- `ArgumentException: nativeTex can not be null` (ARCameraManager, ~12,700×) appears only when the AR smoke is started with `-nographics`
+  (XR Simulation without a graphics device). The QA runner starts `WorldMapSmoke`, `ArSmoke` and `ArSmokeInjection` **with** graphics.
+  These exceptions are *not* classified as noise, so a `-nographics` smoke run still fails T15 by design.
+- `ArSmokeInjection` is scheduled before `AndroidBuild` in a multi-gate run (the Android build switches the Library target).
+- An Android build failure caused by a full disk (`No space left on device`) is reported in the gate evidence.
+- The #31 device acceptance checklist is in [qa/METINAR-031-FPP-ACCEPTANCE.md](qa/METINAR-031-FPP-ACCEPTANCE.md).
+
+## 5. Verification
 
 See the AGENT READY FOR REVIEW comment on issue #26 for the run evidence.
