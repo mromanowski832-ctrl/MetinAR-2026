@@ -113,8 +113,33 @@ This change does **not** alter the contract; if #31 changes it, re-run `fpp_buil
 
 ## 7. Verification
 
-See the gates table in the PR. Logs: `docs/METINAR-FPP-ART-001/unity-*.txt`, Blender report
-`docs/METINAR-FPP-ART-001/blender_build_report.json`.
+Unity 6000.6.4f1 on LuzMen, separate checkout `C:\Users\mroma\MetinAR-FPPART` (local clone + Library copied
+from `MetinAR-009-verify`; nothing in other checkouts touched), batch mode, tested SHA `a5d7e27`
+(the following commit only adds the Unity-generated `.meta`/material/controller/prefab files and these reports).
+
+| Gate | Result | Evidence |
+|---|---|---|
+| Blender build (`fpp_build.py -- full`) | PASS: 0 hand vertices in the sword proxies in any frame; grip clearance R 3.1 mm / L 2.8 mm; sockets vs PR #32 0 mm / 0°; IK wrist gap 0 mm | `METINAR-FPP-ART-001/blender_build_report.json` |
+| `dotnet test tests/AssetPipeline.Tests` (box) | PASS 149/149 | PR description |
+| Unity compile | PASS: 0 `error CS` (standalone `-quit` compile on `1d7547b`; scripts recompiled on `a5d7e27` at the start of the build step; 0 `error CS` in all step logs) | `unity-batch-summary.txt` |
+| `FppArtAssetBuilder.BuildBatch` | PASS (exit 0) | prefabs/materials/controller committed |
+| `FppArtAssetCheck.RunBatch` | PASS: errors = 0 (1 WARN = framing, section 6) | `unity-asset-check.txt` |
+| — sockets in Unity vs PR #32 (every 10 ms) | B_Socket_Sword ≤ 0.60 mm / 0.00°, B_Socket_GripL ≤ 0.69 mm / 0.00° | ″ |
+| — sword sockets | all 6 within 0.00 mm of the contract, frames = RightGrip frame (0.00°) | ″ |
+| — hand/sword intersection on the skinned mesh | 0 vertices in all sampled frames; min grip clearance 3.1 mm (Idle/Attack), 2.9 mm (Aura) | ″ |
+| — materials/textures/missing scripts | URP Lit, all maps assigned, 0 missing scripts, shadows off, UV0 present | ″ |
+| `AssetPipelineValidator.RunBatch` | PASS: files=26 errors=0 warnings=0 (Player files included, not skipped) | `unity-asset-validation.txt` |
+| `MetinARQaChecks.Run` | PASS: scenes=2 prefabs=4 (incl. both new prefabs) missingScripts=0 | `unity-qa-checks.json` |
+| Unity screenshots | 28 written (portrait/landscape FPP, side, grip) | `METINAR-FPP-ART-001/unity/`, `checkpoint-03-*.jpg` |
+| APK / A31 / FPS / memory | **NOT RUN — UNVERIFIED** (integration and device test belong to #31 / QA #26) | — |
+
+Unity-measured mesh numbers: `SK_Player_FppArms` 4 932 tris, 4 277 vertices after import (UV/normal splits),
+1 sub-mesh, 29 bones; `SM_Weapon_FppSword` 1 452 tris, 1 132 vertices, 1 sub-mesh.
+
+Found and fixed by the Unity check (first run): Unity's FBX import maps a node's local axes as vectors and flips
+local Z, so the socket frames came in rotated +90° about X (positions were exact). The socket bones/empties now
+carry `NODE_FIX` (`fpp_contract.py`); the clips additionally use tighter compression tolerances (0.05) because the
+default ones moved the left socket by ~4 mm.
 
 ## 8. Reproduce
 
