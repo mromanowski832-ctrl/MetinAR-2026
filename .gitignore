@@ -138,3 +138,6 @@ tests/**/obj/
 
 # METINAR-011 QA runner output (reports, Unity logs, redacted logcat) stays local.
 /[Bb]uilds/qa/
+
+# Python bytecode from the Blender art-source scripts
+art-source/**/__pycache__/

@@ -150,8 +150,13 @@ match the asset folder.
 - Units: metres. 1 Unity unit = 1 m. Model at real AR size (section 8/9).
 - Blender export (FBX): Scale 1.0, *Apply Scalings: FBX All*, Forward **-Z**, Up **Y**, *Apply Unit* on,
   *Use Space Transform* on, *Add Leaf Bones* off, *Bake Animation* on for clip files, armature *Primary Bone Axis* Y.
-  The character faces Blender **-Y** (the Front view looks at its face). Apply all object transforms (Ctrl+A) before
-  export; the armature and mesh objects have identity transforms.
+  The character must face Blender **+Y** in the exported file (the *Back* view, Ctrl+Numpad 1, looks at its face):
+  with *Bake Axis Conversion* Unity maps Blender +Y to Unity +Z whatever the Forward setting says (verified on
+  Unity 6000.6.4f1 in METINAR-013; a model facing Blender -Y arrives facing -Z). Modelling facing -Y is fine if the
+  export step turns it 180° about Z, as `art-source/VenomousSpider/spider_build.py` does. Apply all object
+  transforms (Ctrl+A) before export; the armature and mesh objects have identity transforms.
+- Rigged files are imported with *Preserve Hierarchy* on, so a clip FBX that contains only the armature keeps the
+  same curve paths as the mesh FBX (otherwise Unity collapses the single root node and the clip does not bind).
 - Unity: Scale Factor 1, *Convert Units* on, *Bake Axis Conversion* on → the model's front faces **+Z**, up is **+Y**
   (same as the METINAR-006 placeholder spider, whose pivot is on the ground facing +Z).
 - Pivot: ground contact point in the centre of the footprint (mobs, NPCs); grip point for weapons/props.

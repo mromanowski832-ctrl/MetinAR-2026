@@ -1,0 +1,52 @@
+[METINAR-013] Venomous Spider asset check: checks=29 failures=0
+PASS C01 model imported as Generic rig, Read/Write off, scale 1 — Generic readable=False
+INFO model renderers: SK_Mob_VenomousSpider_LOD0=5182 tris/4257 verts/1 submesh/30 bones, SK_Mob_VenomousSpider_LOD1=2590 tris/2456 verts/1 submesh/30 bones, SK_Mob_VenomousSpider_LOD2=1292 tris/1544 verts/1 submesh/30 bones
+PASS C02 three LOD meshes _LOD0/_LOD1/_LOD2 — SK_Mob_VenomousSpider_LOD0,SK_Mob_VenomousSpider_LOD1,SK_Mob_VenomousSpider_LOD2
+PASS C03 LOD0 <= 8000 tris, LOD1 ~50 %, LOD2 ~25 % — 5182/2590/1292
+PASS C04 <= 40 bones, 1 sub-mesh (1 material) per LOD — 30/30/30
+PASS C05 LODGroup auto-created on the model with 3 levels
+PASS C06 clip Idle: name, length 2,4 s, loop=True, Optimal, Generic — A_VenomousSpider_Idle len=2,400 loop=True frameRate=30
+PASS C06 clip Walk: name, length 1 s, loop=True, Optimal, Generic — A_VenomousSpider_Walk len=1,000 loop=True frameRate=30
+PASS C06 clip Attack: name, length 1,2 s, loop=False, Optimal, Generic — A_VenomousSpider_Attack len=1,200 loop=False frameRate=30
+PASS C06 clip Hit: name, length 0,4 s, loop=False, Optimal, Generic — A_VenomousSpider_Hit len=0,400 loop=False frameRate=30
+PASS C06 clip Death: name, length 2 s, loop=False, Optimal, Generic — A_VenomousSpider_Death len=2,000 loop=False frameRate=30
+INFO texture BC: 1024x1024 type=Default sRGB=True max=1024 Android=ASTC_6x6
+PASS C07 texture BC 1024x1024 with ASTC override — 1024x1024 ASTC_6x6
+INFO texture N: 1024x1024 type=NormalMap sRGB=False max=1024 Android=ASTC_4x4
+PASS C07 texture N 1024x1024 with ASTC override — 1024x1024 ASTC_4x4
+INFO texture MS: 1024x1024 type=Default sRGB=False max=1024 Android=ASTC_6x6
+PASS C07 texture MS 1024x1024 with ASTC override — 1024x1024 ASTC_6x6
+INFO texture E: 1024x1024 type=Default sRGB=True max=1024 Android=ASTC_6x6
+PASS C07 texture E 1024x1024 with ASTC override — 1024x1024 ASTC_6x6
+PASS C08 prefab PF_Mob_VenomousSpider loads
+PASS C09 prefab: 0 missing scripts — 0
+PASS C10 Animator with AC_VenomousSpider (5 states, default Idle, no root motion) — Idle,Walk,Attack,Hit,Death
+PASS C11 LODGroup 3 levels (0.25/0.08/0.01), one renderer each — 0,25/0,08/0,01
+PASS C12 one primitive body collider, no MeshCollider
+PASS C13 material M_VenomousSpider is URP Lit on all LODs
+PASS C14 Anchor_Label present
+PASS C15 orientation: head at +Z, abdomen at -Z (faces +Z) — head z=0,240 abdomen z=-0,020
+INFO rest bounds (m): min (-0.649, 0.000, -0.600) max (0.649, 0.634, 0.649) size (1.298, 0.634, 1.249)
+PASS C16 rest pose on the ground (min y within ±1 cm), span ≈ 1.3 m, top ≈ 0.6 m — Center: (0.000, 0.317, 0.025), Extents: (0.649, 0.317, 0.625)
+INFO clip Idle: 310 curves, 310 bind to the model, root curves=0, e.g. Rig | Rig/B_Root | Rig/B_Root/B_Body
+PASS C17 clip Idle drives the rig (bones move) and stays above ground (min y >= -2 cm) — max bone move 0,033 m, min y -0,006 m
+INFO clip Walk: 310 curves, 310 bind to the model, root curves=0, e.g. Rig | Rig/B_Root | Rig/B_Root/B_Body
+PASS C17 clip Walk drives the rig (bones move) and stays above ground (min y >= -2 cm) — max bone move 0,073 m, min y -0,005 m
+INFO clip Attack: 310 curves, 310 bind to the model, root curves=0, e.g. Rig | Rig/B_Root | Rig/B_Root/B_Body
+PASS C17 clip Attack drives the rig (bones move) and stays above ground (min y >= -2 cm) — max bone move 0,327 m, min y -0,002 m
+INFO clip Hit: 310 curves, 310 bind to the model, root curves=0, e.g. Rig | Rig/B_Root | Rig/B_Root/B_Body
+PASS C17 clip Hit drives the rig (bones move) and stays above ground (min y >= -2 cm) — max bone move 0,117 m, min y -0,004 m
+INFO clip Death: 310 curves, 310 bind to the model, root curves=0, e.g. Rig | Rig/B_Root | Rig/B_Root/B_Body
+PASS C17 clip Death drives the rig (bones move) and stays above ground (min y >= -2 cm) — max bone move 0,608 m, min y -0,003 m
+PASS C18 asset pipeline validator on VenomousSpider: 0 errors — 14 files, 0 issues
+INFO screenshot unity_hero_34.png
+INFO screenshot unity_front.png
+INFO screenshot unity_lod0.png
+INFO screenshot unity_lod1.png
+INFO screenshot unity_lod2.png
+INFO screenshot unity_pose_Idle_36.png
+INFO screenshot unity_pose_Walk_08.png
+INFO screenshot unity_pose_Attack_12.png
+INFO screenshot unity_pose_Attack_17.png
+INFO screenshot unity_pose_Hit_03.png
+INFO screenshot unity_pose_Death_60.png
