@@ -62,9 +62,13 @@ $selected = if ($Gates -contains 'All') { $all } else { @($all | Where-Object { 
 # ArSmokeInjection runs right after the Editor smokes and before AndroidBuild: the Android build switches the Library to the
 # Android target, and the injected Editor smokes must run on the same Editor state as ArSmoke.
 if ($Gates -contains 'ArSmokeInjection') {
-    $at = [Array]::IndexOf([string[]]$selected, 'AndroidBuild')
-    if ($at -ge 0) { $selected = @($selected[0..($at - 1)]) + @('ArSmokeInjection') + @($selected[$at..($selected.Count - 1)]) }
-    else { $selected = @($selected) + @('ArSmokeInjection') }
+    $ordered = New-Object System.Collections.Generic.List[string]
+    foreach ($g in @($selected | Where-Object { $_ -ne 'ArSmokeInjection' })) {
+        if ($g -eq 'AndroidBuild' -and -not $ordered.Contains('ArSmokeInjection')) { $ordered.Add('ArSmokeInjection') }
+        $ordered.Add($g)
+    }
+    if (-not $ordered.Contains('ArSmokeInjection')) { $ordered.Add('ArSmokeInjection') }
+    $selected = $ordered.ToArray()
 }
 $unityGates = @('UnityCompile', 'UnityQaChecks', 'WorldMapSmoke', 'ArSmoke', 'AndroidBuild', 'ArSmokeInjection')
 
