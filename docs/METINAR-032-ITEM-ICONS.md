@@ -51,6 +51,12 @@ two runs give byte-identical PNGs. No external image, font, brush or icon pack i
   - transparent corners and border, 15–75 % coverage.
   It also checks `ASSET_SOURCE.txt`, runs the METINAR-009 validator on the folder (0 errors, 0 warnings) and renders a preview
   of the imported sprites. Results are in `docs/METINAR-032/unity/`.
+- Result (Unity 6000.6.4f1, URP, real batch run on the local Windows machine; clean checkout of `96555a4` plus the final
+  sword PNG and check script, byte-identical to this branch): **57 checks, 0 failures**
+  ([unity-icon-check.txt](METINAR-032/unity/unity-icon-check.txt)). METINAR-009 validator on the whole project: **errors=0, warnings=0**
+  ([report](METINAR-032/unity/metinar-009-asset-validation.txt)). `MetinARQaChecks`: PASS (0 missing scripts). Import + compile: 0 `error CS`.
+- Unity preview of the imported (ASTC) sprites: [unity_icons_grid.png](METINAR-032/unity/unity_icons_grid.png) (about 340 px per slot),
+  [unity_icons_small.png](METINAR-032/unity/unity_icons_small.png) (about 120 px per slot, phone inventory scale).
 - `AssetPipelineValidator.RunBatch` on the whole project: report in `docs/METINAR-032/unity/`.
 
 ## 4. Known limitations

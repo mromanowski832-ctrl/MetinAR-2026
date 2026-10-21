@@ -53,12 +53,12 @@ def dashes(points, dash=26, gap=22, width=7):
 # ------------------------------------------------------------------ 1. starter_sword — Miecz Rekruta
 def starter_sword():
     ic = Icon()
-    T = lambda pts: xform(pts, angle_deg=-45, offset=(512, 512), pivot=(0, 0))
-    blade = m_poly(T([(-205, -50), (400, -43), (538, 0), (400, 43), (-205, 50)]))
-    guard = m_stroke(T(bezier((-160, -178), (-238, -95), (-238, 95), (-160, 178))), 44)
-    grip = m_poly(T([(-470, -30), (-228, -32), (-228, 32), (-470, 30)]))
+    T = lambda pts: xform(pts, angle_deg=-45, scale=1.1, offset=(518, 506), pivot=(0, 0))
+    blade = m_poly(T([(-205, -58), (395, -50), (530, 0), (395, 50), (-205, 58)]))
+    guard = m_stroke(T(bezier((-160, -178), (-238, -95), (-238, 95), (-160, 178))), 50)
+    grip = m_poly(T([(-470, -34), (-228, -36), (-228, 36), (-470, 34)]))
     pc = T([(-508, 0)])[0]
-    pommel = m_ellipse(pc[0], pc[1], 50)
+    pommel = m_ellipse(pc[0], pc[1], 56)
     collar = m_poly(T([(-262, -40), (-212, -46), (-212, 46), (-262, 40)]))
     ic.put(shade(grip, tex((0.21, 0.155, 0.12), 11, 40, 0.3), bevel=30, spec=0.08))
     for k in range(7):

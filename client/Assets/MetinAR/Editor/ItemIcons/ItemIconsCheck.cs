@@ -143,23 +143,35 @@ namespace MetinAR.Editor.ItemIcons
         private static void Preview(List<Sprite> sprites, int size, string file)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            var slotTex = new Texture2D(4, 4);
-            slotTex.SetPixels(Enumerable.Repeat(Color.white, 16).ToArray());
-            slotTex.Apply();
-            Sprite slot = Sprite.Create(slotTex, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 4f / 3.0f);
+            // Quads with URP Unlit materials (the imported sprite texture as _BaseMap, alpha-blended): the same shader
+            // family the game uses, and it renders reliably with Camera.Render in batch mode.
+            Shader unlit = Shader.Find("Universal Render Pipeline/Unlit");
+            Info("preview shader " + unlit.name);
+            var slotMat = new Material(unlit);
+            slotMat.SetColor("_BaseColor", new Color(0.25f, 0.235f, 0.23f));
             for (int i = 0; i < sprites.Count; i++)
             {
                 int r = i / 3, c = i % 3;
                 var pos = new Vector3((c - 1) * 3.0f, (1 - r) * 3.0f, 0f);
-                var bg = new GameObject("Slot" + i).AddComponent<SpriteRenderer>();
-                bg.sprite = slot;
-                bg.color = new Color(0.25f, 0.235f, 0.23f);
+                GameObject bg = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 bg.transform.position = pos + new Vector3(0, 0, 0.1f);
-                bg.transform.localScale = Vector3.one * 0.70f;
-                var icon = new GameObject(sprites[i].name).AddComponent<SpriteRenderer>();
-                icon.sprite = sprites[i];
+                bg.transform.localScale = Vector3.one * 2.8f;
+                bg.GetComponent<Renderer>().sharedMaterial = slotMat;
+                var mat = new Material(unlit);
+                mat.SetTexture("_BaseMap", sprites[i].texture);
+                mat.SetColor("_BaseColor", Color.white);
+                mat.SetFloat("_Surface", 1f);
+                mat.SetFloat("_Blend", 0f);
+                mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                mat.SetFloat("_ZWrite", 0f);
+                mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+                GameObject icon = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                icon.name = sprites[i].name;
                 icon.transform.position = pos;
-                icon.transform.localScale = Vector3.one * (2.6f / 2.56f);
+                icon.transform.localScale = Vector3.one * 2.6f;
+                icon.GetComponent<Renderer>().sharedMaterial = mat;
             }
 
             var cam = new GameObject("Cam").AddComponent<Camera>();
