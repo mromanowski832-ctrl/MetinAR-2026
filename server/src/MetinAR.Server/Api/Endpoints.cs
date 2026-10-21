@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using MetinAR.Server.Domain;
 using MetinAR.Server.Geo;
 using MetinAR.Server.Persistence;
@@ -6,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace MetinAR.Server.Api;
 
-public static class Endpoints
+public static partial class Endpoints
 {
     public const string ApiVersion = "v1";
 
@@ -47,7 +49,8 @@ public static class Endpoints
             .Produces<StartEncounterResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status409Conflict);
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         v1.MapPost("/encounters/complete", CompleteEncounterAsync)
             .WithName("CompleteEncounter").WithTags("Encounters")
@@ -55,7 +58,8 @@ public static class Endpoints
             .Produces<CompleteEncounterResponse>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status410Gone);
     }
 
     internal static async Task<IResult> HealthAsync(SqliteConnectionFactory connections, TimeProvider time, CancellationToken ct)
@@ -179,6 +183,7 @@ public static class Endpoints
 
         // Exact radius filter, then a deterministic order: nearest first, ties broken by stable id.
         var inRadius = candidates
+            .Where(e => e.IsActiveAt(now)) // schedule phase (deterministic, server-owned)
             .Select(e => (Entity: e, Distance: GeoDistance.HaversineMeters(center, new GeoPoint(e.Latitude, e.Longitude))))
             .Where(x => x.Distance <= radius)
             .OrderBy(x => x.Distance)
@@ -194,8 +199,9 @@ public static class Endpoints
 
     internal static async Task<IResult> StartEncounterAsync(
         HttpContext http, StartEncounterRequest? body, IPlayerStore players, IWorldStore world, IEncounterStore encounters,
-        TimeProvider time, CancellationToken ct)
+        IOptions<EncounterRules> ruleOptions, TimeProvider time, ILoggerFactory loggers, CancellationToken ct)
     {
+        EncounterRules rules = ruleOptions.Value;
         var errors = new ValidationErrors();
         if (body is null)
         {
@@ -205,7 +211,7 @@ public static class Endpoints
         {
             Validation.Id(errors, "playerId", body.PlayerId);
             Validation.Id(errors, "worldEntityId", body.WorldEntityId);
-            Validation.Position(errors, "clientPosition", body.ClientPosition);
+            Validation.ClientFix(errors, "clientPosition", body.ClientPosition);
         }
 
         if (errors.HasErrors)
@@ -230,15 +236,48 @@ public static class Endpoints
         if (!entity.IsActiveAt(now))
         {
             return ApiErrors.Result(http, StatusCodes.Status409Conflict, ErrorCodes.WorldEntityInactive, "World entity is not active.",
-                $"World entity '{entity.Id}' is inactive or outside its spawn window.");
+                $"World entity '{entity.Id}' is inactive, outside its spawn window or outside its scheduled active phase.");
         }
 
-        // NOTE: body.ClientPosition is accepted and validated but intentionally NOT trusted or enforced yet.
-        // A future server-side proximity/plausibility check belongs here (see docs, "Trust boundaries").
-        (EncounterSession session, bool created) = await encounters.StartAsync(
-            Guid.NewGuid().ToString("N"), body.PlayerId!, entity.Id, now, ct).ConfigureAwait(false);
+        // Server-side proximity authority: the entity position is server-owned; the client fix is only evidence.
+        ClientFixDto fix = body.ClientPosition!;
+        (ProximityVerdict verdict, EncounterStartEvidence evidence) = ProximityCheck.Evaluate(
+            new GeoPoint(fix.Latitude!.Value, fix.Longitude!.Value), fix.HorizontalAccuracyMeters!.Value, fix.CapturedAt,
+            new GeoPoint(entity.Latitude, entity.Longitude), now, rules);
 
-        var response = new StartEncounterResponse(session.ToDto(), created);
+        if (verdict != ProximityVerdict.Allowed)
+        {
+            ILogger log = loggers.CreateLogger("MetinAR.Server.Encounters");
+            // Never log client coordinates: only the verdict and rounded server-side derived values.
+            LogStartRejected(log, verdict.ToString(), body.PlayerId!, entity.Id, Math.Round(evidence.DistanceMeters), Math.Round(evidence.AccuracyMeters));
+            return verdict switch
+            {
+                ProximityVerdict.AccuracyTooPoor => ApiErrors.Result(http, StatusCodes.Status422UnprocessableEntity, ErrorCodes.GpsAccuracyInsufficient,
+                    "GPS accuracy is too poor to start an encounter.",
+                    $"Reported accuracy must be at most {rules.MaxAcceptedAccuracyMeters} m.",
+                    extensions: new Dictionary<string, object?> { ["maxAccuracyMeters"] = rules.MaxAcceptedAccuracyMeters }),
+                ProximityVerdict.FixStale or ProximityVerdict.FixInFuture => ApiErrors.Result(http, StatusCodes.Status422UnprocessableEntity, ErrorCodes.GpsFixStale,
+                    "GPS fix timestamp is not current.",
+                    verdict == ProximityVerdict.FixStale
+                        ? $"capturedAt is older than {rules.MaxFixAgeSeconds} s."
+                        : $"capturedAt is more than {rules.MaxFutureSkewSeconds} s in the future.",
+                    extensions: new Dictionary<string, object?> { ["maxFixAgeSeconds"] = rules.MaxFixAgeSeconds }),
+                _ => ApiErrors.Result(http, StatusCodes.Status422UnprocessableEntity, ErrorCodes.EncounterTooFar,
+                    "Too far from the world entity to start an encounter.",
+                    extensions: new Dictionary<string, object?>
+                    {
+                        ["distanceMeters"] = Math.Round(evidence.DistanceMeters),
+                        ["allowedMeters"] = Math.Round(evidence.AllowedMeters, 1),
+                    }),
+            };
+        }
+
+        string nonce = NewNonce();
+        (EncounterSession session, bool created) = await encounters.StartAsync(
+            Guid.NewGuid().ToString("N"), body.PlayerId!, entity.Id, now, now.AddSeconds(rules.EncounterTtlSeconds),
+            HashNonce(nonce), evidence, ct).ConfigureAwait(false);
+
+        var response = new StartEncounterResponse(session.ToDto(), created, nonce);
         return created ? Results.Created($"/api/{ApiVersion}/encounters/{session.Id}", response) : Results.Ok(response);
     }
 
@@ -254,6 +293,7 @@ public static class Endpoints
         {
             Validation.Id(errors, "encounterId", body.EncounterId);
             Validation.Id(errors, "playerId", body.PlayerId);
+            Validation.Nonce(errors, "nonce", body.Nonce);
         }
 
         if (errors.HasErrors)
@@ -274,14 +314,41 @@ public static class Endpoints
                 "Encounter belongs to a different player.");
         }
 
+        string? storedHash = await encounters.GetNonceHashAsync(existing.Id, ct).ConfigureAwait(false);
+        if (storedHash is null || !NonceMatches(storedHash, body.Nonce!))
+        {
+            return ApiErrors.Result(http, StatusCodes.Status403Forbidden, ErrorCodes.EncounterNonceMismatch,
+                "Encounter nonce does not match.", "Use the nonce from the most recent start response for this encounter.");
+        }
+
         DateTimeOffset now = UtcTimestamp.Normalize(time.GetUtcNow());
-        (EncounterSession Session, bool FirstCompletion)? result = await encounters.CompleteAsync(existing.Id, now, ct).ConfigureAwait(false);
+        (EncounterSession Session, CompletionOutcome Outcome)? result = await encounters.CompleteAsync(existing.Id, now, ct).ConfigureAwait(false);
         if (result is null)
         {
             return ApiErrors.Result(http, StatusCodes.Status404NotFound, ErrorCodes.EncounterNotFound, "Encounter not found.");
         }
 
+        if (result.Value.Outcome == CompletionOutcome.Expired)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status410Gone, ErrorCodes.EncounterExpired, "Encounter has expired.",
+                $"The encounter expired at {UtcTimestamp.ToText(result.Value.Session.ExpiresAt)}. Start a new one.");
+        }
+
         // Future rewards may ONLY be granted when FirstCompletion is true (see docs, "Idempotency").
-        return Results.Ok(new CompleteEncounterResponse(result.Value.Session.ToDto(), result.Value.FirstCompletion));
+        return Results.Ok(new CompleteEncounterResponse(result.Value.Session.ToDto(), result.Value.Outcome == CompletionOutcome.FirstCompletion));
     }
+
+    internal static string NewNonce() => Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+
+    internal static string HashNonce(string nonce) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(nonce)));
+
+    private static bool NonceMatches(string storedHashHex, string nonce) =>
+        CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(storedHashHex), Encoding.ASCII.GetBytes(HashNonce(nonce)));
+
+    private static string Base64UrlEncode(byte[] bytes) =>
+        Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    [LoggerMessage(EventId = 100, Level = LogLevel.Information,
+        Message = "Encounter start rejected: {Verdict} player={PlayerId} entity={WorldEntityId} distanceM={DistanceMeters} accuracyM={AccuracyMeters}")]
+    private static partial void LogStartRejected(ILogger logger, string verdict, string playerId, string worldEntityId, double distanceMeters, double accuracyMeters);
 }

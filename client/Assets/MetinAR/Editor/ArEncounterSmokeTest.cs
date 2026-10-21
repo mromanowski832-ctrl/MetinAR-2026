@@ -116,6 +116,8 @@ namespace MetinAR.Editor
 
             private readonly List<(string name, string failure)> _results = new List<(string, string)>();
             private readonly List<string> _exceptions = new List<string>();
+            private readonly List<string> _infrastructureNoise = new List<string>();
+            private readonly List<string> _exceptionDiagnostics = new List<string>();
             private readonly List<string> _errors = new List<string>();
             private string _currentFailure;
 
@@ -157,9 +159,29 @@ namespace MetinAR.Editor
 
             private void OnLog(string condition, string stackTrace, LogType type)
             {
+                RecordLog(condition, stackTrace, type);
+            }
+
+            /// <summary>
+            /// METINAR-014: exceptions are classified by <see cref="SmokeExceptionClassifier"/>. Only the single reproduced
+            /// Unity Editor Search startup signature (no MetinAR frame) is kept out of the failure list; MetinAR and
+            /// unknown exceptions still fail T15.
+            /// </summary>
+            private void RecordLog(string condition, string stackTrace, LogType type)
+            {
                 if (type == LogType.Exception)
                 {
-                    _exceptions.Add(condition);
+                    if (SmokeExceptionClassifier.Classify(condition, stackTrace) == SmokeExceptionKind.KnownEditorInfrastructure)
+                    {
+                        _infrastructureNoise.Add(condition);
+                    }
+                    else
+                    {
+                        _exceptions.Add(condition);
+                        _exceptionDiagnostics.Add(SmokeExceptionClassifier.Classify(condition, stackTrace) + " frames=["
+                            + string.Join(" < ", SmokeExceptionClassifier.ExtractFrames((condition ?? string.Empty) + "\n" + (stackTrace ?? string.Empty)))
+                            + "]");
+                    }
                 }
                 else if (type == LogType.Error)
                 {
@@ -825,9 +847,87 @@ namespace MetinAR.Editor
 
             private IEnumerator T15_NoExceptionsLogged()
             {
+                InjectExceptionForGateCheck();
+                yield return Frames(2);
+                if (_infrastructureNoise.Count > 0)
+                {
+                    Debug.Log("[ArSmoke] T15 ignored known editor-infrastructure exceptions (" + _infrastructureNoise.Count + ", "
+                        + SmokeExceptionClassifier.SearchDatabaseSignatureId + "): " + FirstLines(_infrastructureNoise));
+                }
+
+                foreach (string d in _exceptionDiagnostics)
+                {
+                    Debug.Log("[ArSmoke] T15 failing exception classified " + d);
+                }
+
                 Check(_exceptions.Count == 0, "exceptions: " + string.Join(" | ", _exceptions));
                 Debug.Log("[ArSmoke] logged errors (" + _errors.Count + "): " + string.Join(" | ", _errors));
                 yield break;
+            }
+
+            private static string FirstLines(List<string> messages)
+            {
+                var parts = new List<string>();
+                foreach (string m in messages)
+                {
+                    parts.Add((m ?? string.Empty).Split('\n')[0]);
+                }
+
+                return string.Join(" | ", parts);
+            }
+
+            /// <summary>
+            /// METINAR-014 negative gate check. Off unless the environment variable METINAR_SMOKE_INJECT is set
+            /// (tools/qa/Invoke-MetinARQa.ps1 -Gates ArSmokeInjection). Values:
+            ///   metinar - a real exception thrown from MetinAR code and logged through Debug.LogException -> T15 must FAIL;
+            ///   unknown - a synthetic Unity runtime exception without MetinAR frames -> T15 must FAIL;
+            ///   searchdb - a synthetic copy of the known Search startup signature -> T15 must still PASS.
+            /// </summary>
+            private void InjectExceptionForGateCheck()
+            {
+                string mode = Environment.GetEnvironmentVariable("METINAR_SMOKE_INJECT");
+                if (string.IsNullOrEmpty(mode))
+                {
+                    return;
+                }
+
+                Debug.Log("[ArSmoke] T15 injecting exception for gate check: " + mode);
+                switch (mode.Trim().ToLowerInvariant())
+                {
+                    case "metinar":
+                        try
+                        {
+                            throw new InvalidOperationException("Injected project-code smoke exception (issue 014 gate check)");
+                        }
+                        catch (InvalidOperationException e)
+                        {
+                            Debug.LogException(e);
+                        }
+
+                        break;
+                    case "unknown":
+                        RecordLog(
+                            "NullReferenceException: injected unknown Unity exception (issue 014 gate check)",
+                            "UnityEngine.XR.ARFoundation.ARSession:Update ()\n",
+                            LogType.Exception);
+                        break;
+                    case "searchdb":
+                        RecordLog(
+                            "ArgumentOutOfRangeException: Index was out of range. Must be non-negative and less than the size of the collection.\n"
+                            + "Parameter name: index\n"
+                            + "  at System.Collections.Generic.List`1[T].get_Item (System.Int32 index) [0x00009] in <x>:0 \n"
+                            + "  at UnityEditor.Search.SearchDatabase+<EnumerateAll>d__78.MoveNext () [0x00089] in <x>:0 \n"
+                            + "  at System.Linq.Enumerable.First[TSource] (System.Collections.Generic.IEnumerable`1[T] source) [0x00000] in <x>:0 \n"
+                            + "  at UnityEditor.Search.SearchDatabase.GetDefaultSearchDatabase () [0x00005] in <x>:0 \n"
+                            + "  at UnityEditor.Search.SearchInit.IndexationOnStartup () [0x0000a] in <x>:0 \n"
+                            + "  at UnityEditor.EditorApplication.Internal_CallDelayFunctions () [0x00029] in <x>:0 ",
+                            string.Empty,
+                            LogType.Exception);
+                        break;
+                    default:
+                        Debug.LogError("[ArSmoke] unknown METINAR_SMOKE_INJECT value: " + mode);
+                        break;
+                }
             }
 
             private void WriteResultsAndExit()

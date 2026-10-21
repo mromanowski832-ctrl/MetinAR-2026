@@ -53,6 +53,53 @@ namespace MetinAR.QA
             }
         }
 
+        /// <summary>Well-known latency metric names (METINAR-014) so features and budgets agree on spelling.</summary>
+        public static class Metrics
+        {
+            /// <summary>Hand-tracking model inference per frame (METINAR-007).</summary>
+            public const string HandInference = "hand.inference";
+
+            /// <summary>Map tile fetch-to-decoded time (METINAR-008B).</summary>
+            public const string MapTileDecode = "map.tile.decode";
+
+            /// <summary>Map tile mesh/geometry build time (METINAR-008B).</summary>
+            public const string MapTileMesh = "map.tile.mesh";
+        }
+
+        /// <summary>
+        /// Generic timing hook: <c>using (MetinARPerfProbe.Measure(MetinARPerfProbe.Metrics.MapTileDecode)) { ... }</c>.
+        /// Reports the elapsed wall time through <see cref="RecordLatency"/> on dispose. When the probe is inactive (Editor,
+        /// release builds) it does not read the clock and allocates nothing.
+        /// </summary>
+        public static LatencyScope Measure(string metric)
+        {
+            return _active ? new LatencyScope(metric, System.Diagnostics.Stopwatch.GetTimestamp()) : default;
+        }
+
+        /// <summary>Disposable timing scope returned by <see cref="Measure"/>.</summary>
+        public readonly struct LatencyScope : System.IDisposable
+        {
+            private readonly string _metric;
+            private readonly long _start;
+
+            internal LatencyScope(string metric, long start)
+            {
+                _metric = metric;
+                _start = start;
+            }
+
+            public void Dispose()
+            {
+                if (_metric == null)
+                {
+                    return;
+                }
+
+                long ticks = System.Diagnostics.Stopwatch.GetTimestamp() - _start;
+                RecordLatency(_metric, ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
+            }
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
