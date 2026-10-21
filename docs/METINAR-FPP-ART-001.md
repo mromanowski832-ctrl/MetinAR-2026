@@ -140,6 +140,29 @@ rest pose has the grip, guard, blade and left hand in the lower part of the fram
 **V3 regeneration:** results of the V3 clips are in section 7.0 (added with the Unity run). The tables below 7.0
 are the V1 run (`a5d7e27`/`cd3d02c`) and are kept as history.
 
+### 7.0 V3 (contract `v3-a31-retest`)
+
+Unity 6000.6.4f1 on LuzMen, batch mode. Each run used a **new clean clone** from GitHub with a fresh Library
+(first import). Run 1: `C:\Users\mroma\MetinAR-FPPART-V3` @ `3092949`; its only output was the expected
+`PF_Player_FppArms.prefab` change (nested sword scale 0.75), committed as `22d2b1a`. **Run 2 (tested SHA `22d2b1a`)**:
+`C:\Users\mroma\MetinAR-FPPART-V3B`. The commit after it only adds this section and the reports/screenshots below.
+
+| Gate (run 2, `22d2b1a`) | Result | Evidence |
+|---|---|---|
+| Blender build (`fpp_build.py -- full`, box) | sockets vs contract 0 mm / 0°; IK wrist gap 0 mm; Idle/Aura 0 hand vertices in the sword proxies; **Attack 591** (section 6.1); grip clearance R 7.2 mm / L 5.7 mm | `blender_build_report.json` |
+| `dotnet test tests/AssetPipeline.Tests` (box) | PASS 179/179 (incl. 10 new V3 contract/idempotency tests) | — |
+| Unity compile | exit 0, 0 `error CS` in all step logs | `unity-batch-summary.txt` |
+| `FppArtAssetBuilder.BuildBatch` ×2 | exit 0 both times; `git status` **clean** after the 1st and 2nd build and at the end (idempotent: `AC_FppArms.controller` and prefabs unchanged) | `unity-batch-summary.txt` |
+| `FppArtAssetCheck.RunBatch` | **errors = 1**: `Attack: hand vertices inside sword proxies = 527 over 37 sampled frames` (contract V3 overlap, section 6.1). Everything else is OK: B_Socket_Sword ≤ 0.52 mm / 0.00°, B_Socket_GripL ≤ 0.57 mm / 0.00°; nested sword scale 0.75; sockets in the RightGrip frame = contract (GripL (0,−0.09,0), BladeBase 0.0975, BladeTip 0.705, AuraBurst 0.285) 0.00 mm; Idle/Aura 0 penetrations; 28 screenshots | `unity-asset-check.txt` |
+| `AssetPipelineValidator.RunBatch` | PASS: files=26 errors=0 warnings=0 | `unity-asset-validation.txt` |
+| `MetinARQaChecks.Run` | PASS: scenes=2 prefabs=4 missingScripts=0 failures=0 | log |
+| `AssetPipelineSelfTest.Run` | PASS 14/14 | log |
+| Visibility (estimated A31 portrait, 69.4° v) | Idle: grip 201/201, blade tip 66/201, left hand 201/201; Attack: grip 55/73, tip 24/73, left 73/73; Aura: grip 116/116, tip 0/116, left 116/116 | `unity-asset-check.txt` |
+| APK / A31 / FPS | **NOT RUN, UNVERIFIED** | — |
+
+The check screenshots now do a warm-up render after `BakeMesh`. In run 1 the first shot of each pose showed the
+previous proxy mesh, so the Idle portrait/grip shots had no hands. The V1 screenshots had the same artefact.
+
 Unity 6000.6.4f1 on LuzMen, separate checkout `C:\Users\mroma\MetinAR-FPPART` (local clone + Library copied
 from `MetinAR-009-verify`; nothing in other checkouts touched), batch mode, tested SHA `a5d7e27`
 (the following commit only adds the Unity-generated `.meta`/material/controller/prefab files and these reports).

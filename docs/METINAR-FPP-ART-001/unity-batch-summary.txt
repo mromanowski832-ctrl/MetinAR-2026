@@ -1,16 +1,12 @@
-START compile 2026-10-21T02:48:22.6307839+02:00
-compile exit=0 secs=129 freeBefore=91,54GB freeAfter=91,48GB
-DONE compile
-START build,check,validate,qa 2026-10-21T02:51:58.3570661+02:00
-build exit=0 secs=22 freeBefore=91,47GB freeAfter=91,50GB
-check exit=1 secs=28 freeBefore=91,50GB freeAfter=91,49GB
-DONE build,check,validate,qa
-START check 2026-10-21T02:55:36.8731429+02:00
-check exit=1 secs=26 freeBefore=91,46GB freeAfter=91,48GB
-DONE check
-START build,check,validate,qa 2026-10-21T02:59:28.3807710+02:00
-build exit=0 secs=25 freeBefore=91,43GB freeAfter=91,43GB
-check exit=0 secs=19 freeBefore=91,43GB freeAfter=91,43GB
-validate exit=0 secs=18 freeBefore=91,43GB freeAfter=91,43GB
-qa exit=0 secs=18 freeBefore=91,43GB freeAfter=91,43GB
-DONE build,check,validate,qa
+START compile,build,status,build,status,check,validate,qa,selftest,status 2026-10-21T15:14:45.9842418+02:00 head=22d2b1a198fa21b96facfdca60fcd858a0a196b1
+compile#1 exit=0 secs=552 freeBefore=62,74GB freeAfter=61,22GB
+build#2 exit=0 secs=23 freeBefore=61,22GB freeAfter=61,22GB
+status#3 lines=0
+build#4 exit=0 secs=22 freeBefore=61,22GB freeAfter=61,22GB
+status#5 lines=0
+check#6 exit=1 secs=28 freeBefore=61,22GB freeAfter=61,21GB
+validate#7 exit=0 secs=20 freeBefore=61,21GB freeAfter=61,21GB
+qa#8 exit=0 secs=19 freeBefore=61,21GB freeAfter=61,21GB
+selftest#9 exit=0 secs=19 freeBefore=61,21GB freeAfter=61,21GB
+status#10 lines=0
+DONE 2026-10-21T15:26:12.4534715+02:00
