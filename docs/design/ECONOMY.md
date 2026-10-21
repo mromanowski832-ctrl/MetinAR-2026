@@ -1,6 +1,6 @@
 # METINAR-017 — Waluta i ekonomia
 
-> **Status: PROPOZYCJA do akceptacji właściciela (#40). Bez implementacji.**
+> **Status: ZAAKCEPTOWANE przez właściciela 2026-10-21 (#40; maks. poziom 99, pozostałe propozycje domyślne). Bez implementacji.**
 > Wszystkie ceny i przychody to **proponowane wartości startowe do balansowania**. Indeks: [README.md](README.md).
 
 ## 1. Waluta
@@ -20,7 +20,9 @@
 | Sprzedaż przedmiotów NPC | 20% ceny kupna × mnożnik rzadkości ([tables/rarity_tiers.csv](tables/rarity_tiers.csv)) | 5–60 |
 | Skrzynka odkrycia (nowa komórka mapy, maks. 5/dobę) | `10 × L` | 50 |
 
-Cel: **~450 talarów / h na poziomie 5**, ok. ×1,1 na każdy kolejny poziom (wolniej niż ceny, żeby ujścia działały).
+Cel: **~450 talarów / h na poziomie 5**. Przychód rośnie razem z talarami z moba (`4 + 2 × m`): ok. ×9 na poziomie 60
+i ×14 na poziomie 99 względem poziomu 5. To wolniej niż ceny sprzętu (`iL^1.35`: ok. ×56 dla iL 99 względem iL 5)
+i hartowania, żeby ujścia działały także w końcówce gry (poziomy 60–99).
 
 ## 3. Ujścia talarów (sinks)
 
@@ -29,10 +31,12 @@ Cel: **~450 talarów / h na poziomie 5**, ok. ×1,1 na każdy kolejny poziom (wo
 | Mikstury i antidotum | stałe ceny NPC ([tables/shop_starter_merchant.csv](tables/shop_starter_merchant.csv)) | główne ujście wczesne |
 | Hartowanie przedmiotów | `round5(5 × iL × t^1.6)` + Odłamki Rudy | główne ujście późne ([ITEMS_COMBAT_SPEC.md](ITEMS_COMBAT_SPEC.md) §4) |
 | Przekucie affiksu | `round5(40 × iL)` + 3 Odłamki | losuje 1 affiks od nowa |
-| Trening umiejętności | `round5(8 × unlockLevel × rank^1.4)` za rangę | [CLASSES_SKILLS.md](CLASSES_SKILLS.md) §2 |
-| Napar Zapomnienia (reset statystyk) | `1500 × max(1, L/10)` | |
+| Trening umiejętności | `round5(8 × unlockLevel × rank^1.4)` za punkt | Wprawa 1–14 i awans do Biegłości I (`rank` 1–15), [CLASSES_SKILLS.md](CLASSES_SKILLS.md) §2 |
+| Traktat Biegłości (u trenera) | `round5(60 × L)`, min. 1 200 | od poz. 20, limit zakupu 2/dobę, skup 0; Iskra Kunsztu i Pieczęć Szczytu nie są sprzedawane |
+| Próba podniesienia stopnia (ujście EXP, nie talarów) | 3% / 6% / 10% EXP do następnego poziomu | Traktat / Iskra / Pieczęć, [CLASSES_SKILLS.md](CLASSES_SKILLS.md) §2.1 |
+| Napar Zapomnienia (reset statystyk) | `1500 × max(1, L/10)` | poz. 99: 14 850 |
 | Sakwa (+8 miejsc ekwipunku) | 2 000, każda kolejna ×2 | maks. 56 miejsc |
-| Zmiana ścieżki | `500 × L` + zadanie | Q11 |
+| Zmiana ścieżki | `500 × L` + zadanie | Q11; poz. 99: 49 500 |
 | Sprzęt zwykły u NPC | `round5(20 × iL^1.35 × slotFactor)` | slotFactor: broń 1,2; zbroja 1,0; reszta 0,6; formuła od iL 5, ceny zestawu startowego (iL 1) ustalone ręcznie w §5 |
 
 **Bez naprawy sprzętu**, bo proponujemy brak wytrzymałości przedmiotów (Q5). Brak szybkiej podróży, bo mapa to
