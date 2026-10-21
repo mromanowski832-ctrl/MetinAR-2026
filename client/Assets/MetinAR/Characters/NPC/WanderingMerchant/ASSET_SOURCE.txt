@@ -1,0 +1,10 @@
+# METINAR-016 — provenance / licence record (METINAR-009 section 11)
+asset_id: WanderingMerchant
+origin: original
+author: MetinAR project (Grok Bot implementation agent for the owner Michał Romanowski)
+license: MetinAR-Owned
+commercial_use: yes
+created_with: Blender 4.2.9 LTS (official blender.org build, headless) driven by project scripts art-source/WanderingMerchant/*.py; geometry, humanoid rig, UVs, palette-atlas textures and all six clips generated procedurally; LOD1/LOD2 by Blender Decimate; Unity 6000.6.4f1 for avatar, material, controller and prefab
+date_added: 2026-10-21
+modifications: n/a (first version)
+notes: no external meshes, scans, photos, textures, marketplace, mocap or AI-generated content; no reference files from other games; reproducible with blender -b --factory-startup --python art-source/WanderingMerchant/merchant_build.py -- full <out_dir>
