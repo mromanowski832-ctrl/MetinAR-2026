@@ -1,0 +1,18 @@
+affixId,namePl,unit,valueAtIL1,valueAtIL60,allowedSlots,notes
+max_hp_flat,Maks. HP,flat,6,180,helmet|armor|necklace,
+max_mp_flat,Maks. MP,flat,4,110,earrings|necklace|off_hand,
+atk_pct,Atak %,pct,2,12,weapon|gloves|bracelet,
+mag_pct,Moc magii %,pct,2,12,weapon|off_hand|earrings,
+crit_chance,Szansa kryt. %,pct,1,6,weapon|gloves|ring|bracelet,limit łączny 40%
+crit_damage,Obrażenia kryt. %,pct,3,20,weapon|ring,limit mnożnika 2.2
+accuracy,Celność,flat,2,30,gloves|helmet|bracelet,
+evasion,Unik,flat,2,25,boots|armor,
+block_rating,Blok %,pct,1,6,off_hand,tylko tarcza; limit 35%
+defense_flat,Obrona,flat,2,40,armor|helmet|boots|off_hand,
+res_poison,Odporność na truciznę %,pct,3,20,earrings|ring|armor,limit 50%
+res_dark,Odporność na mrok %,pct,3,20,earrings|ring|necklace,limit 50%
+hp_regen,Regeneracja HP/5 s,flat,1,18,necklace|armor,
+dmg_vs_family,Obrażenia vs rodzina moba %,pct,3,15,weapon,np. vs pajęczaki
+gold_find,Znajdowanie talarów %,pct,2,10,ring|necklace,serwer: weryfikacja
+exploration_exp,EXP z eksploracji %,pct,2,10,boots,serwer: weryfikacja
+skill_cdr,Skrócenie odnowienia %,pct,1,6,earrings|helmet,limit 20%
