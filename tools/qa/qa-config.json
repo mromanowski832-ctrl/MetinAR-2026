@@ -4,7 +4,10 @@
   "unityProject": "client",
   "testProjects": [
     "tests/GeoCore.Tests/GeoCore.Tests.csproj",
-    "tests/MetinAR.QA.Tests/MetinAR.QA.Tests.csproj"
+    "tests/MetinAR.QA.Tests/MetinAR.QA.Tests.csproj",
+    "tests/AssetPipeline.Tests/AssetPipeline.Tests.csproj",
+    "tests/MetinAR.Gameplay.Tests/MetinAR.Gameplay.Tests.csproj",
+    "server/tests/MetinAR.Server.Tests/MetinAR.Server.Tests.csproj"
   ],
   "optionalTestProjectGlobs": [
     "tests/*/*.Tests.csproj",
