@@ -6,6 +6,9 @@ Python standard library. No samples, recordings, sound libraries or AI audio are
 is original MetinAR-Owned material. Same script + same seeds = bit-identical WAV files.
 
 Output: 16-bit PCM mono WAV, 44.1 kHz (lossless source; Unity compresses on import per .meta, ADPCM on mobile).
+Every clip is a whole number of 64-sample blocks: Unity's ADPCM import pads a clip up to the next multiple of 64
+samples (verified on LuzMen: 88 200 -> 88 256 samples), which would push clips past their length budget and put
+~1.3 ms of silence into a loop seam. Lengths are therefore rounded DOWN to a multiple of ADPCM_BLOCK_FRAMES.
 
 Usage:
   python3 tools/audio/generate_sfx.py            # writes into client/Assets/MetinAR/Audio/SFX
@@ -22,13 +25,19 @@ import wave
 import numpy as np
 
 SR = 44100
+ADPCM_BLOCK_FRAMES = 64      # Unity ADPCM block; every generated clip length must be a multiple of this
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DEFAULT_OUT = os.path.join(REPO, "client", "Assets", "MetinAR", "Audio", "SFX")
 
 
 # ---------------------------------------------------------------- building blocks
+def n_frames(dur):
+    """Sample count for a nominal duration, rounded down to whole ADPCM blocks (never longer than `dur`)."""
+    return (int(round(dur * SR)) // ADPCM_BLOCK_FRAMES) * ADPCM_BLOCK_FRAMES
+
+
 def t_axis(dur):
-    return np.arange(int(round(dur * SR))) / SR
+    return np.arange(n_frames(dur)) / SR
 
 
 def rng(seed):
@@ -233,8 +242,17 @@ def ui_click():
 # Prototype timing in FppCombatTimeline (PR #32): cast 1.15 s, burst at 0.65 s, Aura active 6 s on the blade.
 # Start = cast (two-hand grip, energy gathering, burst at 0.65 s); Loop = sustained blade hum while active
 # (played looped by an AudioSource); Stop = discharge when the Aura expires.
-AURA_LOOP_SECONDS = 2.0      # 88 200 samples; every partial / modulation is periodic in exactly this length
-AURA_BASE_HZ = 110.0         # multiple of 1 / AURA_LOOP_SECONDS -> integer cycles per loop
+AURA_LOOP_FRAMES = 88192                 # 1378 x 64 (1.99982 s): a whole number of ADPCM blocks -> no import padding
+AURA_LOOP_SECONDS = AURA_LOOP_FRAMES / SR
+
+
+def loop_hz(f):
+    """Nearest frequency with an integer number of cycles in the loop length (re-tuned, not cut: seam stays exact)."""
+    return round(f * AURA_LOOP_SECONDS) / AURA_LOOP_SECONDS
+
+
+AURA_BASE_HZ = loop_hz(110.0)            # 220 cycles per loop (110.0102 Hz)
+AURA_SHIMMER_HZ = (loop_hz(1320.0), loop_hz(1981.5), loop_hz(2643.0))   # 2640 / 3963 / 5286 cycles per loop
 
 
 def periodic_noise(r, n, lo, hi):
@@ -252,18 +270,19 @@ def aura_layers(t, r, n, periods=1):
     `periods` tiles the (one-period) noise so the same timbre can be rendered over several loop lengths."""
     loop = AURA_LOOP_SECONDS
     hum = tone(t, AURA_BASE_HZ) + 0.45 * tone(t, AURA_BASE_HZ * 2) + 0.2 * tone(t, AURA_BASE_HZ * 3)
-    # shimmer partials: frequencies are multiples of 0.5 Hz, slow AM at 1/loop and 2/loop Hz -> periodic
-    shimmer = (0.30 * tone(t, 1320.0) * (0.6 + 0.4 * np.sin(2 * np.pi * (1 / loop) * t)) +
-               0.22 * tone(t, 1981.5) * (0.6 + 0.4 * np.sin(2 * np.pi * (2 / loop) * t + 1.3)) +
-               0.15 * tone(t, 2643.0) * (0.6 + 0.4 * np.sin(2 * np.pi * (3 / loop) * t + 2.1)))
+    # shimmer partials: integer cycles per loop (loop_hz), slow AM at k/loop Hz -> periodic
+    s1, s2, s3 = AURA_SHIMMER_HZ
+    shimmer = (0.30 * tone(t, s1) * (0.6 + 0.4 * np.sin(2 * np.pi * (1 / loop) * t)) +
+               0.22 * tone(t, s2) * (0.6 + 0.4 * np.sin(2 * np.pi * (2 / loop) * t + 1.3)) +
+               0.15 * tone(t, s3) * (0.6 + 0.4 * np.sin(2 * np.pi * (3 / loop) * t + 2.1)))
     air = np.tile(periodic_noise(r, n, 3000, 9000), periods)[:len(t)] * (0.7 + 0.3 * np.sin(2 * np.pi * (4 / loop) * t))
     pulse = 0.85 + 0.15 * np.sin(2 * np.pi * (6 / loop) * t)   # 3 Hz "breathing", periodic in the loop
     return (0.55 * hum + shimmer + 0.12 * air) * pulse
 
 
 def aura_loop():
-    """Seamless loop: all components periodic in AURA_LOOP_SECONDS, no fades -> sample-continuous seam."""
-    n = int(round(AURA_LOOP_SECONDS * SR))
+    """Seamless loop: all components periodic in AURA_LOOP_FRAMES, no fades -> sample-continuous seam."""
+    n = AURA_LOOP_FRAMES
     t = np.arange(n) / SR
     r = rng(1811)
     x = aura_layers(t, r, n)
@@ -297,7 +316,7 @@ def aura_stop():
     n = len(t)
     r = rng(1813)
     drop = np.exp(-t / 0.25)
-    hum = (tone(t, AURA_BASE_HZ * (1 - 0.35 * (1 - drop))) + 0.4 * tone(t, 1320 * (1 - 0.4 * (1 - drop)))) * drop
+    hum = (tone(t, AURA_BASE_HZ * (1 - 0.35 * (1 - drop))) + 0.4 * tone(t, AURA_SHIMMER_HZ[0] * (1 - 0.4 * (1 - drop)))) * drop
     crackle = chitter(r, n, 40, dur_click=0.003, f_lo=3000, f_hi=8000) * np.exp(-t / 0.2)
     air = bandpass(r.standard_normal(n), 3000, 9000) * np.exp(-t / 0.15) * 0.3
     x = 0.8 * hum + 0.5 * crackle + air
@@ -323,6 +342,8 @@ SOUNDS = [
 
 
 def write_wav(path, x):
+    if len(x) % ADPCM_BLOCK_FRAMES != 0:
+        raise ValueError("%s: %d samples is not a multiple of %d" % (path, len(x), ADPCM_BLOCK_FRAMES))
     os.makedirs(os.path.dirname(path), exist_ok=True)
     pcm = np.clip(np.round(x * 32767.0), -32768, 32767).astype("<i2")
     with wave.open(path, "wb") as w:
@@ -346,10 +367,22 @@ def generate(out_dir):
 def check_aura_periodic():
     """The Aura timbre rendered over two loop lengths must repeat exactly (to float precision) and its first period
     must equal the committed loop render: the seam is then the same as any other sample transition."""
-    n = int(round(AURA_LOOP_SECONDS * SR))
+    n = AURA_LOOP_FRAMES
     one = aura_layers(np.arange(n) / SR, rng(1811), n)
     two = aura_layers(np.arange(2 * n) / SR, rng(1811), n, periods=2)
     return bool(np.allclose(two[:n], one, atol=1e-9) and np.allclose(two[:n], two[n:], atol=1e-6))
+
+
+def check_block_alignment(out_dir):
+    """Committed WAVs whose sample count is not a whole number of ADPCM blocks (empty list = all aligned)."""
+    bad = []
+    for rel, _ in SOUNDS:
+        path = os.path.join(out_dir, rel)
+        if os.path.exists(path):
+            with wave.open(path, "rb") as w:
+                if w.getnframes() % ADPCM_BLOCK_FRAMES != 0:
+                    bad.append("%s (%d)" % (rel, w.getnframes()))
+    return bad
 
 
 def main():
@@ -368,7 +401,9 @@ def main():
             print("reproducible: %s (%d/%d)" % ("YES" if bad == 0 else "NO", len(SOUNDS) - bad, len(SOUNDS)))
             periodic = check_aura_periodic()
             print("aura loop periodic: %s" % ("YES" if periodic else "NO"))
-            return 1 if bad or not periodic else 0
+            aligned = check_block_alignment(a.out)
+            print("lengths multiple of %d samples: %s" % (ADPCM_BLOCK_FRAMES, "YES" if not aligned else "NO " + ", ".join(aligned)))
+            return 1 if bad or not periodic or aligned else 0
     for rel, size, sha in generate(a.out):
         print("%-60s %7d B  sha256=%s" % (rel, size, sha))
     return 0
