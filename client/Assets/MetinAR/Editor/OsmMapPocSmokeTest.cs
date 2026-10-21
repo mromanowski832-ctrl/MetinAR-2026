@@ -171,9 +171,10 @@ namespace MetinAR.Editor
                 var attribution = FindFirstObjectByType<MapAttributionView>();
                 var diagnostics = FindFirstObjectByType<OsmPocDiagnostics>();
                 var avatar = FindFirstObjectByType<PlayerMapAvatar>();
+                var smoothing = FindFirstObjectByType<OsmPocAvatarSmoothing>();
 
                 Begin("scene_wiring_present");
-                Check(bootstrap && location && origin && placement && map && rig && attribution && diagnostics && avatar,
+                Check(bootstrap && location && origin && placement && map && rig && attribution && diagnostics && avatar && smoothing,
                     "a required component is missing");
                 End();
                 if (_currentFailure != null)
@@ -297,6 +298,20 @@ namespace MetinAR.Editor
                 Check(safety.TryFindSafePoint(origin.Origin, 120, 1, out GeoCoordinate _), "no safe point within 120 m of the demo square");
                 End();
 
+                Begin("avatar_smoothing_wiring");
+                Transform visual = smoothing.Visual;
+                Check(visual != null && visual.parent == avatar.transform, "Visual anchor is not a child of Player");
+                Check(rig.Target == visual, "camera does not follow the smoothed Visual anchor");
+                Check(visual != null && visual.Find("Model") != null, "Model is not under the Visual anchor");
+                for (int i = 0; i < 30 && !smoothing.Smoother.HasPosition; i++)
+                {
+                    yield return null;
+                }
+
+                Check(smoothing.Smoother.HasPosition, "smoother never received a fix");
+                Check(visual != null && (visual.position - avatar.transform.position).sqrMagnitude < 0.01f, "visual not on the raw player at rest");
+                End();
+
                 Begin("camera_rig_rotate_tilt_zoom");
                 rig.Snap();
                 Quaternion before = rig.transform.rotation;
@@ -334,6 +349,17 @@ namespace MetinAR.Editor
                 Check(map.Stats.TilesFailed == 0, "tile failures after moving: " + map.LastError);
                 Check(map.TrianglesIn(MapRenderLayer.Building) > 0, "no buildings after moving");
                 _props["mapStatsAfterMove"] = map.Stats.Summary();
+                End();
+
+                Begin("avatar_visual_converges_after_teleport");
+                float t2 = Time.realtimeSinceStartup;
+                while (Time.realtimeSinceStartup - t2 < 5f && (smoothing.Visual.position - avatar.transform.position).sqrMagnitude > 0.01f)
+                {
+                    yield return null;
+                }
+
+                Check((smoothing.Visual.position - avatar.transform.position).sqrMagnitude <= 0.01f, "visual did not reach the raw player after the mock move");
+                _props["avatarSmoothing"] = "fixes=" + smoothing.FixCount + " last=" + smoothing.LastResult + " pendingTimeouts=" + smoothing.Smoother.PendingTimeouts;
                 End();
 
                 Begin("no_provider_types_leak_into_gameplay");
@@ -379,11 +405,14 @@ namespace MetinAR.Editor
                 }
 
                 var coord = new Regex(@"50[.,]06\d|19[.,]93\d|19[.,]94\d|\b1[46]/\d{4,5}/\d{4,5}\b|\.pbf|openfreemap\.org/planet/");
-                string bad = logs.FirstOrDefault(l => coord.IsMatch(l));
+                // [PlayerLocationService] lines carry lat/lon by design (dev-build logcat only, approved for the
+                // avatar-jump diagnosis); everything else, including [OsmPocAvatar], must stay coordinate-free.
+                string bad = logs.FirstOrDefault(l => !l.Contains("[PlayerLocationService]") && coord.IsMatch(l));
                 Check(bad == null, "log leaks location: " + (bad == null ? string.Empty : bad.Substring(0, Math.Min(120, bad.Length))));
                 Check(MapUserAgent.Default.StartsWith("MetinAR/"), "user agent not MetinAR");
                 var so = new SerializedObject(location);
-                Check(Mathf.Approximately(so.FindProperty("_diagnosticLogIntervalSeconds").floatValue, 0f), "PlayerLocationService coordinate logging enabled in POC scene");
+                Check(Mathf.Approximately(so.FindProperty("_diagnosticLogIntervalSeconds").floatValue, 2f), "PlayerLocationService position logging not at the approved 2 s interval");
+                Check(logs.Any(l => l.Contains("[OsmPocAvatar] fix ")), "no [OsmPocAvatar] fix lines logged");
                 End();
 
                 _props["diagnostics"] = diagnostics.LastLine;

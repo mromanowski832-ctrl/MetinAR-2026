@@ -75,14 +75,17 @@ namespace MetinAR.Editor
             var locSo = new SerializedObject(location);
             locSo.FindProperty("_providerKind").intValue = (int)PlayerLocationService.ProviderKind.Mock;
             locSo.FindProperty("_startOnEnable").boolValue = false; // OsmPocBootstrap chooses demo vs GPS
-            locSo.FindProperty("_diagnosticLogIntervalSeconds").floatValue = 0f; // no coordinate logging
+            locSo.FindProperty("_diagnosticLogIntervalSeconds").floatValue = 2f; // dev-build logcat only (contains lat/lon: never paste it anywhere)
             locSo.ApplyModifiedPropertiesWithoutUndo();
 
             // Player.
+            // Player = raw GPS position (gameplay). Visual = smoothed marker (model + camera target only).
             var player = new GameObject("Player");
+            var visual = new GameObject("Visual");
+            visual.transform.SetParent(player.transform, false);
             GameObject model = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             model.name = "Model";
-            model.transform.SetParent(player.transform, false);
+            model.transform.SetParent(visual.transform, false);
             model.transform.localPosition = new Vector3(0f, 1f, 0f);
             model.transform.localScale = new Vector3(1.2f, 1f, 1.2f);
             Object.DestroyImmediate(model.GetComponent<Collider>());
@@ -98,6 +101,8 @@ namespace MetinAR.Editor
             avatar.Configure(location, origin, model.transform);
             var mockMove = player.AddComponent<EditorMockMovement>();
             mockMove.Configure(location, avatar);
+            var smoothing = player.AddComponent<OsmPocAvatarSmoothing>();
+            smoothing.Configure(location, origin, player.transform, visual.transform);
 
             // Mob + NPC placed through the unchanged PrototypeWorldPlacement offsets.
             GameObject mob = Marker("Mob", PrimitiveType.Sphere, mobMat, new Vector3(2.2f, 2.2f, 2.2f), "Mob (POC)", out TextMeshPro mobLabel);
@@ -132,7 +137,7 @@ namespace MetinAR.Editor
             cam.fieldOfView = 50f;
             camGo.AddComponent<AudioListener>();
             var rig = camGo.AddComponent<MapCameraRig>();
-            rig.Configure(player.transform, avatar);
+            rig.Configure(visual.transform, avatar); // follows the smoothed marker
             camGo.transform.SetPositionAndRotation(new Vector3(0f, 27f, -22f), Quaternion.Euler(50f, 0f, 0f));
 
             // UI.

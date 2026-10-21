@@ -281,3 +281,33 @@ Before you install, re-run `Get-FileHash <apk> -Algorithm SHA256` on the **P8 va
 
 - **Demo: Kraków is a synthetic origin** (a public square) and uses no GPS. It is **not a physical GPS test**. The physical GPS check ("Use my GPS", foreground permission only, walk test) stays **UNVERIFIED** and is reported separately, with no coordinates.
 - The same-tree baseline APK (`BuildBaselineApk`) has still not been built. LuzMen now has about 107 GB free, so it can run in a separate Unity slot if the controller wants an exact size delta.
+
+### Avatar smoothing (decision of Kierownik produkcji, PR #28, 2026-10-21)
+
+Owner P8 GPS run: the map is OK, but the player **character** jumped from one GPS fix to the next
+(`PlayerMapAvatar` moves the transform straight to the raw fix; there is no jitter filter in the GPS core).
+Approved narrow fix, POC scene only:
+
+- `Scripts/Map/Core/AvatarPositionSmoother.cs` (engine-free, `tests/MapCore.Tests/AvatarPositionSmootherTests.cs`):
+  local east/north metres in, smoothed visual position out.
+  - First fix: snap. Same timestamp: ignored (the provider is polled every frame). Older timestamp: ignored.
+  - Jitter: moves below `max(2 m, min(6 m, 0.3 × accuracy))` do not move the target.
+  - Outlier: implied speed > 8 m/s is held until the next fix confirms it (within 10 m). A non-confirming fix
+    discards it; with no newer fix for 2 s it is accepted (mock/demo teleport).
+  - Relock: ≥ 50 m after ≥ 10 s without an accepted fix snaps.
+  - Visual: exponential approach (τ = 0.6 s), capped at 6 m/s, frame-rate independent.
+- `Scripts/Map/Runtime/OsmPocAvatarSmoothing.cs` (order 90, LateUpdate, between `PlayerMapAvatar` and
+  `MapCameraRig`): scene hierarchy is `Player` (raw GPS, gameplay: entity distances, map streaming) →
+  `Visual` (smoothed; carries `Model` and is the camera target) → `Model`. `PlayerMapAvatar`,
+  `WorldMapPrototype` and the GPS core are unchanged.
+- Logging, dev builds only:
+  - `[OsmPocAvatar] fix result=… dtFix=… stepM=… rawSpeed=… acc_m=… jitterThrM=… lagM=…` per new fix and a
+    `summary` every 10 s (counts per result, max raw step, max visual per-frame step, max lag). Deltas,
+    accuracy and timings only, never coordinates.
+  - `PlayerLocationService._diagnosticLogIntervalSeconds = 2` in the POC scene. These `[PlayerLocationService]`
+    lines contain absolute lat/lon: they stay in device logcat; never paste or commit them. GitHub reports
+    use only `[OsmPocAvatar]` numbers.
+- Smoke test: `avatar_smoothing_wiring`, `avatar_visual_converges_after_teleport`; the privacy check
+  still rejects coordinates in every line except `[PlayerLocationService]`.
+- Not in scope: spawn relocation (spawn safety stays diagnostic-only), the overlay overflow.
+- Physical verification (walk outdoors in GPS mode on the A31): UNVERIFIED until run.
