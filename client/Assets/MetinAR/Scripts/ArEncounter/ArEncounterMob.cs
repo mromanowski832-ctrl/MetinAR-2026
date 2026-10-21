@@ -24,7 +24,19 @@ namespace MetinAR.ArEncounter
         [SerializeField]
         private Transform _hpFillPivot;
 
+        /// <summary>Top of the procedural spider body in its unscaled local space (metres).</summary>
+        public const float MobTopLocalHeight = 0.6f;
+
         private Camera _camera;
+        private bool _hasLabelAnchor;
+        private Vector3 _labelLocalAnchor;
+        private Vector3 _labelLocalScale = Vector3.one;
+
+        /// <summary>World scale factor of the nameplate applied last frame (1 = authored size).</summary>
+        public float LabelScaleFactor { get; private set; } = 1f;
+
+        /// <summary>The nameplate was lowered this frame to stay out of the top HUD band.</summary>
+        public bool LabelClampedBelowHud { get; private set; }
 
         public ArEncounterRequest Request { get; private set; }
 
@@ -77,12 +89,59 @@ namespace MetinAR.ArEncounter
                 _hpFillPivot.localScale = new Vector3(Mathf.Clamp01(request.HpFraction), s.y, s.z);
             }
 
+            ClampLabel();
             FaceCamera();
         }
 
         private void LateUpdate()
         {
+            ClampLabel();
             FaceCamera();
+        }
+
+        /// <summary>
+        /// Keeps the world-space nameplate readable but small (#31 A31 retest: huge up close): constant maximum
+        /// angular size when near, authored size when far, and below the top HUD band without covering the mob.
+        /// </summary>
+        public void ClampLabel()
+        {
+            Camera cam = _camera != null ? _camera : Camera.main;
+            if (_labelRoot == null || cam == null)
+            {
+                return;
+            }
+
+            if (!_hasLabelAnchor)
+            {
+                _labelLocalAnchor = _labelRoot.localPosition;
+                _labelLocalScale = _labelRoot.localScale;
+                _hasLabelAnchor = true;
+            }
+
+            Transform parent = _labelRoot.parent;
+            Vector3 anchor = parent != null ? parent.TransformPoint(_labelLocalAnchor) : _labelLocalAnchor;
+            float distance = Vector3.Distance(cam.transform.position, anchor);
+            float factor = (float)ArEncounterFraming.NameplateScale(distance);
+            float parentScale = parent != null ? Mathf.Max(1e-4f, parent.lossyScale.x) : 1f;
+            _labelRoot.localScale = _labelLocalScale * (factor / parentScale);
+            LabelScaleFactor = factor;
+
+            Vector3 position = anchor;
+            LabelClampedBelowHud = false;
+            Vector3 vp = cam.WorldToViewportPoint(anchor);
+            if (vp.z > cam.nearClipPlane)
+            {
+                Vector3 top = transform.TransformPoint(new Vector3(0f, MobTopLocalHeight, 0f));
+                Vector3 topVp = cam.WorldToViewportPoint(top);
+                double y = ArEncounterFraming.ClampNameplateViewportY(vp.y, topVp.z > 0f ? topVp.y : double.NaN);
+                if (y < vp.y - 1e-4)
+                {
+                    position = cam.ViewportToWorldPoint(new Vector3(vp.x, (float)y, vp.z));
+                    LabelClampedBelowHud = true;
+                }
+            }
+
+            _labelRoot.position = position;
         }
 
         private void FaceCamera()
