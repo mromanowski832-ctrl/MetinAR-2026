@@ -23,16 +23,46 @@ Razem 14 na klasę, 56 w grze.
 
 - **Wybór ścieżki:** poziom 10, u NPC-trenera (w prototypie: Wędrowny Handlarz). Zmiana ścieżki: zadanie + opłata
   (Q11). Po zmianie punkty umiejętności ścieżki wracają do puli.
-- **Punkty umiejętności:** 1 punkt za każdy awans od poziomu 2 (98 punktów do poziomu 99). Ranga 1–10 dostępna
-  od odblokowania; **rangi mistrzowskie 11–15** wymagają poziomu postaci 60 / 68 / 76 / 84 / 92 (ranga 11 / 12 / 13 / 14 / 15).
-  8 dostępnych umiejętności × 15 rang = 120 punktów, więc na poziomie 99 da się w pełni rozwinąć ok. 6–7 z 8 i gracz
-  dalej wybiera styl. Poziomy odblokowania umiejętności (1, 5, 10, 12, 15, 20, 26, 34) i wybór ścieżki (10) bez zmian.
-- **Skalowanie z rangą** (dla każdej umiejętności):
-  - współczynnik obrażeń/leczenia: `coef × (1 + 0,08 × (rank − 1))` (ranga 10 = ×1,72, ranga 15 = ×2,12),
-  - koszt MP: `mpCost × (1 + 0,06 × (rank − 1))`,
-  - odnowienie: `cooldown × (1 − 0,02 × (rank − 1))` (ranga 15 = ×0,72),
-  - czas trwania efektów: `+3%` na rangę.
-- **Opłata treningowa** za każdą rangę (ujście talarów): `round5(8 × unlockLevel × rank^1.4)`.
+- **Punkty umiejętności:** 1 punkt za każdy awans od poziomu 2 (98 punktów do poziomu 99). Punktami rozwija się tylko
+  stopień **Wprawa**; dalsze stopnie wymagają przedmiotów i czasu (§2.1). Do Biegłości I potrzeba 15 punktów na
+  umiejętność, więc 98 punktów wystarcza na ok. 6 z 8 dostępnych umiejętności (8 × 15 = 120) i gracz wybiera styl.
+  Poziomy odblokowania umiejętności (1, 5, 10, 12, 15, 20, 26, 34) i wybór ścieżki (10) bez zmian.
+- **Skalowanie ze stopniem** (`rankIndex` 1–29, pełna tabela: [tables/skill_tiers.csv](tables/skill_tiers.csv)):
+  - współczynnik obrażeń/leczenia: `coef × coefMult` — Wprawa `1 + 0,06 × (r − 1)` (1,00…1,78), Biegłość I–VIII
+    1,84…2,33 (+0,07), Kunszt I–VI 2,45…2,95 (+0,10), Szczyt 3,30,
+  - koszt MP: `mpCost × (1 + 0,04 × (rankIndex − 1))` (Szczyt ×2,12),
+  - odnowienie: `cooldown × max(0,65; 1 − 0,0125 × (rankIndex − 1))` (Szczyt ×0,65),
+  - czas trwania efektów: `+2,5%` na `rankIndex` (Szczyt ×1,70).
+- **Opłata treningowa** za każdy punkt (ujście talarów): `round5(8 × unlockLevel × rank^1.4)`, `rank` = 1–15.
+
+### 2.1 Stopnie umiejętności: Wprawa → Biegłość → Kunszt → Szczyt
+
+Decyzja właściciela 2026-10-21 10:13: rozwój umiejętności „jak w gatunku” (stopnie podstawowy → wyższe, podnoszone
+przedmiotami z szansą i odstępem czasu). **Nazwy stopni i przedmiotów, wszystkie liczby i opisy są własne MetinAR**;
+nie używamy nazw stopni, przedmiotów ani oznaczeń z Metin2.
+
+| Stopień (`tierId`) | Rangi | Jak podnieść | Szansa | Odstęp między próbami | Koszt EXP / próba | Warunek |
+|---|---|---|---|---|---|---|
+| **Wprawa** (`practice`) | 1–14 | 1 punkt umiejętności za rangę | 100% | — | — | odblokowana umiejętność |
+| **Biegłość** (`proficiency`) | I | 15. punkt: **automatyczny awans** z Wprawy 14 | 100% | — | — | — |
+| | II–VIII | **Traktat Biegłości** (wersja dla klasy) | 70 → 40% (−5 pkt. proc. na rangę) | 6 h | 3% EXP do nast. poziomu | poziom postaci ≥ 20 |
+| **Kunszt** (`artistry`) | I–VI | **Iskra Kunsztu** | 35 / 30 / 26 / 22 / 18 / 15% | 24 h | 6% | poziom postaci 60 / 66 / 72 / 78 / 84 / 90 |
+| **Szczyt** (`apex`) | jedna ranga | **Pieczęć Szczytu** z Kunsztu VI | 12% | 72 h | 10% | poziom postaci ≥ 95 |
+
+Zasady:
+- **Porażka** zużywa przedmiot i koszt EXP, ale **stopień nigdy nie spada**. EXP nie może zejść poniżej 0 na bieżącym
+  poziomie (bez spadku poziomu); przy za małej puli EXP próba jest niedostępna.
+- **Odstęp liczony osobno dla każdej umiejętności** w czasie rzeczywistym, więc można rozwijać kilka umiejętności
+  równolegle i wracać do gry raz-dwa razy dziennie. Odstęp i wynik losowania **ustala serwer** (`nextAttemptAtUtc`),
+  zegar telefonu nie ma znaczenia; offline próby są niedostępne.
+- Średnio na jedną umiejętność: ~13 Traktatów (min. 7 prób, ≥ 42 h), ~27 Iskier (min. 6 prób, ≥ 6 dni, średnio ~27 dni),
+  ~8 Pieczęci (średnio ~25 dni). Pełny rozwój wszystkich 8 umiejętności to cel na wiele miesięcy po poziomie 99.
+- Zmiana ścieżki (Q11): punkty Wprawy umiejętności ścieżki wracają do puli; stopnie Biegłość+ zostają zapisane
+  przy umiejętności i wracają po powrocie na tę ścieżkę (przedmioty nie są zwracane).
+- Przedmioty i źródła: [ITEMS_COMBAT_SPEC.md](ITEMS_COMBAT_SPEC.md) §4.1, ceny: [ECONOMY.md](ECONOMY.md).
+- Kontrola skali: Ciężkie Cięcie przy zakładanym stopniu dla poziomu zabija moba tego samego poziomu w ~2,3–2,7
+  użyciach na wszystkich poziomach ([tables/sanity_warrior_ttk.csv](tables/sanity_warrior_ttk.csv)), więc stopnie
+  nadrabiają wzrost HP mobów, a odnowienie umiejętności dalej ogranicza tempo walki.
 - **Obrażenia umiejętności:** `Atk` lub `Mag` × współczynnik, dalej jak w formule obrażeń ([COMBAT_PHYSICS.md](COMBAT_PHYSICS.md) §1).
 - **Typy obrażeń:** fizyczne, magiczne-żywioł (szaman), mrok (Slajter), trucizna (DoT).
 - **Kontrola (ogłuszenie, unieruchomienie):** maleje przy powtórzeniu na tym samym celu (100% → 50% → 25%, reset po 15 s).

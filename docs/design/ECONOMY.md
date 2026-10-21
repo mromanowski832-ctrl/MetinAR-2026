@@ -31,7 +31,9 @@ i hartowania, żeby ujścia działały także w końcówce gry (poziomy 60–99)
 | Mikstury i antidotum | stałe ceny NPC ([tables/shop_starter_merchant.csv](tables/shop_starter_merchant.csv)) | główne ujście wczesne |
 | Hartowanie przedmiotów | `round5(5 × iL × t^1.6)` + Odłamki Rudy | główne ujście późne ([ITEMS_COMBAT_SPEC.md](ITEMS_COMBAT_SPEC.md) §4) |
 | Przekucie affiksu | `round5(40 × iL)` + 3 Odłamki | losuje 1 affiks od nowa |
-| Trening umiejętności | `round5(8 × unlockLevel × rank^1.4)` za rangę | rangi 1–15 (11–15 od poz. 60), [CLASSES_SKILLS.md](CLASSES_SKILLS.md) §2 |
+| Trening umiejętności | `round5(8 × unlockLevel × rank^1.4)` za punkt | Wprawa 1–14 i awans do Biegłości I (`rank` 1–15), [CLASSES_SKILLS.md](CLASSES_SKILLS.md) §2 |
+| Traktat Biegłości (u trenera) | `round5(60 × L)`, min. 1 200 | od poz. 20, limit zakupu 2/dobę, skup 0; Iskra Kunsztu i Pieczęć Szczytu nie są sprzedawane |
+| Próba podniesienia stopnia (ujście EXP, nie talarów) | 3% / 6% / 10% EXP do następnego poziomu | Traktat / Iskra / Pieczęć, [CLASSES_SKILLS.md](CLASSES_SKILLS.md) §2.1 |
 | Napar Zapomnienia (reset statystyk) | `1500 × max(1, L/10)` | poz. 99: 14 850 |
 | Sakwa (+8 miejsc ekwipunku) | 2 000, każda kolejna ×2 | maks. 56 miejsc |
 | Zmiana ścieżki | `500 × L` + zadanie | Q11; poz. 99: 49 500 |

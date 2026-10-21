@@ -55,6 +55,7 @@ ciężka (wojownik), lekka (ninja, Slajter), szata (szaman) — wpływ tylko na 
 | `Consumable` | mikstury, antidotum, napary | 50 |
 | `Material` | Odłamek Rudy, Jedwab Pajęczy, Olej Kowalski | 99 (olej 20) |
 | `Quest` | przedmioty zadań | 20, nie do sprzedania |
+| `SkillTier` | Traktat Biegłości, Iskra Kunsztu, Pieczęć Szczytu (§4.1) | 20 / 10 / 5 |
 | `Service` | sakwa, reset | — (natychmiastowe) |
 
 Każdy przedmiot ma `itemLevel` (iL 1–99, jak poziomy postaci), wymagany poziom = `max(1, iL − 2)` i wymaganą klasę dla broni/drugiej ręki.
@@ -91,6 +92,21 @@ Każdy przedmiot ma `itemLevel` (iL 1–99, jak poziomy postaci), wymagany pozio
 **Przedmiot nigdy nie jest niszczony.** Koszt: Odłamki Rudy + talary `round5(5 × iL × t^1.6)`.
 **Przekucie** (`Reforge`): losuje jeden affiks od nowa za talary i 3 Odłamki. Gniazda/kamienie: poza v1 (Q18).
 **Wytrzymałości brak** (propozycja, Q5): brak naprawy, brak irytacji przy spacerach.
+
+### 4.1 Przedmioty stopni umiejętności (decyzja właściciela 2026-10-21 10:13)
+
+Nazwy i liczby własne MetinAR. Zasady stopni: [CLASSES_SKILLS.md](CLASSES_SKILLS.md) §2.1.
+Tabela: [tables/skill_tier_items.csv](tables/skill_tier_items.csv).
+
+| Id | Nazwa | Do czego | Źródła (propozycja) | Sklep |
+|---|---|---|---|---|
+| `treatise_proficiency_<classId>` | **Traktat Biegłości** (4 wersje: Wojownik, Ninja, Szaman, Slajter) | Biegłość II–VIII | moby od poz. 20: zwykły 0,8%, elitarny 4%, strażnik 25%; zadanie dzienne od poz. 20: 15% szansy na 1 szt. | trener / Wędrowny Handlarz: `round5(60 × L)`, min. 1 200, 2/dobę |
+| `spark_artistry` | **Iskra Kunsztu** (wspólna) | Biegłość VIII → Kunszt I…VI | moby od poz. 55: elitarny 1,5%, strażnik 15%; zadania fabularne od poz. 60: 1 szt. | nie |
+| `seal_apex` | **Pieczęć Szczytu** (wspólna) | Kunszt VI → Szczyt | strażnicy od poz. 90: 2%; finał fabuły ścieżki (poz. 95): 1 szt. na ścieżkę | nie |
+
+Przedmioty są przypisane do postaci (brak handlu w v1, Q8), skup u NPC = 0 talarów. Drop, wynik próby i odstęp
+między próbami docelowo ustala serwer (#22/#39); dzienny limit dropu Iskier i Pieczęci na gracza po stronie serwera.
+Trujący Pająk (poz. 5) tych przedmiotów nie upuszcza.
 
 ## 5. Ekwipunek (inwentarz)
 

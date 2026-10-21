@@ -91,7 +91,7 @@ Formuła jest ta sama co przy limicie 60, więc tempo poziomów 1–60 się nie 
 | 80 → 99 | 2 100 | ~85 h |
 | **1 → 99** | **6 210** | **~250 h** |
 
-Poziomy 60–99 to długa końcówka gry (~155 h): rangi mistrzowskie umiejętności ([CLASSES_SKILLS.md](CLASSES_SKILLS.md) §2),
+Poziomy 60–99 to długa końcówka gry (~155 h): stopnie umiejętności Kunszt i Szczyt ([CLASSES_SKILLS.md](CLASSES_SKILLS.md) §2.1),
 przedmioty iL 60–99 i hartowanie +6…+10. Tempo Q2 (poz. 10 w ~3–4 h) zaakceptowane bez zmian.
 
 ### 2.1 Wskaźnik EXP w HUD (4 × 25%)

@@ -1,0 +1,4 @@
+itemId,namePl,tierId,stack,sources,normalMobDropPct,eliteDropPct,guardianDropPct,minMobLevel,shopPrice,notes
+treatise_proficiency_<classId>,Traktat Biegłości (wersja dla klasy: Wojownik/Ninja/Szaman/Slajter),proficiency,20,drop|quest_daily|shop_trainer,0.8,4.0,25.0,20,round5(60*L) min 1200,4 warianty (po jednym na klasę); zadanie dzienne od poz. 20: 15% szansy na 1 sztukę
+spark_artistry,Iskra Kunsztu,artistry,10,drop|quest_story,0.0,1.5,15.0,55,,wspólna dla klas; zadania fabularne od poz. 60: 1 sztuka za zadanie; nie do kupienia
+seal_apex,Pieczęć Szczytu,apex,5,drop|quest_story,0.0,0.0,2.0,90,,wspólna dla klas; finał fabuły ścieżki (poz. 95): 1 sztuka na ścieżkę; nie do kupienia

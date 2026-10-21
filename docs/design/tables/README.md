@@ -5,11 +5,13 @@ Format danych (kolumny, nazwy pól) jest szkicem pod przyszły import do `Script
 
 | Plik | Zawartość |
 |---|---|
-| [generate_tables.py](generate_tables.py) | generator `exp_curve.csv`, `mob_level_stats.csv`, `sanity_warrior_ttk.csv` z formuł (Python 3, bez zależności) |
+| [generate_tables.py](generate_tables.py) | generator `exp_curve.csv`, `mob_level_stats.csv`, `sanity_warrior_ttk.csv`, `skill_tiers.csv`, `skill_tier_items.csv` z formuł (Python 3, bez zależności) |
 | [exp_curve.csv](exp_curve.csv) | EXP do następnego poziomu 1–99, suma, ekwiwalent zabić, EXP na kulę HUD |
 | [mob_level_stats.csv](mob_level_stats.csv) | HP/Atk/Def/EXP/talary zwykłego moba wg poziomu 1–99 |
 | [sanity_warrior_ttk.csv](sanity_warrior_ttk.csv) | kontrola skali: ile trafień wojownika na moba tego samego poziomu (1–99) |
-| [classes_skills.json](classes_skills.json) | 4 klasy, 8 ścieżek, 56 umiejętności, reguły rang (1–15, mistrzowskie od poz. 60) |
+| [skill_tiers.csv](skill_tiers.csv) | stopnie umiejętności 1–29: Wprawa, Biegłość, Kunszt, Szczyt; szanse, odstępy, koszty, mnożniki (generowana) |
+| [skill_tier_items.csv](skill_tier_items.csv) | Traktat Biegłości, Iskra Kunsztu, Pieczęć Szczytu: źródła i ceny (generowana) |
+| [classes_skills.json](classes_skills.json) | 4 klasy, 8 ścieżek, 56 umiejętności, reguły stopni umiejętności |
 | [item_slots.csv](item_slots.csv) | sloty ekwipunku i widoczność w FPP |
 | [rarity_tiers.csv](rarity_tiers.csv) | rzadkości, affiksy, wagi dropu |
 | [affixes.csv](affixes.csv) | pula losowanych statystyk (`valueAtIL1` → `valueAtIL99`, edytowana ręcznie, nie generowana) |

@@ -32,6 +32,9 @@
 
 Uwagi do decyzji, które nie są pytaniami:
 - **Audio CC-BY-4.0 dozwolone z atrybucją autora** (decyzja właściciela 2026-10-21) → ekran Napisy, [MODES_DATA_MODEL.md](MODES_DATA_MODEL.md) §5.
+- **Rozwój umiejętności stopniami „jak w gatunku”** (decyzja właściciela 2026-10-21 10:13): Wprawa → Biegłość → Kunszt
+  → Szczyt, przedmioty Traktat Biegłości / Iskra Kunsztu / Pieczęć Szczytu; nazwy i liczby własne → [CLASSES_SKILLS.md](CLASSES_SKILLS.md) §2.1.
+  Zastępuje wcześniejszy szkic „rangi 1–15”.
 - Monetyzacja, waluta premium i płatności są **poza zakresem** tej specyfikacji.
 - Nazwa klasy **Slajter** — decyzja właściciela, bez uwag.
 
