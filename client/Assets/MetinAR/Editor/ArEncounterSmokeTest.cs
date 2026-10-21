@@ -687,16 +687,16 @@ namespace MetinAR.Editor
                 float maxPos = 0f, maxAng = 0f, maxLeft = 0f;
                 int samples = 0, hitEvents = 0;
                 IFppHandsView view = combat.View;
-                Action<FppCombatAction, float> onRender = (action, t) =>
+                Action<FppCombatAction, float> onRender = (renderedAction, renderedTime) =>
                 {
-                    if (view == null || action == FppCombatAction.Idle) return;
-                    Pose e = view.Contract.SwordPose(action, t);
-                    maxPos = Mathf.Max(maxPos, (CamLocal(cam, view.RightGrip.position) - e.position).magnitude);
-                    maxAng = Mathf.Max(maxAng, Quaternion.Angle(Quaternion.Inverse(cam.rotation) * view.RightGrip.rotation, e.rotation));
-                    maxLeft = Mathf.Max(maxLeft, (CamLocal(cam, view.LeftHand.position) - view.Contract.LeftHandPose(action, t).position).magnitude);
+                    if (view == null || renderedAction == FppCombatAction.Idle) return;
+                    Pose expectedPose = view.Contract.SwordPose(renderedAction, renderedTime);
+                    maxPos = Mathf.Max(maxPos, (CamLocal(cam, view.RightGrip.position) - expectedPose.position).magnitude);
+                    maxAng = Mathf.Max(maxAng, Quaternion.Angle(Quaternion.Inverse(cam.rotation) * view.RightGrip.rotation, expectedPose.rotation));
+                    maxLeft = Mathf.Max(maxLeft, (CamLocal(cam, view.LeftHand.position) - view.Contract.LeftHandPose(renderedAction, renderedTime).position).magnitude);
                     samples++;
                 };
-                Action<ArEncounterMob, int> onHit = (mob, swing) => hitEvents++;
+                Action<ArEncounterMob, int> onHit = (hitMob, hitSwing) => hitEvents++;
                 combat.Rendered += onRender;
                 combat.HitDetected += onHit;
                 try
