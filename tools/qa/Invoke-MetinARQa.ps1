@@ -25,7 +25,7 @@
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARQa.ps1 -Gates Hygiene,DotNetTests
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARQa.ps1 -SkipAndroid -ApkPath client\Builds\Android\MetinAR-ar-encounter-dev.apk
+  powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARQa.ps1 -SkipAndroid -ApkPath client\Builds\Android\MetinAR-ar-encounter-qa.apk
 #>
 [CmdletBinding()]
 param(
@@ -34,6 +34,9 @@ param(
     [string]$UnityPath,
     [string]$OutputDir,
     [string]$ApkPath,
+    # ApkAudit: required package. Default: the QA build (androidBuild.expectedPackage); with -ApkPath any package in
+    # androidBuild.auditAcceptedPackages (QA build or the game APK of another bot).
+    [string]$ExpectedPackage,
     [switch]$SkipUnity,
     [switch]$SkipAndroid,
     [switch]$StopOnFail,
@@ -265,10 +268,11 @@ try {
                 $b = $rep.Badging
                 if ($null -eq $b -or -not $b.Package) { $problems += 'aapt badging unavailable (cannot audit manifest)' }
                 else {
-                    if ($b.Package -ne $config.androidBuild.expectedPackage) { $problems += "package $($b.Package) != $($config.androidBuild.expectedPackage)" }
+                    $accepted = if ($ExpectedPackage) { @($ExpectedPackage) } elseif ($ApkPath) { @($config.androidBuild.auditAcceptedPackages) } else { @($config.androidBuild.expectedPackage) }
+                    if ($accepted -cnotcontains $b.Package) { $problems += "package $($b.Package) not in expected [$($accepted -join ', ')]" }
                     if ($config.androidBuild.requireDebuggable -and -not $b.Debuggable) { $problems += 'not a development (debuggable) build' }
                     if ($b.MinSdk -lt [int]$config.androidBuild.minSdk) { $problems += "minSdk $($b.MinSdk) < $($config.androidBuild.minSdk)" }
-                    $perm = Test-MetinARPermissionPolicy -Permissions $b.Permissions -Forbidden @($config.permissions.forbidden) -Allowed @($config.permissions.allowed)
+                    $perm = Test-MetinARPermissionPolicy -Permissions $b.Permissions -Forbidden @($config.permissions.forbidden) -Allowed (Resolve-MetinARPermissionAllowList -Allowed @($config.permissions.allowed) -Package $b.Package)
                     if ($perm.Forbidden.Count) { $problems += "FORBIDDEN permissions: $($perm.Forbidden -join ', ')" }
                     if ($perm.Unexpected.Count) { $warnings += "permissions not in allow-list (review): $($perm.Unexpected -join ', ')" }
                 }

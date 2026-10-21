@@ -24,7 +24,7 @@ Assert 'badging.permissions' (@($b.Permissions).Count -eq 5)
 
 # --- permission policy
 $cfg = Get-Content -Raw (Join-Path $PSScriptRoot '..\qa-config.json') | ConvertFrom-Json
-$p = Test-MetinARPermissionPolicy -Permissions $b.Permissions -Forbidden @($cfg.permissions.forbidden) -Allowed @($cfg.permissions.allowed)
+$p = Test-MetinARPermissionPolicy -Permissions $b.Permissions -Forbidden @($cfg.permissions.forbidden) -Allowed (Resolve-MetinARPermissionAllowList -Allowed @($cfg.permissions.allowed) -Package $b.Package)
 Assert 'perm.current-build-pass' ($p.Status -eq 'PASS' -and $p.BackgroundLocationAbsent) "status=$($p.Status) unexpected=$($p.Unexpected -join ',')"
 $p2 = Test-MetinARPermissionPolicy -Permissions (@($b.Permissions) + 'android.permission.ACCESS_BACKGROUND_LOCATION') -Forbidden @($cfg.permissions.forbidden) -Allowed @($cfg.permissions.allowed)
 Assert 'perm.background-location-fails' ($p2.Status -eq 'FAIL' -and -not $p2.BackgroundLocationAbsent)
@@ -247,6 +247,41 @@ Assert 'condfields.count' ($cf.Count -eq 4) ($cfl -join ',')
 $hyg = @(& (Join-Path $PSScriptRoot '../Test-RepoHygiene.ps1') -RepoRoot (Join-Path $PSScriptRoot '../../..') -PassThru)
 Assert 'condfields.repo-clean' (@($hyg | Where-Object { $_.Name -eq 'EditorOnlySerializedFields' -and $_.Status -eq 'PASS' }).Count -eq 1) (($hyg | Where-Object { $_.Name -match 'EditorOnly|ManagedStripping' } | ForEach-Object { "$($_.Name)=$($_.Status): $($_.Detail)" }) -join ' || ')
 Assert 'stripping.reported' (@($hyg | Where-Object { $_.Name -eq 'ManagedStripping' -and $_.Detail -match 'Android stripping=' }).Count -eq 1)
+
+# --- METINAR-037 (#73): adb devices parsing, lost-connection output, install guard, package-scoped allow-list
+$hdr = 'List of devices attached'
+Assert 'adb.device' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, "R58N123ABC`tdevice", '')).State -eq 'device')
+Assert 'adb.missing-empty' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, '')).State -eq 'missing')
+Assert 'adb.missing-nooutput' ((ConvertFrom-MetinARAdbDevices -Lines @()).State -eq 'missing')
+Assert 'adb.daemon-chatter' ((ConvertFrom-MetinARAdbDevices -Lines @('* daemon not running; starting now at tcp:5037', '* daemon started successfully', $hdr, "R58N123ABC`tdevice")).State -eq 'device')
+Assert 'adb.offline' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, "R58N123ABC`toffline")).State -eq 'offline')
+Assert 'adb.unauthorized' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, "R58N123ABC`tunauthorized")).State -eq 'unauthorized')
+Assert 'adb.no-permissions' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, 'R58N123ABC      no permissions (user in plugdev group; are your udev rules wrong?)')).State -eq 'unauthorized')
+$two = @($hdr, "R58N123ABC`tdevice", "emulator-5554`tdevice")
+Assert 'adb.multiple' ((ConvertFrom-MetinARAdbDevices -Lines $two).State -eq 'multiple')
+Assert 'adb.serial-selects' ((ConvertFrom-MetinARAdbDevices -Lines $two -Serial 'R58N123ABC').State -eq 'device')
+Assert 'adb.serial-gone' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, "emulator-5554`tdevice") -Serial 'R58N123ABC').State -eq 'missing')
+Assert 'adb.serial-offline' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, "R58N123ABC`toffline", "emulator-5554`tdevice") -Serial 'R58N123ABC').State -eq 'offline')
+Assert 'adb.lost-notfound' (Test-MetinARAdbOutputLost -Lines @("error: device 'R58N123ABC' not found"))
+Assert 'adb.lost-nodevices' (Test-MetinARAdbOutputLost -Lines @('adb.exe: error: no devices/emulators found'))
+Assert 'adb.lost-offline' (Test-MetinARAdbOutputLost -Lines @('error: device offline'))
+Assert 'adb.not-lost-logcat' (-not (Test-MetinARAdbOutputLost -Lines (Lines 'logcat-clean.txt')))
+Assert 'adb.not-lost-app-error' (-not (Test-MetinARAdbOutputLost -Lines @('10-20 04:30:30.000  4242  4242 E Unity   : error: device not ready in game')))
+$g = Test-MetinARInstallGuard -Package 'com.metinar.game' -ProtectedPackages @('com.metinar.game', 'com.metinar.game.mappoc') -InstalledPackages @('com.metinar.game')
+Assert 'guard.blocks-installed-game' ($g.Status -eq 'FAIL' -and $g.Reason -match 'would replace the installed com\.metinar\.game')
+$g = Test-MetinARInstallGuard -Package 'com.metinar.game' -ProtectedPackages @('com.metinar.game') -InstalledPackages @('com.metinar.game') -AllowReplace
+Assert 'guard.allow-replace' ($g.Status -eq 'PASS' -and $g.Reason -match 'replacing installed')
+Assert 'guard.game-not-installed' ((Test-MetinARInstallGuard -Package 'com.metinar.game' -ProtectedPackages @('com.metinar.game') -InstalledPackages @()).Status -eq 'PASS')
+Assert 'guard.qa-next-to-game' ((Test-MetinARInstallGuard -Package 'com.metinar.game.qa' -ProtectedPackages @('com.metinar.game', 'com.metinar.game.mappoc') -InstalledPackages @('com.metinar.game', 'com.metinar.game.qa')).Status -eq 'PASS')
+Assert 'guard.prefix-is-not-protected' ((Test-MetinARInstallGuard -Package 'com.metinar.gam' -ProtectedPackages @('com.metinar.game') -InstalledPackages @('com.metinar.gam')).Status -eq 'PASS')
+$al = Resolve-MetinARPermissionAllowList -Allowed @('android.permission.CAMERA', '{package}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION') -Package 'com.metinar.game.qa'
+Assert 'perm.package-expanded' ($al -contains 'com.metinar.game.qa.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION' -and $al -contains 'android.permission.CAMERA')
+$pol = Test-MetinARPermissionPolicy -Permissions @('com.metinar.game.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION') -Forbidden @() -Allowed $al
+Assert 'perm.other-package-receiver-flagged' ($pol.Status -eq 'WARN')
+$qcfg = Get-Content -Raw (Join-Path $PSScriptRoot '../qa-config.json') | ConvertFrom-Json
+Assert 'config.qa-package-separate' ($qcfg.androidBuild.expectedPackage -eq 'com.metinar.game.qa' -and $qcfg.androidBuild.gamePackage -eq 'com.metinar.game' -and
+    @($qcfg.androidBuild.protectedPackages) -contains 'com.metinar.game' -and @($qcfg.androidBuild.protectedPackages) -notcontains $qcfg.androidBuild.expectedPackage -and
+    $qcfg.androidBuild.method -match 'BuildArEncounterQaApk$' -and $qcfg.androidBuild.apk -match '-qa\.apk$')
 
 Write-Host ''
 Write-Host "QA tool tests: $script:passed passed, $script:failed failed"

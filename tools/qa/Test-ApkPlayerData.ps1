@@ -6,7 +6,7 @@
     52a1375 crash) or when .split chunks are not contiguous from 0. Same rules as ApkAudit and as
     AndroidPlayerDataValidator (feat/fpp-hands-aura-prototype, 2ec7a47).
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File tools\qa\Test-ApkPlayerData.ps1 -ApkPath client\Builds\Android\MetinAR-ar-encounter-dev.apk
+    powershell -ExecutionPolicy Bypass -File tools\qa\Test-ApkPlayerData.ps1 -ApkPath client\Builds\Android\MetinAR-ar-encounter-qa.apk
 #>
 [CmdletBinding()]
 param([Parameter(Mandatory = $true)][string[]]$ApkPath)

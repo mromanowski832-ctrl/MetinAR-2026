@@ -760,4 +760,65 @@ function ConvertTo-MetinARMarkdownReport {
     return $sb.ToString()
 }
 
+# --- METINAR-037 (#73): adb connection state, install guard, package-scoped permissions --------------------------------
+
+function ConvertFrom-MetinARAdbDevices {
+    <# Parses `adb devices` output. State: device | offline | unauthorized | missing | multiple (no -Serial and
+       more than one attached). Daemon start-up chatter and the header are ignored. Serials are returned for
+       redaction only and must never be written to a report. #>
+    param(
+        [AllowEmptyCollection()][string[]]$Lines = @(),
+        [string]$Serial
+    )
+    $entries = @()
+    foreach ($l in @($Lines)) {
+        if ("$l" -match '^(\S+)\s+(device|offline|unauthorized|recovery|sideload|bootloader|no permissions.*)$') {
+            $entries += [pscustomobject]@{ Serial = $Matches[1]; State = $Matches[2] }
+        }
+    }
+    $pool = if ($Serial) { @($entries | Where-Object { $_.Serial -eq $Serial }) } else { @($entries) }
+    $state = 'missing'
+    if ($pool.Count -gt 1) { $state = if (@($pool | Where-Object { $_.State -eq 'device' }).Count -gt 1) { 'multiple' } else { (@($pool | Where-Object { $_.State -eq 'device' }) + @($pool))[0].State } }
+    elseif ($pool.Count -eq 1) { $state = $pool[0].State }
+    if ($state -like 'no permissions*') { $state = 'unauthorized' }
+    [pscustomobject]@{
+        State   = $state
+        Count   = $entries.Count
+        Serials = @($entries | ForEach-Object { $_.Serial })
+    }
+}
+
+function Test-MetinARAdbOutputLost {
+    <# True when adb output shows the connection to the device is gone (a command that silently returns nothing
+       useful, e.g. an empty logcat dump, would otherwise look like a clean run). #>
+    param([AllowEmptyCollection()][string[]]$Lines = @())
+    return [bool](@($Lines | Where-Object { "$_" -match "^(adb(\.exe)?: )?error: (device ('[^']*' )?not found|no devices/emulators found|device offline|closed|protocol fault)" }).Count)
+}
+
+function Test-MetinARInstallGuard {
+    <# Refuses to install over a protected package that is already on the phone (e.g. the game build another bot
+       is testing), unless explicitly allowed. QA builds use their own applicationIdentifier (com.metinar.game.qa). #>
+    param(
+        [string]$Package,
+        [AllowEmptyCollection()][string[]]$ProtectedPackages = @(),
+        [AllowEmptyCollection()][string[]]$InstalledPackages = @(),
+        [switch]$AllowReplace
+    )
+    $isProtected = [bool]($Package -and (@($ProtectedPackages) -ccontains $Package))
+    $isInstalled = [bool]($Package -and (@($InstalledPackages) -ccontains $Package))
+    $blocked = $isProtected -and $isInstalled -and -not $AllowReplace
+    [pscustomobject]@{
+        Status    = $(if ($blocked) { 'FAIL' } else { 'PASS' })
+        Protected = $isProtected
+        Installed = $isInstalled
+        Reason    = $(if ($blocked) { "would replace the installed $Package (protected; another build may be under test). Use the QA APK (own applicationIdentifier) or pass -AllowReplaceInstalled after a note in #33" } elseif ($isProtected -and $isInstalled) { "replacing installed $Package (-AllowReplaceInstalled)" } else { $null })
+    }
+}
+
+function Resolve-MetinARPermissionAllowList {
+    <# Expands '{package}' in allow-list entries (AndroidX adds <applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION). #>
+    param([AllowEmptyCollection()][string[]]$Allowed = @(), [string]$Package)
+    return @($Allowed | ForEach-Object { if ($Package) { "$_".Replace('{package}', $Package) } else { "$_" } })
+}
+
 Export-ModuleMember -Function *-MetinAR*

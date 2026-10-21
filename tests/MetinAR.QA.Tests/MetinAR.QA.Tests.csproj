@@ -16,5 +16,6 @@
   <ItemGroup>
     <Compile Include="../../client/Assets/MetinAR/Scripts/QA/FrameStatsAccumulator.cs" Link="Production/FrameStatsAccumulator.cs" />
     <Compile Include="../../client/Assets/MetinAR/Editor/SmokeExceptionClassifier.cs" Link="Production/SmokeExceptionClassifier.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Editor/QaApkVariant.cs" Link="Production/QaApkVariant.cs" />
   </ItemGroup>
 </Project>
