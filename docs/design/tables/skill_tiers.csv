@@ -1,0 +1,30 @@
+rankIndex,tierId,tierPl,tierRank,labelPl,raisedBy,skillPointCost,successChancePct,attemptCooldownHours,expCostPctOfExpToNext,minCharacterLevel,expectedAttempts,coefMult,mpCostMult,cooldownMult,durationMult
+1,practice,Wprawa,1,Wprawa 1,skill_point,1,100,0,0,1,1.0,1.0,1.0,1.0,1.0
+2,practice,Wprawa,2,Wprawa 2,skill_point,1,100,0,0,1,1.0,1.06,1.04,0.9875,1.025
+3,practice,Wprawa,3,Wprawa 3,skill_point,1,100,0,0,1,1.0,1.12,1.08,0.975,1.05
+4,practice,Wprawa,4,Wprawa 4,skill_point,1,100,0,0,1,1.0,1.18,1.12,0.9625,1.075
+5,practice,Wprawa,5,Wprawa 5,skill_point,1,100,0,0,1,1.0,1.24,1.16,0.95,1.1
+6,practice,Wprawa,6,Wprawa 6,skill_point,1,100,0,0,1,1.0,1.3,1.2,0.9375,1.125
+7,practice,Wprawa,7,Wprawa 7,skill_point,1,100,0,0,1,1.0,1.36,1.24,0.925,1.15
+8,practice,Wprawa,8,Wprawa 8,skill_point,1,100,0,0,1,1.0,1.42,1.28,0.9125,1.175
+9,practice,Wprawa,9,Wprawa 9,skill_point,1,100,0,0,1,1.0,1.48,1.32,0.9,1.2
+10,practice,Wprawa,10,Wprawa 10,skill_point,1,100,0,0,1,1.0,1.54,1.36,0.8875,1.225
+11,practice,Wprawa,11,Wprawa 11,skill_point,1,100,0,0,1,1.0,1.6,1.4,0.875,1.25
+12,practice,Wprawa,12,Wprawa 12,skill_point,1,100,0,0,1,1.0,1.66,1.44,0.8625,1.275
+13,practice,Wprawa,13,Wprawa 13,skill_point,1,100,0,0,1,1.0,1.72,1.48,0.85,1.3
+14,practice,Wprawa,14,Wprawa 14,skill_point,1,100,0,0,1,1.0,1.78,1.52,0.8375,1.325
+15,proficiency,Biegłość,1,Biegłość I,skill_point_auto_promotion,1,100,0,0,1,1.0,1.84,1.56,0.825,1.35
+16,proficiency,Biegłość,2,Biegłość II,treatise_proficiency_<classId>,0,70,6,3,20,1.43,1.91,1.6,0.8125,1.375
+17,proficiency,Biegłość,3,Biegłość III,treatise_proficiency_<classId>,0,65,6,3,20,1.54,1.98,1.64,0.8,1.4
+18,proficiency,Biegłość,4,Biegłość IV,treatise_proficiency_<classId>,0,60,6,3,20,1.67,2.05,1.68,0.7875,1.425
+19,proficiency,Biegłość,5,Biegłość V,treatise_proficiency_<classId>,0,55,6,3,20,1.82,2.12,1.72,0.775,1.45
+20,proficiency,Biegłość,6,Biegłość VI,treatise_proficiency_<classId>,0,50,6,3,20,2.0,2.19,1.76,0.7625,1.475
+21,proficiency,Biegłość,7,Biegłość VII,treatise_proficiency_<classId>,0,45,6,3,20,2.22,2.26,1.8,0.75,1.5
+22,proficiency,Biegłość,8,Biegłość VIII,treatise_proficiency_<classId>,0,40,6,3,20,2.5,2.33,1.84,0.7375,1.525
+23,artistry,Kunszt,1,Kunszt I,spark_artistry,0,35,24,6,60,2.86,2.45,1.88,0.725,1.55
+24,artistry,Kunszt,2,Kunszt II,spark_artistry,0,30,24,6,66,3.33,2.55,1.92,0.7125,1.575
+25,artistry,Kunszt,3,Kunszt III,spark_artistry,0,26,24,6,72,3.85,2.65,1.96,0.7,1.6
+26,artistry,Kunszt,4,Kunszt IV,spark_artistry,0,22,24,6,78,4.55,2.75,2.0,0.6875,1.625
+27,artistry,Kunszt,5,Kunszt V,spark_artistry,0,18,24,6,84,5.56,2.85,2.04,0.675,1.65
+28,artistry,Kunszt,6,Kunszt VI,spark_artistry,0,15,24,6,90,6.67,2.95,2.08,0.6625,1.675
+29,apex,Szczyt,1,Szczyt,seal_apex,0,12,72,10,95,8.33,3.3,2.12,0.65,1.7
