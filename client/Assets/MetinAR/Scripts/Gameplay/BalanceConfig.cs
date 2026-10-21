@@ -6,7 +6,7 @@ namespace MetinAR.Gameplay
     /// <summary>
     /// All balance numbers used by the pure gameplay core (METINAR-019 / S1). <see cref="CreateDefault"/> returns the
     /// values of the approved spec in docs/design (PR #44) with the owner's max level 99 (PR #61).
-    /// Table-backed parts (rarity, temper, skill rank rules) can be replaced by imported tables, see
+    /// Table-backed parts (rarity, temper, skill tiers) can be replaced by imported tables, see
     /// <see cref="Data.BalanceTableImporter"/>.
     /// </summary>
     public sealed class BalanceConfig
@@ -22,7 +22,7 @@ namespace MetinAR.Gameplay
         public DamageRules Damage = new DamageRules();
         public ExpRules Exp = new ExpRules();
         public MobRules Mobs = new MobRules();
-        public SkillRankRules SkillRanks = new SkillRankRules();
+        public SkillTierRules SkillTiers = new SkillTierRules();
         public List<RarityTier> Rarities = DefaultTables.Rarities();
         public List<TemperLevel> TemperLevels = DefaultTables.TemperLevels();
 
@@ -90,14 +90,14 @@ namespace MetinAR.Gameplay
             if (MaxMobLevel < 1) problems.Add("MaxMobLevel < 1");
             foreach (ClassId id in Enum.GetValues(typeof(ClassId)))
                 if (!_classes.ContainsKey(id)) problems.Add("missing class " + id);
-            if (SkillRanks.BaseMaxRank < 1 || SkillRanks.MaxRank < SkillRanks.BaseMaxRank) problems.Add("invalid skill rank limits");
-            int previous = 0;
-            for (int rank = SkillRanks.BaseMaxRank + 1; rank <= SkillRanks.MaxRank; rank++)
+            if (SkillTiers.Ranks.Count == 0) problems.Add("no skill ranks");
+            for (int i = 0; i < SkillTiers.Ranks.Count; i++)
             {
-                int required;
-                if (!SkillRanks.MasterRankMinCharacterLevel.TryGetValue(rank, out required)) { problems.Add("no level for master rank " + rank); continue; }
-                if (required <= previous || required > MaxCharacterLevel) problems.Add("master rank " + rank + " level " + required + " not increasing within 1.." + MaxCharacterLevel);
-                previous = required;
+                var rank = SkillTiers.Ranks[i];
+                if (rank.RankIndex != i + 1) problems.Add("skill ranks must be 1..n in order");
+                if (rank.MinCharacterLevel < 1 || rank.MinCharacterLevel > MaxCharacterLevel) problems.Add("skill rank " + rank.RankIndex + " min level outside 1.." + MaxCharacterLevel);
+                if (rank.SuccessChance <= 0 || rank.SuccessChance > 1) problems.Add("skill rank " + rank.RankIndex + " success chance");
+                if (i > 0 && rank.CoefMult < SkillTiers.Ranks[i - 1].CoefMult) problems.Add("skill rank " + rank.RankIndex + " coefMult decreases");
             }
             if (Rarities.Count == 0) problems.Add("no rarities");
             for (int i = 0; i < TemperLevels.Count; i++)

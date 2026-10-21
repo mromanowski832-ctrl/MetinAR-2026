@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 
 namespace MetinAR.Gameplay.Data
 {
@@ -93,25 +92,11 @@ namespace MetinAR.Gameplay.Data
             var root = AsObject(MiniJson.Parse(jsonText), "root");
             var catalog = new ClassSkillCatalog();
             var rr = AsObject(Required(root, "rankRules"), "rankRules");
-            var rules = new SkillRankRules
-            {
-                MaxRank = (int)Number(rr, "maxRank"),
-                CoefPerRank = Number(rr, "coefPerRank"),
-                MpCostPerRank = Number(rr, "mpCostPerRank"),
-                CooldownReductionPerRank = Number(rr, "cooldownReductionPerRank"),
-                DurationPerRank = Number(rr, "durationPerRank"),
-                SkillPointsPerLevelFromLevel2 = (int)Number(rr, "skillPointsPerLevelFromLevel2"),
-            };
-            rules.BaseMaxRank = rr.ContainsKey("baseMaxRank") ? (int)Number(rr, "baseMaxRank") : rules.MaxRank;
-            rules.MasterRankMinCharacterLevel = new Dictionary<int, int>();
-            object master;
-            if (rr.TryGetValue("masterRankMinCharacterLevel", out master))
-            {
-                foreach (var kv in AsObject(master, "masterRankMinCharacterLevel"))
-                    rules.MasterRankMinCharacterLevel[int.Parse(kv.Key, NumberStyles.Integer, CultureInfo.InvariantCulture)] = (int)AsNumber(kv.Value, kv.Key);
-            }
-            catalog.RankRules = rules;
-            catalog.MaxCharacterLevel = rr.ContainsKey("maxCharacterLevel") ? (int)Number(rr, "maxCharacterLevel") : 0;
+            catalog.MaxRankIndex = (int)Number(rr, "maxRankIndex");
+            catalog.SkillPointsPerSkillToProficiency = (int)Number(rr, "skillPointsPerSkillToProficiency");
+            catalog.SkillPointsPerLevelFromLevel2 = (int)Number(rr, "skillPointsPerLevelFromLevel2");
+            catalog.MaxCharacterLevel = (int)Number(rr, "maxCharacterLevel");
+            catalog.TotalSkillPointsAtMaxLevel = (int)Number(rr, "totalSkillPointsAtMaxLevel");
 
             foreach (var c in AsArray(Required(root, "classes"), "classes"))
             {
@@ -138,21 +123,57 @@ namespace MetinAR.Gameplay.Data
             return catalog;
         }
 
+        /// <summary>tables/skill_tiers.csv → rank definitions (rankIndex 1…n). Percentages become fractions.</summary>
+        public static List<SkillTierDefinition> ReadSkillTiers(string csvText)
+        {
+            var t = CsvTable.Parse(csvText);
+            var rows = new List<SkillTierDefinition>();
+            for (int i = 0; i < t.Rows.Count; i++)
+            {
+                var d = new SkillTierDefinition
+                {
+                    RankIndex = t.GetInt(i, "rankIndex"),
+                    TierId = t.Get(i, "tierId"),
+                    TierRank = t.GetInt(i, "tierRank"),
+                    LabelPl = t.Get(i, "labelPl"),
+                    RaisedBy = t.Get(i, "raisedBy"),
+                    SkillPointCost = t.GetInt(i, "skillPointCost"),
+                    SuccessChance = t.GetDouble(i, "successChancePct") / 100.0,
+                    AttemptCooldownHours = t.GetDouble(i, "attemptCooldownHours"),
+                    ExpCostFractionOfExpToNext = t.GetDouble(i, "expCostPctOfExpToNext") / 100.0,
+                    MinCharacterLevel = t.GetInt(i, "minCharacterLevel"),
+                    CoefMult = t.GetDouble(i, "coefMult"),
+                    MpCostMult = t.GetDouble(i, "mpCostMult"),
+                    CooldownMult = t.GetDouble(i, "cooldownMult"),
+                    DurationMult = t.GetDouble(i, "durationMult"),
+                };
+                if (d.RankIndex != i + 1) throw new FormatException("skill_tiers.csv: expected rankIndex " + (i + 1) + ", got " + d.RankIndex + ".");
+                rows.Add(d);
+            }
+            return rows;
+        }
+
         /// <summary>
-        /// Replaces the table-backed parts of <paramref name="config"/> (rarity, temper, skill rank rules) with imported
-        /// tables. Pass null to keep a part. Validates the result.
+        /// Replaces the table-backed parts of <paramref name="config"/> (rarity, temper, skill tiers) with imported
+        /// tables and checks classes_skills.json "rankRules" against them. Pass null to keep a part. Validates the result.
+        /// Note: the table values of skill_tiers.csv are rounded for display (coefMult to 0.01).
         /// </summary>
-        public static void ApplyTables(BalanceConfig config, string rarityTiersCsv, string temperLevelsCsv, string classSkillsJson)
+        public static void ApplyTables(BalanceConfig config, string rarityTiersCsv, string temperLevelsCsv, string skillTiersCsv, string classSkillsJson)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
             if (rarityTiersCsv != null) config.Rarities = ReadRarityTiers(rarityTiersCsv);
             if (temperLevelsCsv != null) config.TemperLevels = ReadTemperLevels(temperLevelsCsv);
+            if (skillTiersCsv != null) config.SkillTiers.Ranks = ReadSkillTiers(skillTiersCsv);
             if (classSkillsJson != null)
             {
                 var catalog = ReadClassSkills(classSkillsJson);
-                if (catalog.MaxCharacterLevel != 0 && catalog.MaxCharacterLevel != config.MaxCharacterLevel)
+                if (catalog.MaxCharacterLevel != config.MaxCharacterLevel)
                     throw new InvalidOperationException("classes_skills.json maxCharacterLevel " + catalog.MaxCharacterLevel + " != config " + config.MaxCharacterLevel + ".");
-                config.SkillRanks = catalog.RankRules;
+                if (catalog.MaxRankIndex != config.SkillTiers.MaxRankIndex)
+                    throw new InvalidOperationException("classes_skills.json maxRankIndex " + catalog.MaxRankIndex + " != skill tiers " + config.SkillTiers.MaxRankIndex + ".");
+                if (catalog.SkillPointsPerSkillToProficiency != config.SkillTiers.MaxRankBySkillPoints)
+                    throw new InvalidOperationException("classes_skills.json skillPointsPerSkillToProficiency " + catalog.SkillPointsPerSkillToProficiency + " != skill tiers " + config.SkillTiers.MaxRankBySkillPoints + ".");
+                config.SkillTiers.SkillPointsPerLevelFromLevel2 = catalog.SkillPointsPerLevelFromLevel2;
             }
             config.Validate();
         }

@@ -2,7 +2,7 @@ name: gameplay-core-tests
 
 # METINAR-019 (#46): pure C# MetinAR.Gameplay (BalanceConfig, ExpCurve, DamageResolver, derived stats, table import).
 # Tests compile the production sources from client/Assets/MetinAR/Scripts/Gameplay and check them against
-# docs/design/tables and the 1–99 fixtures from PR #61. No Unity licence, no secrets.
+# docs/design/tables (levels 1–99, skill tiers). No Unity licence, no secrets.
 
 on:
   push:

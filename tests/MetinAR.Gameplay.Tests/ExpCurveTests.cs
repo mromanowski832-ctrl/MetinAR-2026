@@ -20,9 +20,9 @@ namespace MetinAR.Gameplay.Tests
         }
 
         [Fact]
-        public void Formula_MatchesPr61Table_AllLevels1To99()
+        public void Formula_MatchesExpCurveTable_AllLevels1To99()
         {
-            var rows = BalanceTableImporter.ReadExpCurve(TestData.Pr61Table("exp_curve.csv"));
+            var rows = BalanceTableImporter.ReadExpCurve(TestData.RepoTable("exp_curve.csv"));
             Assert.Equal(99, rows.Count);
             foreach (var row in rows)
             {
@@ -33,38 +33,6 @@ namespace MetinAR.Gameplay.Tests
                 double expectedK = row.Level < 99 ? Curve.KillEquivalents(row.Level) : 0;
                 Assert.True(Math.Abs(row.SameLevelKillEquivalents - expectedK) < 0.05 + 1e-9, "K level " + row.Level);
             }
-        }
-
-        [Fact]
-        public void Formula_MatchesRepoTable_BelowItsMaxLevel()
-        {
-            // docs/design/tables/exp_curve.csv on the current base (1–60 from PR #44, or 1–99 after PR #61).
-            var rows = BalanceTableImporter.ReadExpCurve(TestData.RepoTable("exp_curve.csv"));
-            int tableMax = rows.Count;
-            Assert.True(tableMax == 60 || tableMax == 99, "unexpected repo table max level " + tableMax);
-            foreach (var row in rows)
-            {
-                Assert.True(row.CumulativeExpAtLevelStart == Curve.CumulativeExpAtLevelStart(row.Level), "cumulative level " + row.Level);
-                Assert.True(row.SameLevelMobExp == Curve.MobExp(row.Level), "mobExp level " + row.Level);
-                if (row.Level < tableMax)
-                {
-                    Assert.True(row.ExpToNext == Curve.ExpToNext(row.Level), "expToNext level " + row.Level);
-                    Assert.True(row.ExpPerHudOrb == Curve.ExpPerHudOrb(row.Level), "orb level " + row.Level);
-                }
-            }
-        }
-
-        [Fact]
-        public void Pr61Fixture_MatchesRepoTableOnOverlap()
-        {
-            var repo = BalanceTableImporter.ReadExpCurve(TestData.RepoTable("exp_curve.csv"));
-            var pr61 = BalanceTableImporter.ReadExpCurve(TestData.Pr61Table("exp_curve.csv"));
-            for (int i = 0; i < repo.Count - 1; i++)
-            {
-                Assert.Equal(repo[i].ExpToNext, pr61[i].ExpToNext);
-                Assert.Equal(repo[i].CumulativeExpAtLevelStart, pr61[i].CumulativeExpAtLevelStart);
-            }
-            Assert.Equal(repo[repo.Count - 1].CumulativeExpAtLevelStart, pr61[repo.Count - 1].CumulativeExpAtLevelStart);
         }
 
         [Theory]
@@ -89,7 +57,7 @@ namespace MetinAR.Gameplay.Tests
         [Fact]
         public void ImportedCurve_EqualsFormulaCurve()
         {
-            var imported = BalanceTableImporter.ImportExpCurve(TestData.Pr61Table("exp_curve.csv"), Config.Exp);
+            var imported = BalanceTableImporter.ImportExpCurve(TestData.RepoTable("exp_curve.csv"), Config.Exp);
             Assert.Equal(99, imported.MaxLevel);
             for (int level = 1; level <= 99; level++)
             {

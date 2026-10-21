@@ -3,23 +3,17 @@ using System.IO;
 
 namespace MetinAR.Gameplay.Tests
 {
-    /// <summary>Locates the repository and reads spec tables (docs/design/tables) and PR #61 fixtures.</summary>
+    /// <summary>Locates the repository and reads the spec tables in docs/design/tables.</summary>
     internal static class TestData
     {
         private static readonly Lazy<string> Root = new Lazy<string>(FindRoot);
 
         public static string RepoRoot { get { return Root.Value; } }
 
-        /// <summary>Current repository table from docs/design/tables (1–60 before PR #61 is merged, 1–99 after).</summary>
+        /// <summary>Spec table from docs/design/tables (levels 1–99 since PR #61).</summary>
         public static string RepoTable(string fileName)
         {
             return File.ReadAllText(Path.Combine(RepoRoot, "docs", "design", "tables", fileName));
-        }
-
-        /// <summary>Unmodified copy of the 1–99 table from PR #61 (see Fixtures/pr61/README.md).</summary>
-        public static string Pr61Table(string fileName)
-        {
-            return File.ReadAllText(Path.Combine(RepoRoot, "tests", "MetinAR.Gameplay.Tests", "Fixtures", "pr61", fileName));
         }
 
         private static string FindRoot()

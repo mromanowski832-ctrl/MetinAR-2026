@@ -33,6 +33,6 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/GameplayRandom.cs" Link="Production/GameplayRandom.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/MobLevelStats.cs" Link="Production/MobLevelStats.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/PrimaryStats.cs" Link="Production/PrimaryStats.cs" />
-    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/SkillRankRules.cs" Link="Production/SkillRankRules.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/SkillTierRules.cs" Link="Production/SkillTierRules.cs" />
   </ItemGroup>
 </Project>

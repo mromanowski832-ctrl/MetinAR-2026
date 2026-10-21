@@ -21,12 +21,10 @@ namespace MetinAR.Gameplay.Tests
             Assert.Throws<FormatException>(() => ClassIds.Parse("sura"));
         }
 
-        [Theory]
-        [InlineData(true)]
-        [InlineData(false)]
-        public void ClassSkills_Import_56Skills(bool pr61)
+        [Fact]
+        public void ClassSkills_Import_56Skills()
         {
-            var catalog = BalanceTableImporter.ReadClassSkills(pr61 ? TestData.Pr61Table("classes_skills.json") : TestData.RepoTable("classes_skills.json"));
+            var catalog = BalanceTableImporter.ReadClassSkills(TestData.RepoTable("classes_skills.json"));
             Assert.Equal(4, catalog.Classes.Count);
             var all = catalog.AllSkills().ToList();
             Assert.Equal(56, all.Count);
@@ -50,33 +48,15 @@ namespace MetinAR.Gameplay.Tests
         }
 
         [Fact]
-        public void Pr61RankRules_EqualDefaultConfig()
+        public void RankRules_MatchSkillTierConfig()
         {
-            var catalog = BalanceTableImporter.ReadClassSkills(TestData.Pr61Table("classes_skills.json"));
-            var expected = BalanceConfig.CreateDefault().SkillRanks;
-            var r = catalog.RankRules;
+            var catalog = BalanceTableImporter.ReadClassSkills(TestData.RepoTable("classes_skills.json"));
+            var tiers = BalanceConfig.CreateDefault().SkillTiers;
             Assert.Equal(99, catalog.MaxCharacterLevel);
-            Assert.Equal(expected.MaxRank, r.MaxRank);
-            Assert.Equal(expected.BaseMaxRank, r.BaseMaxRank);
-            Assert.Equal(expected.CoefPerRank, r.CoefPerRank);
-            Assert.Equal(expected.MpCostPerRank, r.MpCostPerRank);
-            Assert.Equal(expected.CooldownReductionPerRank, r.CooldownReductionPerRank);
-            Assert.Equal(expected.DurationPerRank, r.DurationPerRank);
-            Assert.Equal(expected.SkillPointsPerLevelFromLevel2, r.SkillPointsPerLevelFromLevel2);
-            Assert.Equal(expected.MasterRankMinCharacterLevel.OrderBy(k => k.Key), r.MasterRankMinCharacterLevel.OrderBy(k => k.Key));
-        }
-
-        [Fact]
-        public void RepoRankRules_PerRankScalingEqualsDefaults()
-        {
-            // Holds before and after PR #61 (only maxRank / master ranks change there).
-            var r = BalanceTableImporter.ReadClassSkills(TestData.RepoTable("classes_skills.json")).RankRules;
-            var expected = BalanceConfig.CreateDefault().SkillRanks;
-            Assert.Equal(expected.CoefPerRank, r.CoefPerRank);
-            Assert.Equal(expected.MpCostPerRank, r.MpCostPerRank);
-            Assert.Equal(expected.CooldownReductionPerRank, r.CooldownReductionPerRank);
-            Assert.Equal(expected.DurationPerRank, r.DurationPerRank);
-            Assert.Equal(expected.SkillPointsPerLevelFromLevel2, r.SkillPointsPerLevelFromLevel2);
+            Assert.Equal(tiers.MaxRankIndex, catalog.MaxRankIndex);
+            Assert.Equal(tiers.MaxRankBySkillPoints, catalog.SkillPointsPerSkillToProficiency);
+            Assert.Equal(tiers.SkillPointsPerLevelFromLevel2, catalog.SkillPointsPerLevelFromLevel2);
+            Assert.Equal(tiers.SkillPointsAtLevel(99), catalog.TotalSkillPointsAtMaxLevel);
         }
 
         [Fact]
@@ -107,13 +87,14 @@ namespace MetinAR.Gameplay.Tests
         }
 
         [Fact]
-        public void ApplyTables_WithPr61Json_Validates()
+        public void ApplyTables_WithRepoTables_Validates()
         {
             var config = BalanceConfig.CreateDefault();
             BalanceTableImporter.ApplyTables(config, TestData.RepoTable("rarity_tiers.csv"), TestData.RepoTable("temper_levels.csv"),
-                TestData.Pr61Table("classes_skills.json"));
-            Assert.Equal(15, config.SkillRanks.MaxRank);
-            Assert.Equal(11, config.SkillRanks.MaxRankForCharacterLevel(60));
+                TestData.RepoTable("skill_tiers.csv"), TestData.RepoTable("classes_skills.json"));
+            Assert.Equal(29, config.SkillTiers.MaxRankIndex);
+            Assert.Equal(3.3, config.SkillTiers.CoefMultiplier(29), 9);
+            Assert.Equal(60, config.SkillTiers.Get(23).MinCharacterLevel);
         }
 
         [Fact]
@@ -122,14 +103,18 @@ namespace MetinAR.Gameplay.Tests
             var config = BalanceConfig.CreateDefault();
             config.MaxCharacterLevel = 60;
             Assert.Throws<InvalidOperationException>(() =>
-                BalanceTableImporter.ApplyTables(config, null, null, TestData.Pr61Table("classes_skills.json")));
+                BalanceTableImporter.ApplyTables(config, null, null, null, TestData.RepoTable("classes_skills.json")));
         }
 
         [Fact]
-        public void Validate_RejectsBrokenMasterRanks()
+        public void Validate_RejectsBrokenSkillTiers()
         {
             var config = BalanceConfig.CreateDefault();
-            config.SkillRanks.MasterRankMinCharacterLevel = new Dictionary<int, int> { { 11, 60 }, { 12, 50 }, { 13, 76 }, { 14, 84 }, { 15, 92 } };
+            config.SkillTiers.Ranks[5].RankIndex = 99;
+            Assert.Throws<InvalidOperationException>(() => config.Validate());
+
+            config = BalanceConfig.CreateDefault();
+            config.SkillTiers.Ranks[28].MinCharacterLevel = 120;
             Assert.Throws<InvalidOperationException>(() => config.Validate());
         }
 

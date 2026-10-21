@@ -160,9 +160,9 @@ namespace MetinAR.Gameplay.Tests
         public void SkillCoefficientAndFlat()
         {
             var req = Basic();
-            req.Coefficient = 1.6 * Config.SkillRanks.CoefMultiplier(10); req.Flat = 7;
+            req.Coefficient = 1.6 * Config.SkillTiers.CoefMultiplier(10); req.Flat = 7;
             var r = Resolver.Resolve(req, new ScriptedRandom(0.0, 0.5, 0.99));
-            Assert.Equal(100 * 1.6 * 1.72 + 7, r.UnroundedDamage, 9);
+            Assert.Equal(100 * 1.6 * 1.54 + 7, r.UnroundedDamage, 9);
         }
 
         [Fact]

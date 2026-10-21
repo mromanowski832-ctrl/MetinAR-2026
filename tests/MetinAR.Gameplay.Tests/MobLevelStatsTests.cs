@@ -7,14 +7,11 @@ namespace MetinAR.Gameplay.Tests
     {
         private static readonly BalanceConfig Config = BalanceConfig.CreateDefault();
 
-        [Theory]
-        [InlineData(true)]
-        [InlineData(false)]
-        public void Formula_MatchesTable(bool pr61)
+        [Fact]
+        public void Formula_MatchesTable_Levels1To99()
         {
-            var text = pr61 ? TestData.Pr61Table("mob_level_stats.csv") : TestData.RepoTable("mob_level_stats.csv");
-            var rows = BalanceTableImporter.ReadMobLevelStats(text);
-            if (pr61) Assert.Equal(99, rows.Count);
+            var rows = BalanceTableImporter.ReadMobLevelStats(TestData.RepoTable("mob_level_stats.csv"));
+            Assert.Equal(99, rows.Count);
             foreach (var row in rows)
             {
                 var s = MobLevelStats.ComputeNormal(Config, row.Level);

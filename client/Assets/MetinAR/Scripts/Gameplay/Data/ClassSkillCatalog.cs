@@ -62,9 +62,12 @@ namespace MetinAR.Gameplay.Data
     /// <summary>Imported content of tables/classes_skills.json.</summary>
     public sealed class ClassSkillCatalog
     {
-        public SkillRankRules RankRules;
-        /// <summary>"maxCharacterLevel" from rankRules when present (PR #61), otherwise 0.</summary>
+        // "rankRules" of classes_skills.json (tier system, CLASSES_SKILLS.md §2.1; ranks in skill_tiers.csv).
+        public int MaxRankIndex;
+        public int SkillPointsPerSkillToProficiency;
+        public int SkillPointsPerLevelFromLevel2;
         public int MaxCharacterLevel;
+        public int TotalSkillPointsAtMaxLevel;
         public List<ClassSkillsDefinition> Classes = new List<ClassSkillsDefinition>();
 
         public ClassSkillsDefinition GetClass(ClassId id)
