@@ -155,6 +155,21 @@ namespace MetinAR.ArEncounter
         /// <summary>Ground was found but the target surface is too far below the camera (#31 P1).</summary>
         public bool PlacementTargetTooLow { get; private set; }
 
+        /// <summary>Ground was found but only beyond the v0 maximum spawn distance (#31 decision 18:58).</summary>
+        public bool PlacementTargetTooFar { get; private set; }
+
+        /// <summary>Horizontal camera-to-mob distance of the placed mob (NaN before placement).</summary>
+        public float ApproachDistance { get; private set; } = float.NaN;
+
+        /// <summary>An ATAK from the current camera pose would hit the placed mob (<see cref="FppCombatController.SwingWouldHit"/>).</summary>
+        public bool InAttackReach { get; private set; }
+
+        /// <summary>„Podejdź – x,x m” is shown (#31 decision 18:58).</summary>
+        public bool ApproachPromptVisible { get; private set; }
+
+        /// <summary>Current approach prompt text, empty while hidden.</summary>
+        public string ApproachPromptText { get; private set; } = string.Empty;
+
         /// <summary>METINAR-020: hit → damage → mob HP → death → EXP/talary (added at runtime in Awake).</summary>
         public ArEncounterCombat Combat { get; private set; }
 
@@ -289,17 +304,19 @@ namespace MetinAR.ArEncounter
                              && _frame.TargetPlaneId != null
                              && ContainsSuitable(_frame.TargetPlaneId);
             bool farEnough = candidate && IsFarEnough(_frame.TargetPose.position);
+            bool nearEnough = candidate && IsNearEnough(_frame.TargetPose.position);
             bool heightOk = candidate && IsPlaneHeightAcceptable(_frame.TargetPose.position);
             if (candidate)
             {
-                LogTargetPlaneHeight(_frame.TargetPlaneId, _frame.TargetPose.position, farEnough && heightOk);
+                LogTargetPlaneHeight(_frame.TargetPlaneId, _frame.TargetPose.position, farEnough && nearEnough && heightOk);
             }
 
-            PlacementTargetTooClose = _machine.State == ArEncounterState.ReadyToPlace
-                                      && ((candidate && !farEnough) || (!_frame.HasTarget && _frame.TargetTooClose));
-            PlacementTargetTooLow = _machine.State == ArEncounterState.ReadyToPlace
-                                    && ((candidate && farEnough && !heightOk) || (!_frame.HasTarget && _frame.TargetTooLow));
-            HasPlacementTarget = candidate && farEnough && heightOk;
+            bool ready = _machine.State == ArEncounterState.ReadyToPlace;
+            PlacementTargetTooClose = ready && ((candidate && !farEnough) || (!_frame.HasTarget && _frame.TargetTooClose));
+            PlacementTargetTooFar = ready && ((candidate && farEnough && !nearEnough) || (!_frame.HasTarget && !_frame.TargetTooClose && _frame.TargetTooFar));
+            PlacementTargetTooLow = ready && ((candidate && farEnough && nearEnough && !heightOk)
+                                              || (!_frame.HasTarget && !_frame.TargetTooClose && !_frame.TargetTooFar && _frame.TargetTooLow));
+            HasPlacementTarget = candidate && farEnough && nearEnough && heightOk;
             if (HasPlacementTarget)
             {
                 PlacementTargetPose = _frame.TargetPose;
@@ -326,6 +343,7 @@ namespace MetinAR.ArEncounter
             {
                 HidePlaneVisuals();
                 UpdateTrackingRecovery();
+                UpdateApproachPrompt();
                 LogAnchorDiagnostics();
             }
 
@@ -416,7 +434,7 @@ namespace MetinAR.ArEncounter
             }
 
             Vector3 p = _frame.TargetPose.position;
-            if (!IsFarEnough(p) || !IsPlaneHeightAcceptable(p))
+            if (!IsFarEnough(p) || !IsNearEnough(p) || !IsPlaneHeightAcceptable(p))
             {
                 return;
             }
@@ -438,6 +456,43 @@ namespace MetinAR.ArEncounter
                       + " planeBelowCam=" + ArEncounterFraming.PlaneDropBelowCamera(c.y, p.y).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                       + " d=" + ArEncounterFraming.HorizontalDistance(c.x, c.z, p.x, p.z).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                       + " anchor=" + MobAnchorKind + " resets=" + _recovery.ResetCount + " " + FightState());
+        }
+
+        /// <summary>
+        /// #31 decision 18:58: v0 mob stands still, the player walks up. „Podejdź – x,x m” while the usable, undefeated mob
+        /// is out of attack reach; hidden in reach, after the kill and while tracking is lost („Szukam otoczenia…” wins).
+        /// Logs <c>[ArEncounter] approach prompt shown|hidden …</c> on every visibility change.
+        /// </summary>
+        private void UpdateApproachPrompt()
+        {
+            if (SpawnedMob == null || _arCamera == null)
+            {
+                SetApproachPrompt(false, float.NaN, "no-mob");
+                return;
+            }
+
+            Vector3 c = _arCamera.transform.position;
+            Vector3 m = SpawnedMob.transform.position;
+            ApproachDistance = (float)ArEncounterFraming.HorizontalDistance(c.x, c.z, m.x, m.z);
+            InAttackReach = FppCombat != null && FppCombat.SwingWouldHit(SpawnedMob);
+            bool defeated = Combat != null && Combat.Session != null && Combat.Session.MobDefeated;
+            bool show = ArApproachPrompt.ShouldShow(true, MobUsable, defeated, InAttackReach, ApproachDistance);
+            string reason = !MobUsable ? "tracking" : defeated ? "defeated" : InAttackReach ? "in-reach" : "out-of-reach";
+            SetApproachPrompt(show, ApproachDistance, reason);
+        }
+
+        private void SetApproachPrompt(bool show, float distance, string reason)
+        {
+            ApproachPromptText = show ? ArApproachPrompt.Format(distance) : string.Empty;
+            if (show == ApproachPromptVisible)
+            {
+                return;
+            }
+
+            ApproachPromptVisible = show;
+            Debug.Log("[ArEncounter] approach prompt " + (show ? "shown" : "hidden")
+                      + " reason=" + reason
+                      + " d=" + (float.IsNaN(distance) ? "n/a" : distance.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)));
         }
 
         private bool IsFrameTargetSuitable()
@@ -479,6 +534,8 @@ namespace MetinAR.ArEncounter
             Debug.Log("[ArEncounter] target plane=" + planeId
                       + " planeBelowCam=" + drop.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                       + " maxBelow=" + _machine.Settings.maxPlaneDropBelowCameraMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                      + " range=" + _machine.Settings.minSpawnDistanceMeters.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)
+                      + "-" + _machine.Settings.maxSpawnDistanceMeters.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)
                       + " d=" + ArEncounterFraming.HorizontalDistance(c.x, c.z, target.x, target.z).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                       + (accepted ? " accepted" : " rejected"));
         }
@@ -601,7 +658,9 @@ namespace MetinAR.ArEncounter
                 SpawnedMob != null ? SpawnedMob.transform : null,
                 _arCamera != null ? _arCamera.transform : null,
                 PlacementTargetTooClose,
-                !MobUsable);
+                !MobUsable,
+                PlacementTargetTooFar,
+                ApproachPromptVisible ? ApproachPromptText : null);
         }
 
         /// <summary>Placement target at least the minimum ground distance from the AR camera (true without a camera).</summary>
@@ -613,7 +672,21 @@ namespace MetinAR.ArEncounter
             }
 
             Vector3 c = _arCamera.transform.position;
-            return ArEncounterFraming.IsPlacementFarEnough(c.x, c.z, target.x, target.z);
+            return ArEncounterFraming.ClassifySpawnDistance(c.x, c.z, target.x, target.z,
+                       _machine.Settings.minSpawnDistanceMeters, double.PositiveInfinity) == ArSpawnDistance.InRange;
+        }
+
+        /// <summary>Placement target not beyond the v0 maximum spawn distance (#31 decision 18:58, PROTOTYPE 3.0 m; true without a camera).</summary>
+        public bool IsNearEnough(Vector3 target)
+        {
+            if (_arCamera == null)
+            {
+                return true;
+            }
+
+            Vector3 c = _arCamera.transform.position;
+            return ArEncounterFraming.ClassifySpawnDistance(c.x, c.z, target.x, target.z,
+                       0.0, _machine.Settings.maxSpawnDistanceMeters) == ArSpawnDistance.InRange;
         }
 
         /// <summary>Maps AR Foundation's session state to the project-owned mirror.</summary>
@@ -695,6 +768,12 @@ namespace MetinAR.ArEncounter
                             continue;
                         }
 
+                        if (!IsNearEnough(hit.pose.position))
+                        {
+                            frame.TargetTooFar = true;
+                            continue;
+                        }
+
                         if (!IsPlaneHeightAcceptable(hit.pose.position))
                         {
                             frame.TargetTooLow = true;
@@ -711,6 +790,12 @@ namespace MetinAR.ArEncounter
             if (!IsFarEnough(nearestSuitable.center))
             {
                 frame.TargetTooClose = true;
+                return;
+            }
+
+            if (!IsNearEnough(nearestSuitable.center))
+            {
+                frame.TargetTooFar = true;
                 return;
             }
 
@@ -832,7 +917,10 @@ namespace MetinAR.ArEncounter
             Vector3 camAtSpawn = _arCamera != null ? _arCamera.transform.position : pose.position;
             Debug.Log("[ArEncounter] spawned " + Request.MobName + " at " + pose.position + " anchor=" + MobAnchorKind
                       + " scale=" + ArEncounterFraming.MobVisualScale
-                      + " planeBelowCam=" + ArEncounterFraming.PlaneDropBelowCamera(camAtSpawn.y, pose.position.y).ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+                      + " planeBelowCam=" + ArEncounterFraming.PlaneDropBelowCamera(camAtSpawn.y, pose.position.y).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                      + " d=" + ArEncounterFraming.HorizontalDistance(camAtSpawn.x, camAtSpawn.z, pose.position.x, pose.position.z).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                      + " range=" + _machine.Settings.minSpawnDistanceMeters.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)
+                      + "-" + _machine.Settings.maxSpawnDistanceMeters.ToString("F1", System.Globalization.CultureInfo.InvariantCulture));
             MobPlaced?.Invoke(SpawnedMob);
         }
 

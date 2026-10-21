@@ -119,6 +119,23 @@ namespace MetinAR.ArEncounter
             return FppHitGeometry.IntersectsReachColumn(Point(a), Point(b));
         }
 
+        /// <summary>
+        /// #31 decision 18:58 („Podejdź” prompt): true when an ATAK swung from the current camera pose would hit the mob,
+        /// using the same blade sweep over the hit window as <see cref="CheckBladeSweep"/>. This is the attack-reach rule:
+        /// no separate reach number is introduced.
+        /// </summary>
+        public bool SwingWouldHit(ArEncounterMob mob)
+        {
+            const int samples = 48;
+            for (int i = 0; i <= samples; i++)
+            {
+                float t = Mathf.Lerp(FppCombatTimeline.HitStartSeconds, FppCombatTimeline.HitEndSeconds, i / (float)samples);
+                if (BladeIntersects(mob, t)) return true;
+            }
+
+            return false;
+        }
+
         private static FppPoint Point(Vector3 p) => new FppPoint(p.x, p.y, p.z);
         public void CancelActions()
         {

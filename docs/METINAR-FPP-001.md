@@ -235,3 +235,36 @@ Protocol and causes: #31 (session protocol 6320633550, causes 6321030003). Summa
   - The reach column makes that walk-up hit possible (T10d (c)).
   - No spec text covers a „Podejdź” prompt or a maximum spawn distance. §8.3 P10 leaves the minimum at 1.5 m (code)
     vs 2.5 m (spec) open until the A31 A4 test. **Neither was added here**; both are reported for a decision.
+
+### Lead decision 18:58 (#31): v0 walk-up, „Podejdź” prompt, spawn range 1.5–3.0 m
+
+This supersedes the "neither was added" note above.
+
+- **v0 mob stands still; the player walks up.** There is no mob movement or aggro (#74 stays in E4/S3).
+- **„Podejdź – x,x m”** (`ArApproachPrompt`, engine-free): this is the HUD status line while the placed mob is usable
+  (tracking, anchored), alive and **out of attack reach**. The distance is the horizontal camera-to-mob distance, with one
+  decimal and a Polish comma.
+  - **Attack reach** is not a new number. It is `FppCombatController.SwingWouldHit`: the same blade sweep over the ATAK
+    hit window that combat uses (reach column, see P0-1).
+  - Because of that rule, the prompt also shows when the player is close but the phone is pointed away from the mob.
+  - The prompt is hidden in reach, after the kill, and while tracking is lost or the mob is waiting for relocation.
+    Priority: „Szukam otoczenia…” > „Podejdź – …” > „… stoi na podłożu.”
+  - Log: `[ArEncounter] approach prompt shown|hidden reason=out-of-reach|in-reach|tracking|defeated d=…` on every
+    visibility change.
+- **v0 spawn range** `ArPlacementSettings.minSpawnDistanceMeters` / `maxSpawnDistanceMeters` = **PROTOTYPE 1.5 / 3.0 m**
+  (horizontal, 1 cm tolerance, `ArEncounterFraming.ClassifySpawnDistance`).
+  - **Targets outside it are rejected, not clamped**, in the same way for the reticle points, the plane-centre fallback
+    and post-reset relocation. This is the least invasive option: it reuses the existing too-close path, and clamping
+    could move the spider off the detected plane polygon and away from where the reticle points.
+  - Reticle: a too-far hit falls through to the next, lower viewport point (closer ground). Otherwise the place button
+    stays disabled with `PlacementTargetTooFar` and „Za daleko. Podejdź bliżej albo wyceluj bliżej w podłoże (maks. 3,0 m).”
+  - Relocation waits for in-range ground.
+  - Logs: `d=… range=1.5-3.0` on `[ArEncounter] spawned …`, and `range=` on the target-plane log.
+- **Open until S3, spec unchanged:** [MOBS_NPC.md §4.2](design/MOBS_NPC.md) spawns at 2.5 m and has the mob approach to
+  1.2 m. In v0 the range is 1.5–3.0 m with walk-up, and [AUDIT_2026-10-21_UPDATE_1.md](audit/AUDIT_2026-10-21_UPDATE_1.md)
+  §8.3 P10 (1.5 m vs 2.5 m) stays open.
+- **Tests:**
+  - Box: `ArApproachAndSpawnRangeTests` covers the format, visibility, the 1.5/3.0 m boundaries, 3.82 m (A31) and
+    invalid settings.
+  - Unity: T10e covers the prompt at 2.4 m and 3.82 m, its absence at 1.0 m in reach, and the tracking-lost priority.
+    T12 covers 3.5 m rejected and 2.95 m accepted. T12b covers relocation at 3.5 m refused.
