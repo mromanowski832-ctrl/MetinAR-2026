@@ -23,13 +23,23 @@ Entry format (example only — fenced blocks are ignored by the test):
 | File | Origin | Author | License | Source | SHA-256 |
 | `SFX/Combat/SFX_Combat_SwordHit_02.wav` | cc_by | Jane Doe | CC-BY-4.0 | Jane Doe, https://example.org/sounds/123 | `<64 hex>` |
 
-| File | Title | Author | Source URL | License | Changes |
-| `SFX/Combat/SFX_Combat_SwordHit_02.wav` | Steel Hit | Jane Doe | https://example.org/sounds/123 | CC-BY-4.0 | trimmed to 0.4 s, mono, peak -1 dBFS |
+| File | Title | Author | Source URL | License | License URL | Attribution | Changes |
+| `SFX/Combat/SFX_Combat_SwordHit_02.wav` | Steel Hit | Jane Doe | https://example.org/sounds/123 | CC-BY-4.0 | https://creativecommons.org/licenses/by/4.0/ | "Steel Hit" by Jane Doe (https://example.org/sounds/123), licensed under CC BY 4.0; trimmed and converted to mono | trimmed to 0.4 s, mono, peak -1 dBFS |
 ```
 
-Attribution fields: `Title` = title of the original work; `Author` = exactly as in the ledger row; `Source URL` = absolute
-http(s) link to the original; `License` = licence version, same as the ledger row; `Changes` = what we changed
-(trim, fades, pitch, mix…) or `unmodified`.
+Attribution fields (names and order = credits spec `docs/design/MODES_DATA_MODEL.md` section 5 / PR #44, read by the
+`credits.json` generator of #40: `title`, `author`, `sourceUrl`, `license`, `licenseUrl`, `attribution`, `changes`):
+
+- `Title`: title of the original work.
+- `Author`: exactly as in the ledger row.
+- `Source URL`: absolute http(s) link to the original.
+- `License`: licence version, same as the ledger row (`CC-BY-x.y`).
+- `License URL`: the licence deed, `https://creativecommons.org/licenses/by/x.y/`.
+- `Attribution`: ready-to-display TASL text, shown on the credits screen as is. It must name the title, the author
+  and the licence (`CC BY x.y`).
+- `Changes`: what we changed (trim, fades, pitch, mix…) or `unmodified`.
+
+All fields are required; empty or `-` fails the test. A `|` inside a cell is not allowed.
 
 ## Ledger
 
@@ -48,7 +58,8 @@ http(s) link to the original; `License` = licence version, same as the ledger ro
 
 ## CC-BY attribution
 
-No CC-BY files yet. Add a table with the header `| File | Title | Author | Source URL | License | Changes |` here.
+No CC-BY files yet. Add a table with the header
+`| File | Title | Author | Source URL | License | License URL | Attribution | Changes |` here.
 
 ## Notes on the original SFX (METINAR-018)
 

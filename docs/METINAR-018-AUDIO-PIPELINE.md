@@ -63,9 +63,15 @@ Runtime voice count (`AudioManager` real voices 32) is unchanged. Not measured o
   - `original` / `MetinAR-Owned`: made by the project.
   - `cc0` / `CC0-1.0`: download URL and author in `Source`.
   - `cc_by` / `CC-BY-x.y` (e.g. CC-BY-4.0): download URL and author in `Source`, plus one row in the **CC-BY attribution**
-    table of `Audio/LICENSES.md`: `| File | Title | Author | Source URL | License | Changes |`. All fields are required;
-    empty or `-` is rejected; `Author` and `License` must equal the ledger row; `Source URL` must be an absolute http(s)
-    URL; `Changes` describes the edits or says `unmodified`. Attribution rows without a `cc_by` ledger entry are rejected.
+    table of `Audio/LICENSES.md`:
+    `| File | Title | Author | Source URL | License | License URL | Attribution | Changes |`.
+    Field names and order follow the credits spec (`docs/design/MODES_DATA_MODEL.md` §5, PR #44), i.e. the
+    `credits.json` keys `title`, `author`, `sourceUrl`, `license`, `licenseUrl`, `attribution`, `changes`; the
+    `files` list of a credits entry comes from the `File` column. Rules: all fields required (empty or `-` rejected);
+    `Author` and `License` equal the ledger row; `Source URL` is an absolute http(s) URL; `License URL` is the CC deed
+    `https://creativecommons.org/licenses/by/x.y/` for that version; `Attribution` is the ready-to-display TASL text and
+    must name the title, the author and `CC BY x.y`; `Changes` describes the edits or says `unmodified`. Attribution
+    rows without a `cc_by` ledger entry, duplicates and the outdated 6-column table (3f032cb) are rejected.
   - Excluded: CC licences with NC, ND or SA terms (CC-BY-NC, CC-BY-ND, CC-BY-SA and combinations, any version or
     spelling). Anything else is an owner decision.
 - CC-BY entries must appear on an in-game credits screen. There is none yet: dependency for the spec #40.

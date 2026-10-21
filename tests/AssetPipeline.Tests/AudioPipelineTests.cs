@@ -218,15 +218,29 @@ namespace AssetPipeline.Tests
         private const string CcByFile = "SFX/Combat/SFX_Combat_SwordHit_02.wav";
         private const string CcByAuthor = "Jane Doe";
 
+        private const string AttributionHeader = "| File | Title | Author | Source URL | License | License URL | Attribution | Changes |\n|---|---|---|---|---|---|---|---|\n";
+
+        private static string DefaultLicenseUrl(string license)
+        {
+            return AudioLicenseLedger.CcByLicenseUrl(license) ?? "https://creativecommons.org/licenses/by/4.0/";
+        }
+
+        private static string DefaultAttribution(string license)
+        {
+            string version = license.StartsWith("CC-BY-", StringComparison.Ordinal) ? license.Substring(6) : "4.0";
+            return "\"Steel Hit\" by Jane Doe (https://example.org/sounds/123), licensed under CC BY " + version + "; trimmed and converted to mono";
+        }
+
         private static string CcByLedger(string license = "CC-BY-4.0", string title = "Steel Hit", string author = CcByAuthor,
             string url = "https://example.org/sounds/123", string attrLicense = null, string changes = "trimmed to 0.4 s, mono, peak -1 dBFS",
-            bool attributionRow = true, string ledgerSource = "Jane Doe, https://example.org/sounds/123")
+            bool attributionRow = true, string ledgerSource = "Jane Doe, https://example.org/sounds/123", string licenseUrl = null, string attribution = null)
         {
             string text = Ledger(CcByFile, "cc_by", license, ledgerSource, author: CcByAuthor);
             if (attributionRow)
             {
-                text += "\n## CC-BY attribution\n\n| File | Title | Author | Source URL | License | Changes |\n|---|---|---|---|---|---|\n" +
-                        "| `" + CcByFile + "` | " + title + " | " + author + " | " + url + " | " + (attrLicense ?? license) + " | " + changes + " |\n";
+                text += "\n## CC-BY attribution\n\n" + AttributionHeader +
+                        "| `" + CcByFile + "` | " + title + " | " + author + " | " + url + " | " + (attrLicense ?? license) + " | " +
+                        (licenseUrl ?? DefaultLicenseUrl(attrLicense ?? license)) + " | " + (attribution ?? DefaultAttribution(license)) + " | " + changes + " |\n";
             }
 
             return text;
@@ -241,9 +255,38 @@ namespace AssetPipeline.Tests
             AudioLicenseLedger l = AudioLicenseLedger.Parse(CcByLedger(license));
             Assert.Single(l.Attributions);
             Assert.Equal("Steel Hit", l.Attributions[0].Title);
+            Assert.Equal(AudioLicenseLedger.CcByLicenseUrl(license), l.Attributions[0].LicenseUrl);
+            Assert.Contains("Jane Doe", l.Attributions[0].Attribution);
             List<AudioIssue> issues = l.Validate();
             Assert.True(issues.Count == 0, string.Join("\n", issues));
             Assert.True(AudioPipelineRules.IsAllowedLicense(license));
+        }
+
+        [Theory]
+        [InlineData("https://creativecommons.org/licenses/by/4.0")]
+        [InlineData("HTTPS://creativecommons.org/licenses/by/4.0/")]
+        public void LicenceUrlWithoutTrailingSlashOrUppercaseSchemeIsAccepted(string url)
+        {
+            Assert.Empty(AudioLicenseLedger.Parse(CcByLedger(licenseUrl: url)).Validate());
+        }
+
+        [Theory]
+        [InlineData("Steel Hit by Jane Doe — CC-BY-4.0")]
+        [InlineData("steel hit / jane doe / cc by 4.0 / https://example.org/sounds/123")]
+        public void AttributionTextAcceptsCommonSpellings(string attribution)
+        {
+            Assert.Empty(AudioLicenseLedger.Parse(CcByLedger(attribution: attribution)).Validate());
+        }
+
+        [Fact]
+        public void OutdatedSixColumnAttributionTableIsRejected()
+        {
+            string text = Ledger(CcByFile, "cc_by", "CC-BY-4.0", "Jane Doe, https://example.org/sounds/123", author: CcByAuthor) +
+                          "\n| File | Title | Author | Source URL | License | Changes |\n|---|---|---|---|---|---|\n" +
+                          "| `" + CcByFile + "` | Steel Hit | Jane Doe | https://example.org/sounds/123 | CC-BY-4.0 | unmodified |\n";
+            List<AudioIssue> issues = AudioLicenseLedger.Parse(text).Validate();
+            Assert.Contains(issues, i => i.Message.Contains("outdated CC-BY attribution table"));
+            Assert.Contains(issues, i => i.Message.Contains("attribution table"));
         }
 
         [Fact]
@@ -293,6 +336,15 @@ namespace AssetPipeline.Tests
         [InlineData("license", "CC-BY-SA-4.0", "NC/ND/SA")]
         [InlineData("changes", "", "changes missing")]
         [InlineData("changes", "—", "changes missing")]
+        [InlineData("licenseUrl", "", "licence URL missing")]
+        [InlineData("licenseUrl", "https://creativecommons.org/licenses/by/3.0/", "licence URL must be https://creativecommons.org/licenses/by/4.0/")]
+        [InlineData("licenseUrl", "https://creativecommons.org/licenses/by-sa/4.0/", "licence URL must be")]
+        [InlineData("attribution", "", "attribution text missing")]
+        [InlineData("attribution", "-", "attribution text missing")]
+        [InlineData("attribution", "Sound by Jane Doe, CC BY 4.0", "must name the title")]
+        [InlineData("attribution", "\"Steel Hit\", CC BY 4.0", "must name the author")]
+        [InlineData("attribution", "\"Steel Hit\" by Jane Doe", "must name the licence")]
+        [InlineData("attribution", "\"Steel Hit\" by Jane Doe, CC BY 3.0", "must name the licence")]
         public void CcByAttributionFieldsAreRequired(string field, string value, string expected)
         {
             string text = field switch
@@ -301,6 +353,8 @@ namespace AssetPipeline.Tests
                 "author" => CcByLedger(author: value),
                 "url" => CcByLedger(url: value),
                 "license" => CcByLedger(attrLicense: value),
+                "licenseUrl" => CcByLedger(licenseUrl: value),
+                "attribution" => CcByLedger(attribution: value),
                 _ => CcByLedger(changes: value),
             };
             List<AudioIssue> issues = AudioLicenseLedger.Parse(text).Validate();
@@ -333,16 +387,16 @@ namespace AssetPipeline.Tests
         public void AttributionRowWithoutCcByEntryIsRejected()
         {
             string text = Ledger("SFX/UI/SFX_UI_Click_01.wav") +
-                          "\n| File | Title | Author | Source URL | License | Changes |\n|---|---|---|---|---|---|\n" +
-                          "| `SFX/UI/SFX_UI_Click_01.wav` | Click | x | https://example.org/a | CC-BY-4.0 | none |\n";
+                          "\n" + AttributionHeader +
+                          "| `SFX/UI/SFX_UI_Click_01.wav` | Click | x | https://example.org/a | CC-BY-4.0 | https://creativecommons.org/licenses/by/4.0/ | Click by x, CC BY 4.0 | none |\n";
             Assert.Contains(AudioLicenseLedger.Parse(text).Validate(), i => i.Message.Contains("without a cc_by ledger entry"));
         }
 
         [Fact]
         public void DuplicateAttributionRowsAndWrongColumnCountAreParseErrors()
         {
-            string row = "| `" + CcByFile + "` | Steel Hit | Jane Doe | https://example.org/sounds/123 | CC-BY-4.0 | unmodified |\n";
-            Assert.Contains(AudioLicenseLedger.Parse(CcByLedger() + "\n| File | Title | Author | Source URL | License | Changes |\n|---|---|---|---|---|---|\n" + row + row).Validate(),
+            string row = "| `" + CcByFile + "` | Steel Hit | Jane Doe | https://example.org/sounds/123 | CC-BY-4.0 | https://creativecommons.org/licenses/by/4.0/ | Steel Hit by Jane Doe, CC BY 4.0 | unmodified |\n";
+            Assert.Contains(AudioLicenseLedger.Parse(CcByLedger() + "\n" + AttributionHeader + row + row).Validate(),
                 i => i.Message.Contains("duplicate attribution"));
             Assert.Contains(AudioLicenseLedger.Parse(CcByLedger(changes: "a | b")).Validate(), i => i.Message.Contains("columns"));
         }

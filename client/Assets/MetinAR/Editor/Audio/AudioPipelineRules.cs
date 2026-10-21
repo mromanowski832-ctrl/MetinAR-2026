@@ -649,7 +649,11 @@ namespace MetinAR.Editor.Audio
         public int Line { get; set; }
     }
 
-    /// <summary>One row of the "CC-BY attribution" table (required for every CC-BY file; feeds the future credits screen).</summary>
+    /// <summary>
+    /// One row of the "CC-BY attribution" table (required for every CC-BY file). Field names and order follow the
+    /// credits spec (docs/design/MODES_DATA_MODEL.md section 5, PR #44) so the credits.json generator of #40 can read
+    /// them 1:1: title, author, sourceUrl, license, licenseUrl, attribution, changes.
+    /// </summary>
     public sealed class AudioAttributionEntry
     {
         public string File { get; set; }
@@ -657,6 +661,10 @@ namespace MetinAR.Editor.Audio
         public string Author { get; set; }
         public string SourceUrl { get; set; }
         public string License { get; set; }
+        public string LicenseUrl { get; set; }
+
+        /// <summary>Ready-to-display attribution text (TASL), shown on the credits screen as is.</summary>
+        public string Attribution { get; set; }
         public string Changes { get; set; }
         public int Line { get; set; }
     }
@@ -666,12 +674,15 @@ namespace MetinAR.Editor.Audio
     /// | File | Origin | Author | License | Source | SHA-256 |
     /// Origin: original | cc0 | cc_by. File is relative to Assets/MetinAR/Audio and wrapped in back-ticks.
     /// Every cc_by file additionally has one row in the attribution table:
-    /// | File | Title | Author | Source URL | License | Changes |
+    /// | File | Title | Author | Source URL | License | License URL | Attribution | Changes |
     /// </summary>
     public sealed class AudioLicenseLedger
     {
         private static readonly string[] Header = { "file", "origin", "author", "license", "source", "sha-256" };
-        private static readonly string[] AttributionHeader = { "file", "title", "author", "source url", "license", "changes" };
+        private static readonly string[] AttributionHeader = { "file", "title", "author", "source url", "license", "license url", "attribution", "changes" };
+
+        /// <summary>Header of the first CC-BY table draft (3f032cb) - rejected with a clear message so old rows are not silently ignored.</summary>
+        private static readonly string[] OutdatedAttributionHeader = { "file", "title", "author", "source url", "license", "changes" };
         private static readonly Regex Sha = new Regex("^[0-9a-f]{64}$");
         private static readonly Regex Url = new Regex("https?://\\S+");
         private static readonly Regex AbsoluteUrl = new Regex("^https?://[^\\s/]+\\.[^\\s]+$");
@@ -715,6 +726,13 @@ namespace MetinAR.Editor.Audio
         public static bool IsCcBy(string license)
         {
             return CcBy.IsMatch(license ?? string.Empty);
+        }
+
+        /// <summary>Canonical deed URL for CC-BY-x.y (https://creativecommons.org/licenses/by/x.y/), or null.</summary>
+        public static string CcByLicenseUrl(string license)
+        {
+            Match m = CcBy.Match(license ?? string.Empty);
+            return m.Success ? "https://creativecommons.org/licenses/by/" + m.Groups[1].Value + "." + m.Groups[2].Value + "/" : null;
         }
 
         public static bool IsRestrictedCc(string license)
@@ -784,6 +802,11 @@ namespace MetinAR.Editor.Audio
                 if (table == 0)
                 {
                     table = Matches(cells, Header) ? 1 : Matches(cells, AttributionHeader) ? 2 : 0;
+                    if (Matches(cells, OutdatedAttributionHeader))
+                    {
+                        ledger.ParseErrors.Add("line " + (i + 1) + ": outdated CC-BY attribution table; use | File | Title | Author | Source URL | License | License URL | Attribution | Changes |");
+                    }
+
                     continue;
                 }
 
@@ -817,7 +840,8 @@ namespace MetinAR.Editor.Audio
                 {
                     var a = new AudioAttributionEntry
                     {
-                        File = cells[0], Title = cells[1], Author = cells[2], SourceUrl = cells[3], License = cells[4], Changes = cells[5], Line = i + 1,
+                        File = cells[0], Title = cells[1], Author = cells[2], SourceUrl = cells[3], License = cells[4], LicenseUrl = cells[5],
+                        Attribution = cells[6], Changes = cells[7], Line = i + 1,
                     };
                     if (ledger.FindAttribution(a.File) != null)
                     {
@@ -945,7 +969,7 @@ namespace MetinAR.Editor.Audio
             string where = AudioPipelineRules.LicenseLedgerFileName + ":" + e.Line + " " + e.File;
             if (a == null)
             {
-                issues.Add(AudioIssue.Error(where, "CC-BY file needs a row in the CC-BY attribution table (title, author, source URL, licence, changes)"));
+                issues.Add(AudioIssue.Error(where, "CC-BY file needs a row in the CC-BY attribution table (title, author, source URL, licence, licence URL, attribution, changes)"));
                 return;
             }
 
@@ -984,6 +1008,40 @@ namespace MetinAR.Editor.Audio
             else if (a.License != e.License)
             {
                 issues.Add(AudioIssue.Error(at, "attribution licence differs from the ledger licence"));
+            }
+
+            string expectedLicenseUrl = CcByLicenseUrl(a.License);
+            if (Blank(a.LicenseUrl))
+            {
+                issues.Add(AudioIssue.Error(at, "attribution licence URL missing"));
+            }
+            else if (expectedLicenseUrl != null && !string.Equals(a.LicenseUrl.Trim().TrimEnd('/') + "/", expectedLicenseUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                issues.Add(AudioIssue.Error(at, "attribution licence URL must be " + expectedLicenseUrl));
+            }
+
+            if (Blank(a.Attribution))
+            {
+                issues.Add(AudioIssue.Error(at, "attribution text missing (ready-to-display TASL text for the credits screen)"));
+            }
+            else
+            {
+                string text = a.Attribution;
+                if (!Blank(a.Title) && text.IndexOf(a.Title.Trim(), StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    issues.Add(AudioIssue.Error(at, "attribution text must name the title"));
+                }
+
+                if (!Blank(a.Author) && text.IndexOf(a.Author.Trim(), StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    issues.Add(AudioIssue.Error(at, "attribution text must name the author"));
+                }
+
+                Match v = CcBy.Match(a.License ?? string.Empty);
+                if (v.Success && !Regex.IsMatch(text, "(?i)CC[- ]BY[- ]" + v.Groups[1].Value + "\\." + v.Groups[2].Value))
+                {
+                    issues.Add(AudioIssue.Error(at, "attribution text must name the licence (e.g. CC BY " + v.Groups[1].Value + "." + v.Groups[2].Value + ")"));
+                }
             }
 
             if (Blank(a.Changes))
