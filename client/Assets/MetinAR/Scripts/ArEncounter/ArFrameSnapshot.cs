@@ -30,6 +30,9 @@ namespace MetinAR.ArEncounter
         /// <summary>True when the target came from the screen-centre reticle raycast (otherwise: plane centre fallback).</summary>
         public bool TargetFromReticle;
 
+        /// <summary>Suitable ground was hit, but only closer than the minimum placement distance.</summary>
+        public bool TargetTooClose;
+
         public void Clear()
         {
             SessionStatus = ArSessionStatus.None;
@@ -39,6 +42,7 @@ namespace MetinAR.ArEncounter
             TargetPlaneId = null;
             TargetPlane = null;
             TargetFromReticle = false;
+            TargetTooClose = false;
         }
     }
 }

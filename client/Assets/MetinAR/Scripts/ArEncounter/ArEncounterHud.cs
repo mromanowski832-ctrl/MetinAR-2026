@@ -187,7 +187,9 @@ namespace MetinAR.ArEncounter
         }
 
         /// <summary>Updates status / place button / failure panel / radar from the controller state.</summary>
-        public void Refresh(ArEncounterState state, ArEncounterStateMachine machine, bool hasPlacementTarget, float notTrackingSeconds, string mobName, Transform mob, Transform viewer)
+        public const string PlacementTooCloseNotice = "Za blisko. Odsuń się albo wyceluj dalej w podłoże (min. 1,5 m).";
+
+        public void Refresh(ArEncounterState state, ArEncounterStateMachine machine, bool hasPlacementTarget, float notTrackingSeconds, string mobName, Transform mob, Transform viewer, bool targetTooClose = false)
         {
             string status;
             switch (state)
@@ -206,7 +208,7 @@ namespace MetinAR.ArEncounter
                 case ArEncounterState.ReadyToPlace:
                     status = hasPlacementTarget
                         ? "Podłoże wykryte. Naciśnij \"Postaw potwora\"."
-                        : "Podłoże wykryte. Wyceluj w podłoże.";
+                        : targetTooClose ? PlacementTooCloseNotice : "Podłoże wykryte. Wyceluj w podłoże.";
                     break;
                 case ArEncounterState.Placed:
                     status = machine != null && machine.IsTrackingLimited

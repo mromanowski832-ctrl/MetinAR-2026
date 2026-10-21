@@ -10,18 +10,29 @@ namespace MetinAR.ArEncounter
     /// </summary>
     public sealed class FppHandsView : MonoBehaviour
     {
-        private static readonly Vector3 RestPosition = new Vector3(0.18f, -0.19f, 0.46f);
-        private static readonly Quaternion RestRotation = Quaternion.Euler(15f, 0f, -14f);
+        // Framing per #31 A31 retest (2026-10-21): see FppViewFraming (engine-free, unit-tested projection).
+        private static readonly Vector3 RestPosition = V(FppViewFraming.RestPosition);
+        private static readonly Quaternion RestRotation = Quaternion.Euler(V(FppViewFraming.RestEuler));
+        private static readonly Vector3 AuraPosition = V(FppViewFraming.AuraPosition);
+        private static readonly Quaternion AuraRotation = Quaternion.Euler(V(FppViewFraming.AuraEuler));
         private static readonly Vector3 LeftRest = new Vector3(-0.19f, -0.25f, 0.43f);
-        public static readonly Vector3 BladeBase = new Vector3(0f, 0.13f, 0f);
-        public static readonly Vector3 BladeTip = new Vector3(0f, 0.94f, 0f);
+        public static readonly float SwordScale = (float)FppViewFraming.SwordScale;
+        /// <summary>Scaled blade segment in the RightGrip frame; the hit sweep samples exactly this visible blade.</summary>
+        public static readonly Vector3 BladeBase = new Vector3(0f, (float)FppViewFraming.BladeBaseY, 0f);
+        public static readonly Vector3 BladeTip = new Vector3(0f, (float)FppViewFraming.BladeTipY, 0f);
+        /// <summary>Left hand on the (scaled) hilt, RightGrip frame.</summary>
+        public static readonly Vector3 LeftGripOffset = new Vector3(0f, (float)FppViewFraming.LeftGripY, 0f);
+        private static readonly Vector3 ModelBladeBase = new Vector3(0f, (float)FppViewFraming.ModelBladeBaseY, 0f);
+        private static readonly Vector3 ModelBladeTip = new Vector3(0f, (float)FppViewFraming.ModelBladeTipY, 0f);
 
         private readonly List<Mesh> _meshes = new List<Mesh>();
         private readonly List<Material> _materials = new List<Material>();
-        private Transform _rightGrip, _leftHand, _rightArm, _leftArm;
+        private Transform _rightGrip, _leftHand, _rightArm, _leftArm, _sword;
         private LineRenderer _ribbonA, _ribbonB, _burst;
         public Transform RightGrip => _rightGrip;
         public Transform LeftHand => _leftHand;
+        /// <summary>Sword model root under the grip, uniformly scaled by <see cref="SwordScale"/>.</summary>
+        public Transform Sword => _sword;
 
         public void Build(Material bodySource, Material energySource)
         {
@@ -32,22 +43,24 @@ namespace MetinAR.ArEncounter
 
             _rightGrip = Child("RightGrip", transform);
             _leftHand = Child("LeftHand", transform);
+            _sword = Child("Sword", _rightGrip);
+            _sword.localScale = Vector3.one * SwordScale;
             DrawMesh("RightGlove", _rightGrip, HandMesh(1f), glove);
             DrawMesh("LeftGlove", _leftHand, HandMesh(-1f), glove);
             var hilt = new Shape();
             hilt.Box(new Vector3(0, -0.035f, 0), new Vector3(0.035f, 0.29f, 0.035f));
-            DrawMesh("SwordGrip", _rightGrip, hilt.Finish(), glove);
+            DrawMesh("SwordGrip", _sword, hilt.Finish(), glove);
             var guard = new Shape();
             guard.Box(new Vector3(0, 0.12f, 0), new Vector3(0.25f, 0.035f, 0.05f));
             guard.Box(new Vector3(0, -0.19f, 0), new Vector3(0.055f, 0.05f, 0.055f));
-            DrawMesh("SwordGuardPommel", _rightGrip, guard.Finish(), gold);
+            DrawMesh("SwordGuardPommel", _sword, guard.Finish(), gold);
             var blade = new Shape();
             blade.Box(new Vector3(0, 0.485f, 0), new Vector3(0.065f, 0.70f, 0.018f));
             blade.Triangle(new Vector3(-0.0325f, 0.835f, -0.009f), new Vector3(0, 0.94f, 0), new Vector3(0.0325f, 0.835f, -0.009f));
             blade.Triangle(new Vector3(0.0325f, 0.835f, 0.009f), new Vector3(0, 0.94f, 0), new Vector3(-0.0325f, 0.835f, 0.009f));
             blade.Triangle(new Vector3(-0.0325f, 0.835f, 0.009f), new Vector3(0, 0.94f, 0), new Vector3(-0.0325f, 0.835f, -0.009f));
             blade.Triangle(new Vector3(0.0325f, 0.835f, -0.009f), new Vector3(0, 0.94f, 0), new Vector3(0.0325f, 0.835f, 0.009f));
-            DrawMesh("SwordBlade", _rightGrip, blade.Finish(), steel);
+            DrawMesh("SwordBlade", _sword, blade.Finish(), steel);
 
             var arm = new Shape();
             arm.Box(Vector3.zero, Vector3.one);
@@ -78,7 +91,7 @@ namespace MetinAR.ArEncounter
             if (action == FppCombatAction.Aura)
             {
                 float blend = time < 0.9f ? Ease(time / 0.25f) : 1f - Ease((time - 0.9f) / 0.25f);
-                return Blend(RestPosition, RestRotation, new Vector3(0.02f, -0.18f, 0.52f), Quaternion.Euler(12, 0, 0), blend);
+                return Blend(RestPosition, RestRotation, AuraPosition, AuraRotation, blend);
             }
             return new Pose(RestPosition, RestRotation);
         }
@@ -94,7 +107,7 @@ namespace MetinAR.ArEncounter
             Pose pose = SwordPose(timeline.Action, timeline.Elapsed);
             _rightGrip.SetLocalPositionAndRotation(pose.position, pose.rotation);
             float grip = LeftGripBlend(timeline.Action, timeline.Elapsed);
-            Vector3 leftTarget = pose.position + pose.rotation * new Vector3(0f, -0.12f, 0f);
+            Vector3 leftTarget = pose.position + pose.rotation * LeftGripOffset;
             _leftHand.SetLocalPositionAndRotation(Vector3.Lerp(LeftRest, leftTarget, grip),
                 Quaternion.Slerp(Quaternion.Euler(0, 0, 12), pose.rotation, grip));
             Arm(_rightArm, new Vector3(0.28f, -0.46f, 0.19f), pose.position + pose.rotation * new Vector3(0.065f, -0.04f, 0));
@@ -103,13 +116,13 @@ namespace MetinAR.ArEncounter
             if (timeline.AuraActive)
             {
                 float fade = Mathf.Min(1f, timeline.AuraRemaining / 0.4f);
-                _ribbonA.widthMultiplier = _ribbonB.widthMultiplier = 0.012f * fade;
+                _ribbonA.widthMultiplier = _ribbonB.widthMultiplier = 0.012f * SwordScale * fade;
                 for (int i = 0; i < 24; i++)
                 {
                     float f = i / 23f, angle = f * Mathf.PI * 5f + visualTime * 6f;
                     float radius = 0.045f + 0.01f * Mathf.Sin(visualTime * 8f + f * 6f);
                     Vector3 offset = new Vector3(Mathf.Cos(angle) * radius, 0, Mathf.Sin(angle) * radius);
-                    Vector3 centre = Vector3.Lerp(BladeBase, BladeTip, f);
+                    Vector3 centre = Vector3.Lerp(ModelBladeBase, ModelBladeTip, f);
                     _ribbonA.SetPosition(i, centre + offset);
                     _ribbonB.SetPosition(i, centre - offset);
                 }
@@ -120,7 +133,7 @@ namespace MetinAR.ArEncounter
             if (burst)
             {
                 float phase = burstTime / 0.28f;
-                _burst.widthMultiplier = 0.035f * (1f - phase);
+                _burst.widthMultiplier = 0.035f * SwordScale * (1f - phase);
                 for (int i = 0; i < 32; i++)
                 {
                     float angle = i * Mathf.PI * 2f / 32f;
@@ -136,6 +149,7 @@ namespace MetinAR.ArEncounter
             arm.localRotation = Quaternion.FromToRotation(Vector3.up, b - a);
             arm.localScale = new Vector3(0.075f, Vector3.Distance(a, b), 0.075f);
         }
+        private static Vector3 V(FppPoint p) => new Vector3((float)p.X, (float)p.Y, (float)p.Z);
         private static float Ease(float t) => Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t));
         private static Pose Blend(Vector3 a, Quaternion ar, Vector3 b, Quaternion br, float t)
             => new Pose(Vector3.Lerp(a, b, t), Quaternion.Slerp(ar, br, t));
@@ -166,7 +180,8 @@ namespace MetinAR.ArEncounter
         }
         private LineRenderer Ribbon(string name, Material material, int count, bool loop)
         {
-            var line = Child(name, _rightGrip).gameObject.AddComponent<LineRenderer>();
+            // Under the scaled sword root: positions are in unscaled sword-model space.
+            var line = Child(name, _sword).gameObject.AddComponent<LineRenderer>();
             line.useWorldSpace = false;
             line.positionCount = count;
             line.loop = loop;
