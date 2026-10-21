@@ -161,6 +161,15 @@ A31 script: place the spider, then (1) rotate in place ±90°, (2) sidestep 0.5 
 `verdict=STAYS`, `followsCam=0/…`, `maxDrift` < 0.10 m, and `d` changing with `closer`. Editor smoke T09 asserts the
 probe saw no follow and drift < 0.05 m. Device result: **UNVERIFIED** until that log is read.
 
+#66 (placed mob disappears, `mobs 0 spawns 1`): AR Foundation destroys a removed anchor's GameObject together with the
+monster parented to it (`ARTrackableManager`, `destroyOnRemoval = true`), and XR Simulation removes a plane-attached
+anchor when its plane is merged away. The monster's anchor now has `destroyOnRemoval = false`; on removal the monster
+is moved to session space at the same spot, the loss is logged as
+`[ArAnchor] event=anchorRemoved kind=<world|plane> id=… action=RehomeAndReanchor … mobKept=true` and a new world anchor
+is requested (at most 3 times). Any destruction of the monster is logged as
+`[ArAnchor] event=mobDestroyed verdict=UNEXPECTED|expected …`. Editor smoke T09b removes the anchor and asserts the
+monster survives and is re-anchored.
+
 Owner request "an attacked mob must become aggressive, run to the player and attack" is **not** in this PR (audit plan
 D1–D4, 2026-10-21): it is a separate `[READY]` issue, implemented after #67. Hands stay virtual on-screen hands with a
 sword; there is no tracking of the player's real hands through the AR camera.

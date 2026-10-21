@@ -142,6 +142,9 @@ namespace MetinAR.Editor
                 }
             }
 
+            private int _anchorRemovedLogs;
+            private int _unexpectedMobDestroyedLogs;
+
             private static IEnumerator Frames(int n)
             {
                 for (int i = 0; i < n; i++)
@@ -174,6 +177,16 @@ namespace MetinAR.Editor
             /// </summary>
             private void RecordLog(string condition, string stackTrace, LogType type)
             {
+                if (condition != null && condition.StartsWith("[ArAnchor] event=anchorRemoved", StringComparison.Ordinal))
+                {
+                    _anchorRemovedLogs++;
+                }
+
+                if (condition != null && condition.StartsWith("[ArAnchor] event=mobDestroyed verdict=UNEXPECTED", StringComparison.Ordinal))
+                {
+                    _unexpectedMobDestroyedLogs++;
+                }
+
                 if (type == LogType.Exception)
                 {
                     if (SmokeExceptionClassifier.Classify(condition, stackTrace) == SmokeExceptionKind.KnownEditorInfrastructure)
@@ -225,6 +238,7 @@ namespace MetinAR.Editor
                     ("T07_XrSimulationDetectsGroundReadyToPlace", T07_XrSimulationDetectsGroundReadyToPlace),
                     ("T08_PlaceButtonSpawnsOneAnchoredMonsterOnGround", T08_PlaceButtonSpawnsOneAnchoredMonsterOnGround),
                     ("T09_RepeatedPlaceNeverDuplicatesAndStaysStable", T09_RepeatedPlaceNeverDuplicatesAndStaysStable),
+                    ("T09b_AnchorRemovalKeepsMonster_Issue66", T09b_AnchorRemovalKeepsMonster_Issue66),
                     ("T10_FppActionsAndRemainingPlaceholders", T10_FppActionsAndRemainingPlaceholders),
                     ("T10b_FppAttackAuraAndHitGeometry", T10b_FppAttackAuraAndHitGeometry),
                     ("T10c_RealSwingsKillSpider_RewardOnce", T10c_RealSwingsKillSpider_RewardOnce),
@@ -659,6 +673,50 @@ namespace MetinAR.Editor
 
                 Check(visiblePlanes == 0, "plane visuals still shown after placement: " + visiblePlanes);
                 Debug.Log("[ArSmoke] T09 drift=" + drift);
+            }
+
+            /// <summary>
+            /// #66 regression ("placed mob disappears, mobs 0 spawns 1"): removing the monster's AR anchor through the
+            /// subsystem goes down the same ARTrackableManager removal path as XR Simulation dropping a plane-attached
+            /// anchor when its plane is merged away. Before the fix that path destroyed the anchor GameObject and the
+            /// monster parented to it with no log (MobCount 0, SpawnCount 1, state Placed). Now the monster must
+            /// survive at the same spot, the loss must be logged, and it must be re-anchored to a new world anchor.
+            /// </summary>
+            private IEnumerator T09b_AnchorRemovalKeepsMonster_Issue66()
+            {
+                if (_ar == null || !_realPlaced || _ar.SpawnedMob == null || _ar.MobAnchor == null)
+                {
+                    Check(false, "precondition: no anchored monster (kind " + (_ar != null ? _ar.MobAnchorKind : "-") + ")");
+                    yield break;
+                }
+
+                ARAnchorManager anchors = FindAnyObjectByType<ARAnchorManager>();
+                ARAnchor oldAnchor = _ar.MobAnchor;
+                yield return WaitUntil(() => oldAnchor == null || !oldAnchor.pending, 3f);
+                Check(oldAnchor != null && !oldAnchor.pending, "anchor still pending");
+                TrackableId oldId = oldAnchor.trackableId;
+                ArEncounterMob mob = _ar.SpawnedMob;
+                Vector3 before = mob.transform.position;
+                int removedLogsBefore = _anchorRemovedLogs;
+                int unexpectedBefore = _unexpectedMobDestroyedLogs;
+                Check(anchors != null && anchors.TryRemoveAnchor(oldAnchor), "TryRemoveAnchor failed");
+                yield return Frames(10);
+                yield return WaitUntil(() => _ar.MobAnchorKind != "pending", 5f);
+                yield return Frames(3);
+                Check(MobCount() == 1 && _ar.SpawnedMob != null && mob != null, "#66 symptom: mobs " + MobCount() + " spawns " + _ar.SpawnCount);
+                Check(_ar.SpawnCount == 1 && _ar.State == ArEncounterState.Placed, "spawns " + _ar.SpawnCount + " state " + _ar.State);
+                Check(_anchorRemovedLogs == removedLogsBefore + 1, "[ArAnchor] event=anchorRemoved logged " + (_anchorRemovedLogs - removedLogsBefore) + "x");
+                Check(_unexpectedMobDestroyedLogs == unexpectedBefore, "mob destroyed while placed");
+                if (mob != null)
+                {
+                    float moved = Vector3.Distance(mob.transform.position, before);
+                    Check(moved < 0.01f, "mob moved on anchor loss: " + moved + " m");
+                    Check(_ar.MobAnchorKind == "world" && _ar.MobAnchor != null && _ar.MobAnchor.trackableId != oldId
+                          && mob.transform.parent == _ar.MobAnchor.transform,
+                          "not re-anchored: kind " + _ar.MobAnchorKind + " parent " + (mob.transform.parent != null ? mob.transform.parent.name : "-"));
+                    Check(_ar.AnchorGuard.Removals == 1, "guard removals " + _ar.AnchorGuard.Removals);
+                    Debug.Log("[ArSmoke] T09b anchor removed, mob kept moved=" + moved + " kind=" + _ar.MobAnchorKind);
+                }
             }
 
             private IEnumerator T10_FppActionsAndRemainingPlaceholders()

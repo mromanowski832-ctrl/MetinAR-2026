@@ -118,6 +118,9 @@ namespace MetinAR.ArEncounter
         /// </summary>
         public string MobAnchorKind { get; private set; } = "none";
 
+        /// <summary>#66: re-homes the monster when its anchor is removed instead of letting AR Foundation destroy it.</summary>
+        public ArMobAnchorGuard AnchorGuard { get; } = new ArMobAnchorGuard();
+
         /// <summary>Seconds between [ArAnchor] diagnostic log lines while a monster is placed (0 = off).</summary>
         public float AnchorDiagnosticsIntervalSeconds { get; set; } = 2f;
 
@@ -210,6 +213,12 @@ namespace MetinAR.ArEncounter
             // METINAR-020 (S2a) x #31: a geometric FPP sword hit on the placed mob becomes damage.
             FppCombat.HitDetected += Combat.HandleHitDetected;
 
+            // #66: a removed anchor used to take the monster (its child) with it, silently.
+            if (_anchorManager != null)
+            {
+                _anchorManager.trackablesChanged.AddListener(OnAnchorsChanged);
+            }
+
             if (!_availabilityCheckStarted && FrameSourceOverride == null)
             {
                 // Resolves Unsupported when no AR subsystem exists (ARSession itself only checks when it has one).
@@ -230,6 +239,105 @@ namespace MetinAR.ArEncounter
             if (FppCombat != null && Combat != null)
             {
                 FppCombat.HitDetected -= Combat.HandleHitDetected;
+            }
+
+            if (_anchorManager != null)
+            {
+                _anchorManager.trackablesChanged.RemoveListener(OnAnchorsChanged);
+            }
+
+            if (SpawnedMob != null)
+            {
+                SpawnedMob.Destroyed -= OnSpawnedMobDestroyed;
+            }
+        }
+
+        /// <summary>
+        /// #66 root cause: ARTrackableManager destroys a removed anchor's GameObject (and so the monster parented to it)
+        /// when destroyOnRemoval is true. The monster's anchor has destroyOnRemoval off; here the monster is moved to
+        /// session space at the same world pose, the old anchor is cleaned up, the loss is logged and a new free world
+        /// anchor is requested (<see cref="ArMobAnchorGuard"/>).
+        /// </summary>
+        private void OnAnchorsChanged(ARTrackablesChangedEventArgs<ARAnchor> args)
+        {
+            if (MobAnchor == null)
+            {
+                return;
+            }
+
+            TrackableId mobAnchorId = MobAnchor.trackableId;
+            foreach (KeyValuePair<TrackableId, ARAnchor> removed in args.removed)
+            {
+                if (removed.Key == mobAnchorId)
+                {
+                    HandleMobAnchorRemoved(removed.Key);
+                    return;
+                }
+            }
+        }
+
+        private void HandleMobAnchorRemoved(TrackableId removedId)
+        {
+            string kindAtLoss = MobAnchorKind;
+            ArAnchorLossAction action = AnchorGuard.OnAnchorRemoved(removedId.ToString(), SpawnedMob != null, IsExiting);
+            if (action == ArAnchorLossAction.Ignore)
+            {
+                return;
+            }
+
+            ARAnchor oldAnchor = MobAnchor;
+            Transform mob = SpawnedMob.transform;
+            mob.SetParent(_origin != null ? _origin.TrackablesParent : null, true);
+            MobAnchor = null;
+            MobAnchorKind = "session";
+            Vector3 p = mob.position;
+            Debug.LogWarning(AnchorGuard.FormatRemovedLog(removedId.ToString(), kindAtLoss, action, p.x, p.y, p.z));
+            if (oldAnchor != null)
+            {
+                Destroy(oldAnchor.gameObject);
+            }
+
+            if (action == ArAnchorLossAction.RehomeAndReanchor)
+            {
+                // Requested next frame, outside the anchor manager's change callback.
+                MobAnchorKind = "pending";
+                _reanchorRequested = true;
+            }
+        }
+
+        private bool _reanchorRequested;
+
+        private void ReanchorIfRequested()
+        {
+            if (!_reanchorRequested)
+            {
+                return;
+            }
+
+            _reanchorRequested = false;
+            if (SpawnedMob != null && _anchorManager != null && _anchorManager.enabled && _anchorManager.subsystem != null)
+            {
+                Transform mob = SpawnedMob.transform;
+                AnchorMobAtWorldPose(mob, new Pose(mob.position, mob.rotation), null);
+            }
+            else
+            {
+                MobAnchorKind = "session";
+            }
+        }
+
+        private void OnSpawnedMobDestroyed(ArEncounterMob mob)
+        {
+            bool placed = _machine != null && _machine.State == ArEncounterState.Placed;
+            string parent = mob != null && mob.transform.parent != null ? mob.transform.parent.name : null;
+            string line = ArMobAnchorGuard.FormatMobDestroyedLog(IsExiting, placed, MobAnchorKind, parent, SpawnCount);
+            if (ArMobAnchorGuard.MobDestroyedVerdict(IsExiting, placed) == "UNEXPECTED")
+            {
+                Debug.LogWarning(line);
+            }
+            else
+            {
+                Debug.Log(line);
             }
         }
 
@@ -297,6 +405,7 @@ namespace MetinAR.ArEncounter
                 }
             }
 
+            ReanchorIfRequested();
             if (_machine.State == ArEncounterState.Placed)
             {
                 HidePlaneVisuals();
@@ -616,6 +725,7 @@ namespace MetinAR.ArEncounter
             }
 
             SpawnedMob.Configure(Request, _arCamera);
+            SpawnedMob.Destroyed += OnSpawnedMobDestroyed;
 
             // #31 A31 retest 2026-10-21 (spider moved with the phone): keep the monster at one fixed WORLD spot.
             // It is never parented to the camera. First it sits in session space (TrackablesParent); a free ARAnchor
@@ -693,6 +803,9 @@ namespace MetinAR.ArEncounter
             MobAnchorKind = kind;
             if (anchor != null)
             {
+                // #66: never let AR Foundation destroy the anchor GameObject (and the monster with it) on removal.
+                anchor.destroyOnRemoval = false;
+                AnchorGuard.OnAnchorAttached(anchor.trackableId.ToString(), kind);
                 mob.SetParent(anchor.transform, true);
             }
 

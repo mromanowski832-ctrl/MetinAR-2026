@@ -36,6 +36,7 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/FppViewFraming.cs" Link="Production/FppViewFraming.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArEncounterFraming.cs" Link="Production/ArEncounterFraming.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArAnchorProbe.cs" Link="Production/ArAnchorProbe.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArMobAnchorGuard.cs" Link="Production/ArMobAnchorGuard.cs" />
   </ItemGroup>
 </Project>
 

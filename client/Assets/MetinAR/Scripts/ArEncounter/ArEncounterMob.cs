@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using TMPro;
 using UnityEngine;
@@ -53,6 +54,14 @@ namespace MetinAR.ArEncounter
         public bool IsBodyHidden { get; private set; }
 
         public ArEncounterRequest Request { get; private set; }
+
+        /// <summary>#66 diagnostics: raised when this GameObject is destroyed, for any reason.</summary>
+        public event Action<ArEncounterMob> Destroyed;
+
+        private void OnDestroy()
+        {
+            Destroyed?.Invoke(this);
+        }
 
         public string NameLabel => _nameText != null ? _nameText.text : null;
 
