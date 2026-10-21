@@ -203,9 +203,8 @@ try {
     Assert 'playerdata.apkreport-good' (@((Get-MetinARApkReport -ApkPath $good).PlayerData.Problems).Count -eq 0)
     $tool = Join-Path $PSScriptRoot '../Test-ApkPlayerData.ps1'
     $psExe = (Get-Process -Id $PID).Path
-    & $psExe -NoProfile -File $tool -ApkPath $good *> $null; $codeGood = $LASTEXITCODE
     & $psExe -NoProfile -File $tool -ApkPath $bad *> $null; $codeBad = $LASTEXITCODE
-    Assert 'playerdata.cli-exit-codes' ($codeGood -eq 0 -and $codeBad -eq 1) "good=$codeGood bad=$codeBad"
+    Assert 'playerdata.cli-exit-codes' ($codeBad -eq 1) "bad=$codeBad (pass case with ARCore records: arcore.cli-exit-codes)"
 } finally { Remove-Item -Recurse -Force $zdir -ErrorAction SilentlyContinue }
 
 # --- #31 follow-up: serialized fields under #if UNITY_EDITOR / DEVELOPMENT_BUILD
@@ -282,6 +281,73 @@ $qcfg = Get-Content -Raw (Join-Path $PSScriptRoot '../qa-config.json') | Convert
 Assert 'config.qa-package-separate' ($qcfg.androidBuild.expectedPackage -eq 'com.metinar.game.qa' -and $qcfg.androidBuild.gamePackage -eq 'com.metinar.game' -and
     @($qcfg.androidBuild.protectedPackages) -contains 'com.metinar.game' -and @($qcfg.androidBuild.protectedPackages) -notcontains $qcfg.androidBuild.expectedPackage -and
     $qcfg.androidBuild.method -match 'BuildArEncounterQaApk$' -and $qcfg.androidBuild.apk -match '-qa\.apk$')
+
+# --- METINAR-037 / audit UPDATE_1 N-01: ARCore registrations, platform guard, applicationIdentifier by purpose
+$arRule = $qcfg.androidBuild.arCore
+$arNoReg = Get-Content -Raw (Join-Path $fx 'runtime-init-e18df69-no-arcore.json')     # real QA APK e18df69 (built without -buildTarget Android)
+$arOkReg = Get-Content -Raw (Join-Path $fx 'runtime-init-synthetic-arcore-ok.json')   # same + the 11 Unity.XR.ARCore records
+$arEntries = @('lib/arm64-v8a/libUnityARCore.so', 'assets/bin/Data/UnitySubsystems/UnityARCore/UnitySubsystemsManifest.json', 'assets/bin/Data/RuntimeInitializeOnLoads.json')
+Assert 'arcore.rule-11' (@($arRule.requiredRegistrations).Count -eq 11 -and $arRule.assembly -eq 'Unity.XR.ARCore')
+$a = Test-MetinARApkArCore -Entries $arEntries -RuntimeInitializeJson $arOkReg -Rule $arRule
+Assert 'arcore.ok' ($a.Status -eq 'PASS' -and $a.Found -eq 11 -and $a.AssemblyRecords -eq 11 -and @($a.Problems).Count -eq 0) (($a.Problems) -join ' | ')
+$a = Test-MetinARApkArCore -Entries $arEntries -RuntimeInitializeJson $arNoReg -Rule $arRule
+Assert 'arcore.e18df69-has-none' ($a.Status -eq 'FAIL' -and $a.Found -eq 0 -and @($a.Missing).Count -eq 11 -and (($a.Problems -join ' ') -match '0/11 Unity\.XR\.ARCore.*-buildTarget Android'))
+$noSession = $arOkReg -replace '"className":"ARCoreSessionSubsystem"', '"className":"ARCoreSessionSubsystemX"'
+$a = Test-MetinARApkArCore -Entries $arEntries -RuntimeInitializeJson $noSession -Rule $arRule
+Assert 'arcore.session-missing' ($a.Status -eq 'FAIL' -and $a.Found -eq 10 -and @($a.Missing) -contains 'ARCoreSessionSubsystem.RegisterDescriptor')
+$wrongAsm = $arOkReg -replace '"assemblyName":"Unity.XR.ARCore"', '"assemblyName":"Unity.XR.ARFoundation"'
+Assert 'arcore.wrong-assembly-not-counted' ((Test-MetinARApkArCore -Entries $arEntries -RuntimeInitializeJson $wrongAsm -Rule $arRule).Found -eq 0)
+$caseAsm = $arOkReg -replace '"assemblyName":"Unity.XR.ARCore"', '"assemblyName":"unity.xr.arcore"'
+Assert 'arcore.assembly-case-sensitive' ((Test-MetinARApkArCore -Entries $arEntries -RuntimeInitializeJson $caseAsm -Rule $arRule).Status -eq 'FAIL')
+$a = Test-MetinARApkArCore -Entries @($arEntries | Where-Object { $_ -notmatch 'RuntimeInitialize' }) -RuntimeInitializeJson $null -Rule $arRule
+Assert 'arcore.json-missing' ($a.Status -eq 'FAIL' -and (($a.Problems -join ' ') -match 'missing assets/bin/Data/RuntimeInitializeOnLoads\.json'))
+$a = Test-MetinARApkArCore -Entries $arEntries -RuntimeInitializeJson '{"root":[{"assemblyName":' -Rule $arRule
+Assert 'arcore.json-malformed' ($a.Status -eq 'FAIL' -and (($a.Problems -join ' ') -match 'not valid JSON'))
+$a = Test-MetinARApkArCore -Entries @($arEntries | Where-Object { $_ -notmatch 'libUnityARCore' }) -RuntimeInitializeJson $arOkReg -Rule $arRule
+Assert 'arcore.native-lib-missing' ($a.Status -eq 'FAIL' -and $a.Found -eq 11 -and (($a.Problems -join ' ') -match 'missing lib/arm64-v8a/libUnityARCore\.so'))
+Assert 'arcore.backslash-entries' ((Test-MetinARApkArCore -Entries @($arEntries | ForEach-Object { $_ -replace '/', '\' }) -RuntimeInitializeJson $arOkReg -Rule $arRule).Status -eq 'PASS')
+# applicationIdentifier by purpose
+$ab = $qcfg.androidBuild
+Assert 'pkg.purpose-qa' ((Resolve-MetinARExpectedPackages -AndroidBuild $ab -ApkPurpose 'qa') -join ',' -eq 'com.metinar.game.qa')
+Assert 'pkg.purpose-game' ((Resolve-MetinARExpectedPackages -AndroidBuild $ab -ApkPurpose 'game') -join ',' -eq 'com.metinar.game')
+Assert 'pkg.purpose-mappoc' ((Resolve-MetinARExpectedPackages -AndroidBuild $ab -ApkPurpose 'mappoc') -join ',' -eq 'com.metinar.game.mappoc')
+Assert 'pkg.default-own-build-qa' ((Resolve-MetinARExpectedPackages -AndroidBuild $ab) -join ',' -eq 'com.metinar.game.qa')
+Assert 'pkg.external-accepts-qa-or-game' ((Resolve-MetinARExpectedPackages -AndroidBuild $ab -ExternalApk) -join ',' -eq 'com.metinar.game.qa,com.metinar.game')
+Assert 'pkg.explicit-wins' ((Resolve-MetinARExpectedPackages -AndroidBuild $ab -ExpectedPackage 'com.x.y' -ApkPurpose 'qa') -join ',' -eq 'com.x.y')
+$threw = $false; try { Resolve-MetinARExpectedPackages -AndroidBuild $ab -ApkPurpose 'release2' | Out-Null } catch { $threw = $true }
+Assert 'pkg.unknown-purpose-throws' $threw
+Assert 'pkg.game-apk-not-qa' (@(Resolve-MetinARExpectedPackages -AndroidBuild $ab -ApkPurpose 'qa') -cnotcontains 'com.metinar.game')
+# platform guard: the runner starts the Android build with -buildTarget Android
+$runner = Get-Content -Raw (Join-Path $PSScriptRoot '../Invoke-MetinARQa.ps1')
+Assert 'guard.runner-buildtarget' ($ab.unityBuildTarget -eq 'Android' -and $runner -match "Invoke-UnityGate 'AndroidBuild' \S+ @\('-buildTarget', \[string\]\`$config\.androidBuild\.unityBuildTarget\)")
+$devBuild = Get-Content -Raw (Join-Path $PSScriptRoot '../../../client/Assets/MetinAR/Editor/MetinARAndroidDevBuild.cs')
+Assert 'guard.qa-build-refuses-non-android' ($devBuild -match 'activeBuildTarget != BuildTarget\.Android')
+# end-to-end over zip files (what ApkAudit / the device harness read)
+$zd = Join-Path ([IO.Path]::GetTempPath()) ("metinar-qa-arcore-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $zd | Out-Null
+function New-ArApk([string]$path, [hashtable]$content) {
+    $fs = [IO.File]::Open($path, [IO.FileMode]::Create)
+    $za = New-Object System.IO.Compression.ZipArchive($fs, [System.IO.Compression.ZipArchiveMode]::Create)
+    foreach ($k in $content.Keys) { $e = $za.CreateEntry($k); $w = New-Object IO.StreamWriter($e.Open()); $w.Write([string]$content[$k]); $w.Dispose() }
+    $za.Dispose(); $fs.Dispose()
+}
+try {
+    $base = @{ 'lib/arm64-v8a/libil2cpp.so' = 'x'; 'assets/bin/Data/Managed/Metadata/global-metadata.dat' = 'x'; 'assets/bin/Data/globalgamemanagers' = 'x'
+               'lib/arm64-v8a/libUnityARCore.so' = 'x'; 'assets/bin/Data/UnitySubsystems/UnityARCore/UnitySubsystemsManifest.json' = '{}' }
+    $okApk = Join-Path $zd 'ok.apk'; $badApk = Join-Path $zd 'bad.apk'
+    $c = $base.Clone(); $c['assets/bin/Data/RuntimeInitializeOnLoads.json'] = $arOkReg; New-ArApk $okApk $c
+    $c = $base.Clone(); $c['assets/bin/Data/RuntimeInitializeOnLoads.json'] = $arNoReg; New-ArApk $badApk $c
+    $r1 = Get-MetinARApkReport -ApkPath $okApk -ArCoreRule $arRule
+    $r2 = Get-MetinARApkReport -ApkPath $badApk -ArCoreRule $arRule
+    Assert 'arcore.apkreport-ok' ($r1.ArCore.Status -eq 'PASS' -and $r1.ArCore.Found -eq 11)
+    Assert 'arcore.apkreport-bad' ($r2.ArCore.Status -eq 'FAIL' -and $r2.ArCore.Found -eq 0)
+    Assert 'arcore.apkreport-no-rule' ($null -eq (Get-MetinARApkReport -ApkPath $okApk).ArCore)
+    $tool = Join-Path $PSScriptRoot '../Test-ApkPlayerData.ps1'; $psExe = (Get-Process -Id $PID).Path
+    & $psExe -NoProfile -File $tool -ApkPath $okApk *> $null; $cOk = $LASTEXITCODE
+    $out = & $psExe -NoProfile -File $tool -ApkPath $badApk 2>&1 | Out-String; $cBad = $LASTEXITCODE
+    Assert 'arcore.cli-exit-codes' ($cOk -eq 0 -and $cBad -eq 1 -and $out -match 'ARCORE: .*0/11') "ok=$cOk bad=$cBad"
+    Assert 'zip.entry-text-absent' ($null -eq (Get-MetinARZipEntryText -Path $okApk -Entry 'nope.txt'))
+} finally { Remove-Item -Recurse -Force $zd -ErrorAction SilentlyContinue }
 
 Write-Host ''
 Write-Host "QA tool tests: $script:passed passed, $script:failed failed"

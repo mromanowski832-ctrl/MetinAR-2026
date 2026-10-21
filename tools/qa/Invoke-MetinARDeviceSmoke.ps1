@@ -170,6 +170,10 @@ if (-not $SkipInstall) {
         # #31: never install an APK whose player data mixes whole files with stale .split chunks (crashes on scene load).
         $pd = Test-MetinARApkPlayerData -Entries @(Get-MetinARZipEntries -Path $ApkPath)
         Add-Result (New-MetinARGateResult -Name 'Install' -Status 'FAIL' -Detail 'APK rejected before install: inconsistent player data (stale .split chunks)' -Evidence @($pd.Problems))
+    } elseif (($arc = Test-MetinARApkArCore -Entries @(Get-MetinARZipEntries -Path $ApkPath) -Rule $config.androidBuild.arCore `
+                -RuntimeInitializeJson (Get-MetinARZipEntryText -Path $ApkPath -Entry $config.androidBuild.arCore.runtimeInitializeEntry)).Status -eq 'FAIL') {
+        # #31 f194aa9 / audit N-01: an APK without the ARCore registrations starts with "AR unavailable"; don't spend a phone slot on it.
+        Add-Result (New-MetinARGateResult -Name 'Install' -Status 'FAIL' -Detail ("APK rejected before install: ARCore registrations {0}/{1}" -f $arc.Found, $arc.Required) -Evidence @($arc.Problems))
     } else {
         if ($guard.Reason) { $notes.Add($guard.Reason) }
         $t0 = Get-Date

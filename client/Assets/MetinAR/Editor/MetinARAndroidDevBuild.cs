@@ -63,6 +63,16 @@ namespace MetinAR.Editor
                 return;
             }
 
+            // Platform guard (#31 f194aa9 / audit N-01): with another active target the APK misses ARCore's runtime
+            // registrations ("AR unavailable"). The QA runner starts Unity with -buildTarget Android.
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
+            {
+                Debug.LogError(Tag + "FAILED active build target is " + EditorUserBuildSettings.activeBuildTarget
+                               + ", expected Android. Start Unity with -buildTarget Android.");
+                ExitWith(false);
+                return;
+            }
+
             bool ok = false;
             try
             {

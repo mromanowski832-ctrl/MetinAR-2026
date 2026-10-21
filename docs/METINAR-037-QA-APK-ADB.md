@@ -24,6 +24,24 @@ Owner: QA (#26). Source: audit `docs/audit/AUDIT_2026-10-21.md` §E.3 T19, probl
   permission allow-list uses `{package}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (AndroidX adds it per applicationId).
 - Other test APKs use their own ids too: `com.metinar.game.mappoc` (Mapy, #28), `com.metinar.audiotest` (Dźwięk).
 
+## 1a. ApkAudit: ARCore registrations, platform guard, package by purpose (audit UPDATE_1 N-01)
+
+- **Why:** the QA APK `e18df69` passed the old ApkAudit (it contains `Unity.XR.ARCore.dll`, `libUnityARCore.so` and the
+  subsystems manifest), yet `assets/bin/Data/RuntimeInitializeOnLoads.json` holds **0/11** `Unity.XR.ARCore`
+  registrations. The editor's active target was not Android, and the app shows "AR unavailable".
+- **Check:** `Test-MetinARApkArCore` (in `MetinARQa.psm1`, written independently of the C# validator) parses that JSON.
+  It counts the `className.methodName` records listed in `qa-config.json` → `androidBuild.arCore.requiredRegistrations`
+  (11, from the working APK 8d0acee) whose `assemblyName` is exactly `Unity.XR.ARCore`. It also requires
+  `requiredEntries`. Missing or invalid JSON, any missing registration or a missing entry = **FAIL**
+  (`ARCORE:` problem in ApkAudit). The device harness refuses to install such an APK.
+- **Platform guard:** the runner starts the AndroidBuild gate with `-buildTarget Android` (`androidBuild.unityBuildTarget`).
+  `BuildArEncounterQaApk` fails if `EditorUserBuildSettings.activeBuildTarget` is not Android.
+- **applicationIdentifier:** `-ApkPurpose qa|game|mappoc` (`androidBuild.packagesByPurpose`) pins the expected id for
+  `-ApkPath`, e.g. a release/game APK must be `com.metinar.game` and a QA APK `com.metinar.game.qa`. Without it an
+  external APK may be either (`auditAcceptedPackages`), and our own build must be `.qa`. `-ExpectedPackage` overrides both.
+- Fixtures: `tools/qa/tests/fixtures/runtime-init-e18df69-no-arcore.json` (the real e18df69 file) and
+  `runtime-init-synthetic-arcore-ok.json` (the same file plus the 11 records).
+
 ## 2. Device harness (`tools/qa/Invoke-MetinARDeviceSmoke.ps1`)
 
 - **`adb devices` before every step** (Install, ColdLaunch, PermissionUi, Process, Permissions, Memory, Background,
@@ -36,6 +54,8 @@ Owner: QA (#26). Source: audit `docs/audit/AUDIT_2026-10-21.md` §E.3 T19, probl
 - **Install guard:** if the APK's package is in `protectedPackages` and already installed (e.g. the game build another
   bot is testing), Install = FAIL `would replace the installed com.metinar.game`. Override only with
   `-AllowReplaceInstalled` after a note in #33. The QA APK (`com.metinar.game.qa`) installs next to the game.
+- **ARCore guard:** an APK failing the ARCore check is never installed (`APK rejected before install: ARCore
+  registrations n/11`). There is no override.
 - Covered without a phone by `tools/qa/tests/Invoke-DeviceSmokeSimulation.ps1` (fake adb: `adblost`, `adbblip`,
   guard on/off, QA install) and the unit tests in `tools/qa/tests/Invoke-QaToolTests.ps1`. A simulation is never
   device evidence.

@@ -46,11 +46,22 @@ New-Item -ItemType Directory -Force $apkDir | Out-Null
 $apk = Join-Path $apkDir 'fake.apk'
 $fs = [IO.File]::Open($apk, [IO.FileMode]::Create)
 $za = New-Object System.IO.Compression.ZipArchive($fs, [System.IO.Compression.ZipArchiveMode]::Create)
-foreach ($n in @('assets/bin/Data/globalgamemanagers', 'assets/bin/Data/data.unity3d', 'lib/arm64-v8a/libil2cpp.so')) { $e = $za.CreateEntry($n); $w = New-Object IO.StreamWriter($e.Open()); $w.Write('x'); $w.Dispose() }
+$okReg = Get-Content -Raw (Join-Path $PSScriptRoot 'fixtures/runtime-init-synthetic-arcore-ok.json')
+$files = [ordered]@{ 'assets/bin/Data/globalgamemanagers' = 'x'; 'assets/bin/Data/data.unity3d' = 'x'; 'lib/arm64-v8a/libil2cpp.so' = 'x'
+    'lib/arm64-v8a/libUnityARCore.so' = 'x'; 'assets/bin/Data/UnitySubsystems/UnityARCore/UnitySubsystemsManifest.json' = '{}'; 'assets/bin/Data/RuntimeInitializeOnLoads.json' = $okReg }
+foreach ($n in $files.Keys) { $e = $za.CreateEntry($n); $w = New-Object IO.StreamWriter($e.Open()); $w.Write([string]$files[$n]); $w.Dispose() }
+$za.Dispose(); $fs.Dispose()
+# the real e18df69 registrations (no Unity.XR.ARCore): the harness must refuse to install such an APK
+$noAr = Join-Path $apkDir 'no-arcore.apk'
+$fs = [IO.File]::Open($noAr, [IO.FileMode]::Create)
+$za = New-Object System.IO.Compression.ZipArchive($fs, [System.IO.Compression.ZipArchiveMode]::Create)
+$files['assets/bin/Data/RuntimeInitializeOnLoads.json'] = Get-Content -Raw (Join-Path $PSScriptRoot 'fixtures/runtime-init-e18df69-no-arcore.json')
+foreach ($n in $files.Keys) { $e = $za.CreateEntry($n); $w = New-Object IO.StreamWriter($e.Open()); $w.Write([string]$files[$n]); $w.Dispose() }
 $za.Dispose(); $fs.Dispose()
 Run 'ok' 1 { param($o) (ReportOf $o) -match '\| Install \| \*\*FAIL\*\* \| [^|]*\| APK not installed: would replace the installed com\.metinar\.game' } @('-ApkPath', $apk, '-Package', 'com.metinar.game') 'com.metinar.game' 'guard-game'
 Run 'ok' 0 { param($o) (ReportOf $o) -match '\| Install \| \*\*PASS\*\*' -and (ReportOf $o) -match 'replacing installed com\.metinar\.game' } @('-ApkPath', $apk, '-Package', 'com.metinar.game', '-AllowReplaceInstalled') 'com.metinar.game' 'guard-allowed'
 Run 'ok' 0 { param($o) (ReportOf $o) -match '\| Install \| \*\*PASS\*\*' } @('-ApkPath', $apk) 'com.metinar.game.qa' 'qa-install'
+Run 'ok' 1 { param($o) (ReportOf $o) -match '\| Install \| \*\*FAIL\*\* \| [^|]*\| APK rejected before install: ARCore registrations 0/11' } @('-ApkPath', $noAr) 'com.metinar.game.qa' 'no-arcore'
 Remove-Item -Recurse -Force $apkDir -ErrorAction SilentlyContinue
 Write-Host "device simulation: $(if ($failed) { "$failed FAILED" } else { 'all passed' })"
 if ($failed) { exit 1 } else { exit 0 }

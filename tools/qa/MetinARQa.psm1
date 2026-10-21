@@ -338,8 +338,89 @@ function Test-MetinARApkPlayerData {
     [pscustomobject]@{ Problems = $problems.ToArray(); WholeFiles = @($whole | Sort-Object); SplitFiles = [pscustomobject]$splitInfo }
 }
 
+function Get-MetinARZipEntryText {
+    <# UTF-8 text of one zip entry, or $null when the entry is absent. #>
+    param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][string]$Entry)
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $Path).Path)
+    try {
+        $e = $zip.GetEntry($Entry)
+        if ($null -eq $e) { return $null }
+        $r = New-Object System.IO.StreamReader($e.Open(), [System.Text.Encoding]::UTF8)
+        try { return $r.ReadToEnd() } finally { $r.Dispose() }
+    } finally { $zip.Dispose() }
+}
+
+function Test-MetinARApkArCore {
+    <#
+      METINAR-037 / audit UPDATE_1 N-01 (independent of the C# build validator): an Android APK can start ARCore only when
+      the Unity.XR.ARCore [RuntimeInitializeOnLoadMethod] registrations (session, camera, planes, ...) are listed in
+      assets/bin/Data/RuntimeInitializeOnLoads.json. They are missing when the APK was built while the editor's ACTIVE build
+      target was not Android (#31 f194aa9: "Failed to load session subsystem" -> AR unavailable). The JSON is parsed as JSON
+      (records under "root"), the rule (assembly, required entries, required Class.Method list) comes from qa-config.json.
+      Returns { Status, Found, Required, AssemblyRecords, Missing, Problems }.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Entries,
+        [AllowNull()][AllowEmptyString()][string]$RuntimeInitializeJson,
+        [Parameter(Mandatory = $true)]$Rule
+    )
+    $names = @{}
+    foreach ($n in @($Entries)) { if ($n) { $names[("$n" -replace '\\', '/')] = $true } }
+    $problems = New-Object System.Collections.Generic.List[string]
+    foreach ($req in @($Rule.requiredEntries)) { if (-not $names.ContainsKey($req)) { $problems.Add("missing $req") } }
+    $required = @($Rule.requiredRegistrations)
+    $found = 0; $asmRecords = 0; $missing = @()
+    $records = $null
+    if (-not $names.ContainsKey($Rule.runtimeInitializeEntry) -or [string]::IsNullOrEmpty($RuntimeInitializeJson)) {
+        $problems.Add("missing $($Rule.runtimeInitializeEntry)")
+        $missing = $required
+    } else {
+        try { $records = @((ConvertFrom-Json -InputObject $RuntimeInitializeJson -ErrorAction Stop).root) } catch { $records = $null }
+        if ($null -eq $records) {
+            $problems.Add("$($Rule.runtimeInitializeEntry) is not valid JSON with a 'root' array")
+            $missing = $required
+        } else {
+            $have = @{}
+            foreach ($r in $records) {
+                if ($null -eq $r -or -not $r.PSObject.Properties['assemblyName']) { continue }
+                if ([string]$r.assemblyName -cne [string]$Rule.assembly) { continue }
+                $asmRecords++
+                $have[("{0}.{1}" -f $r.className, $r.methodName)] = $true
+            }
+            foreach ($q in $required) { if ($have.ContainsKey($q)) { $found++ } else { $missing += $q } }
+            if ($missing.Count) {
+                $problems.Add(("{0}: {1}/{2} {3} registrations (missing: {4}) - ARCore subsystems will not load ('AR unavailable'); build with the active target Android (-buildTarget Android)" -f $Rule.runtimeInitializeEntry, $found, $required.Count, $Rule.assembly, ($missing -join ', ')))
+            }
+        }
+    }
+    [pscustomobject]@{
+        Status          = $(if ($problems.Count) { 'FAIL' } else { 'PASS' })
+        Found           = $found
+        Required        = $required.Count
+        AssemblyRecords = $asmRecords
+        Missing         = @($missing)
+        Problems        = @($problems)
+    }
+}
+
+function Resolve-MetinARExpectedPackages {
+    <# Which applicationIdentifier ApkAudit accepts: -ExpectedPackage pins one id; -ApkPurpose (qa/game/mappoc) maps through
+       androidBuild.packagesByPurpose; otherwise the runner's own build (expectedPackage) or, for an external -ApkPath, the
+       auditAcceptedPackages list. #>
+    param([Parameter(Mandatory = $true)]$AndroidBuild, [string]$ExpectedPackage, [string]$ApkPurpose, [switch]$ExternalApk)
+    if ($ExpectedPackage) { return @($ExpectedPackage) }
+    if ($ApkPurpose) {
+        $map = $AndroidBuild.packagesByPurpose
+        if ($null -eq $map -or -not $map.PSObject.Properties[$ApkPurpose]) { throw "unknown -ApkPurpose '$ApkPurpose' (qa-config androidBuild.packagesByPurpose)" }
+        return @([string]$map.$ApkPurpose)
+    }
+    if ($ExternalApk) { return @($AndroidBuild.auditAcceptedPackages) }
+    return @([string]$AndroidBuild.expectedPackage)
+}
+
 function Get-MetinARApkReport {
-    param([Parameter(Mandatory = $true)][string]$ApkPath, [string]$AaptPath)
+    param([Parameter(Mandatory = $true)][string]$ApkPath, [string]$AaptPath, $ArCoreRule)
     $item = Get-Item $ApkPath
     $hash = (Get-FileHash -Algorithm SHA256 -Path $ApkPath).Hash.ToLowerInvariant()
     $entries = Get-MetinARZipEntries -Path $ApkPath
@@ -359,6 +440,7 @@ function Get-MetinARApkReport {
         HasGlobalMetadata = [bool](@($entries | Where-Object { $_ -match 'global-metadata\.dat$' }).Count)
         HasMonoAssemblies = [bool](@($entries | Where-Object { $_ -match '^assets/bin/Data/Managed/.+\.dll$' }).Count)
         PlayerData     = Test-MetinARApkPlayerData -Entries @($entries)
+        ArCore         = $(if ($ArCoreRule) { Test-MetinARApkArCore -Entries @($entries) -RuntimeInitializeJson (Get-MetinARZipEntryText -Path $ApkPath -Entry $ArCoreRule.runtimeInitializeEntry) -Rule $ArCoreRule } else { $null })
         Badging        = $badging
     }
 }

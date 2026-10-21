@@ -46,6 +46,34 @@
       "com.metinar.game",
       "com.metinar.game.mappoc"
     ],
+    "packagesByPurpose": {
+      "qa": "com.metinar.game.qa",
+      "game": "com.metinar.game",
+      "mappoc": "com.metinar.game.mappoc"
+    },
+    "unityBuildTarget": "Android",
+    "arCore": {
+      "note": "#31 f194aa9: an APK built while the editor active target was not Android lacks these registrations and shows \"AR niedostepne\" (Failed to load session subsystem). Registration list from the working A31 APK 8d0acee (ARCore 6.x), audit UPDATE_1 N-01.",
+      "assembly": "Unity.XR.ARCore",
+      "runtimeInitializeEntry": "assets/bin/Data/RuntimeInitializeOnLoads.json",
+      "requiredEntries": [
+        "lib/arm64-v8a/libUnityARCore.so",
+        "assets/bin/Data/UnitySubsystems/UnityARCore/UnitySubsystemsManifest.json"
+      ],
+      "requiredRegistrations": [
+        "ARCoreSessionSubsystem.RegisterDescriptor",
+        "ARCoreCameraSubsystem.Register",
+        "ARCorePlaneSubsystem.RegisterDescriptor",
+        "ARCoreRaycastSubsystem.RegisterDescriptor",
+        "ARCoreAnchorSubsystem.RegisterDescriptor",
+        "ARCorePointCloudSubsystem.RegisterDescriptor",
+        "ARCoreEnvironmentProbeSubsystem.Register",
+        "ARCoreFaceSubsystem.RegisterDescriptor",
+        "ARCoreImageTrackingSubsystem.RegisterDescriptor",
+        "ARCoreOcclusionSubsystem.Register",
+        "InputLayoutLoader.RegisterLayouts"
+      ]
+    },
     "requiredAbi": "arm64-v8a",
     "forbiddenAbis": [
       "armeabi-v7a",
