@@ -776,15 +776,18 @@ function ConvertFrom-MetinARAdbDevices {
             $entries += [pscustomobject]@{ Serial = $Matches[1]; State = $Matches[2] }
         }
     }
-    $pool = if ($Serial) { @($entries | Where-Object { $_.Serial -eq $Serial }) } else { @($entries) }
+    $pool = @($entries)
+    if ($Serial) { $pool = @($entries | Where-Object { $_.Serial -eq $Serial }) }
+    $ready = @($pool | Where-Object { $_.State -eq 'device' })
     $state = 'missing'
-    if ($pool.Count -gt 1) { $state = if (@($pool | Where-Object { $_.State -eq 'device' }).Count -gt 1) { 'multiple' } else { (@($pool | Where-Object { $_.State -eq 'device' }) + @($pool))[0].State } }
-    elseif ($pool.Count -eq 1) { $state = $pool[0].State }
+    if ($ready.Count -gt 1) { $state = 'multiple' }
+    elseif ($ready.Count -eq 1) { $state = 'device' }
+    elseif ($pool.Count -ge 1) { $state = [string]$pool[0].State }
     if ($state -like 'no permissions*') { $state = 'unauthorized' }
     [pscustomobject]@{
         State   = $state
-        Count   = $entries.Count
-        Serials = @($entries | ForEach-Object { $_.Serial })
+        Count   = @($entries).Count
+        Serials = @(@($entries) | ForEach-Object { $_.Serial })
     }
 }
 
