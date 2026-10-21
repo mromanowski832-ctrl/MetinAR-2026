@@ -17,7 +17,7 @@ public class HealthAndOpenApiTests
         var json = await response.JsonAsync();
         Assert.Equal("ok", json.GetProperty("status").GetString());
         Assert.Equal("v1", json.GetProperty("apiVersion").GetString());
-        Assert.Equal("0002_seed_synthetic_world", json.GetProperty("schemaVersion").GetString());
+        Assert.Equal("0003_encounter_authority_and_spawn_schedules", json.GetProperty("schemaVersion").GetString());
         Assert.Equal("2026-10-20T00:00:00.000Z", json.GetProperty("serverTime").GetString());
     }
 
