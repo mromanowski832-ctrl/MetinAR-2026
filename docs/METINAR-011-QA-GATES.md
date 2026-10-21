@@ -3,6 +3,9 @@
 Status: prototype QA layer. **All performance numbers below are PROTOTYPE GATES** — technical regression limits for
 development builds, not final product promises. Nothing here changes gameplay, AR, hand/sword, map, backend or assets.
 
+> METINAR-014 update: AR smoke T15 exception classification, branch-aware test discovery, `ArSmokeInjection` gate and
+> multi-metric latency budgets: see [METINAR-014-QA-STABILIZATION.md](METINAR-014-QA-STABILIZATION.md).
+
 ## 1. What was added
 
 | Path | Purpose |

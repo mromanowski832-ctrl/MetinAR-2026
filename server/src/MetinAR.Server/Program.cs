@@ -11,6 +11,10 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<ApiLimits>(builder.Configuration.GetSection(ApiLimits.SectionName));
 builder.Services.Configure<PrototypePlayerDefaults>(builder.Configuration.GetSection(PrototypePlayerDefaults.SectionName));
+builder.Services.AddOptions<EncounterRules>()
+    .Bind(builder.Configuration.GetSection(EncounterRules.SectionName))
+    .Validate(r => !r.Validate().Any(), "EncounterRules configuration is invalid (see EncounterRules.Validate).")
+    .ValidateOnStart();
 builder.Services.TryAddSingleton(TimeProvider.System);
 
 string connectionString = builder.Configuration.GetConnectionString("MetinAR")

@@ -116,6 +116,8 @@ namespace MetinAR.Editor
 
             private readonly List<(string name, string failure)> _results = new List<(string, string)>();
             private readonly List<string> _exceptions = new List<string>();
+            private readonly List<string> _infrastructureNoise = new List<string>();
+            private readonly List<string> _exceptionDiagnostics = new List<string>();
             private readonly List<string> _errors = new List<string>();
             private string _currentFailure;
 
@@ -157,9 +159,29 @@ namespace MetinAR.Editor
 
             private void OnLog(string condition, string stackTrace, LogType type)
             {
+                RecordLog(condition, stackTrace, type);
+            }
+
+            /// <summary>
+            /// METINAR-014: exceptions are classified by <see cref="SmokeExceptionClassifier"/>. Only the single reproduced
+            /// Unity Editor Search startup signature (no MetinAR frame) is kept out of the failure list; MetinAR and
+            /// unknown exceptions still fail T15.
+            /// </summary>
+            private void RecordLog(string condition, string stackTrace, LogType type)
+            {
                 if (type == LogType.Exception)
                 {
-                    _exceptions.Add(condition);
+                    if (SmokeExceptionClassifier.Classify(condition, stackTrace) == SmokeExceptionKind.KnownEditorInfrastructure)
+                    {
+                        _infrastructureNoise.Add(condition);
+                    }
+                    else
+                    {
+                        _exceptions.Add(condition);
+                        _exceptionDiagnostics.Add(SmokeExceptionClassifier.Classify(condition, stackTrace) + " frames=["
+                            + string.Join(" < ", SmokeExceptionClassifier.ExtractFrames((condition ?? string.Empty) + "\n" + (stackTrace ?? string.Empty)))
+                            + "]");
+                    }
                 }
                 else if (type == LogType.Error)
                 {
@@ -198,7 +220,8 @@ namespace MetinAR.Editor
                     ("T07_XrSimulationDetectsGroundReadyToPlace", T07_XrSimulationDetectsGroundReadyToPlace),
                     ("T08_PlaceButtonSpawnsOneAnchoredMonsterOnGround", T08_PlaceButtonSpawnsOneAnchoredMonsterOnGround),
                     ("T09_RepeatedPlaceNeverDuplicatesAndStaysStable", T09_RepeatedPlaceNeverDuplicatesAndStaysStable),
-                    ("T10_PlaceholderButtonsHaveNoGameplayFunction", T10_PlaceholderButtonsHaveNoGameplayFunction),
+                    ("T10_FppActionsAndRemainingPlaceholders", T10_FppActionsAndRemainingPlaceholders),
+                    ("T10b_FppAttackAuraAndHitGeometry", T10b_FppAttackAuraAndHitGeometry),
                     ("T11_ExitButtonReturnsToWorldMap", T11_ExitButtonReturnsToWorldMap),
                     ("T12_SyntheticFrames_ScanReadyPlacedSingleSpawn", T12_SyntheticFrames_ScanReadyPlacedSingleSpawn),
                     ("T13_UnsupportedStateIsClearAndNonCrashing", T13_UnsupportedStateIsClearAndNonCrashing),
@@ -554,7 +577,12 @@ namespace MetinAR.Editor
                     Check(Mathf.Abs(height) < 0.03f, "mob not on the plane surface, height " + height);
                 }
 
-                Check(_ar.MobAnchor != null && mob.transform.parent == _ar.MobAnchor.transform, "mob is not parented to an AR anchor");
+                // #31 retest: free world anchor (TryAddAnchorAsync) instead of a plane-attached one; it completes asynchronously.
+                Check(mob.transform.parent != _ar.ArCamera.transform && !mob.transform.IsChildOf(_ar.ArCamera.transform), "mob is parented to the camera");
+                yield return WaitUntil(() => _ar.MobAnchorKind != "pending", 5f);
+                Check(_ar.MobAnchor != null && mob.transform.parent == _ar.MobAnchor.transform, "mob is not parented to an AR anchor (kind " + _ar.MobAnchorKind + ")");
+                Check(_ar.MobAnchorKind == "world", "mob anchor is not a free world anchor: " + _ar.MobAnchorKind);
+                Check(Vector3.Distance(mob.transform.position, target.position) < 0.05f, "mob moved when anchored: " + mob.transform.position + " vs " + target.position);
                 Check(mob.GetComponentInParent<Canvas>() == null, "mob is a UI overlay");
                 Check(mob.GetComponentsInChildren<MeshRenderer>(true).Length >= 20, "mob has few 3D renderers: " + mob.GetComponentsInChildren<MeshRenderer>(true).Length);
                 Check(Vector3.Angle(mob.transform.up, Vector3.up) < 1f, "mob not upright");
@@ -571,7 +599,7 @@ namespace MetinAR.Editor
                 Check(iScan >= 0 && iReady > iScan && iPlaced > iReady, "state order " + string.Join(",", _ar.StateHistory));
                 _realPlacedPosition = mob.transform.position;
                 _realPlaced = true;
-                Debug.Log("[ArSmoke] T08 placed at " + mob.transform.position + " plane=" + planeId + " anchor=" + (_ar.MobAnchor != null)
+                Debug.Log("[ArSmoke] T08 placed at " + mob.transform.position + " plane=" + planeId + " anchor=" + _ar.MobAnchorKind
                           + " fromReticle=" + _ar.PlacementTargetFromReticle + " states=" + string.Join(",", _ar.StateHistory));
             }
 
@@ -612,6 +640,8 @@ namespace MetinAR.Editor
                 Check(_ar.State == ArEncounterState.Placed, "state " + _ar.State);
                 float drift = Vector3.Distance(_ar.SpawnedMob.transform.position, _realPlacedPosition);
                 Check(drift < 0.05f, "mob drifted " + drift + " m");
+                Check(_ar.AnchorProbe.HasBaseline && _ar.AnchorProbe.FollowsCameraSamples == 0 && _ar.AnchorProbe.MaxDriftMeters < 0.05,
+                      "[ArAnchor] probe: followsCam=" + _ar.AnchorProbe.FollowsCameraSamples + " maxDrift=" + _ar.AnchorProbe.MaxDriftMeters);
                 int visiblePlanes = 0;
                 foreach (ARPlane p in _ar.PlaneManager.trackables)
                 {
@@ -625,7 +655,7 @@ namespace MetinAR.Editor
                 Debug.Log("[ArSmoke] T09 drift=" + drift);
             }
 
-            private IEnumerator T10_PlaceholderButtonsHaveNoGameplayFunction()
+            private IEnumerator T10_FppActionsAndRemainingPlaceholders()
             {
                 if (_ar == null)
                 {
@@ -633,7 +663,8 @@ namespace MetinAR.Editor
                     yield break;
                 }
 
-                var all = new List<Button>(_ar.Hud.ActionButtons);
+                var all = new List<Button>();
+                for (int i = 2; i < _ar.Hud.ActionButtons.Length; i++) all.Add(_ar.Hud.ActionButtons[i]);
                 all.AddRange(_ar.Hud.NavButtons);
                 ArEncounterState stateBefore = _ar.State;
                 int mobsBefore = MobCount();
@@ -645,6 +676,96 @@ namespace MetinAR.Editor
                     Check(_ar.Hud.IsToastVisible && _ar.Hud.LastToastMessage == ArEncounterHud.UnassignedNotice, b.name + " toast " + _ar.Hud.LastToastMessage);
                     Check(_ar.State == stateBefore && MobCount() == mobsBefore && _ar.SpawnCount == mobsBefore
                           && ActiveScenePath == ArEncounterScenes.ArEncounterScenePath, b.name + " changed the encounter");
+                }
+            }
+
+            private IEnumerator T10b_FppAttackAuraAndHitGeometry()
+            {
+                FppCombatController combat = _ar != null ? _ar.FppCombat : null;
+                Check(combat != null, "FPP component missing");
+                if (combat == null) yield break;
+                var savedFrameSource = _ar.FrameSourceOverride;
+                Vector3 savedPosition = _ar.SpawnedMob.transform.position;
+                Quaternion savedRotation = _ar.SpawnedMob.transform.rotation;
+                _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionTracking;
+                yield return Frames(3);
+                try
+                {
+                    Check(combat.Ready && combat.View != null && combat.View.gameObject.activeInHierarchy, "FPP view not ready");
+                    if (combat.View == null) yield break;
+                    Check(combat.View.RightGrip != null && combat.View.LeftHand != null, "virtual hands missing");
+                    // #31 A31 retest framing: scaled sword, rest pose lower-right, spider visual scale, nameplate clamp.
+                    Check(combat.View.Sword != null && Mathf.Abs(combat.View.Sword.localScale.x - FppHandsView.SwordScale) < 1e-4f,
+                        "sword model not scaled to " + FppHandsView.SwordScale);
+                    Pose rest = FppHandsView.SwordPose(FppCombatAction.Idle, 0f);
+                    Check(Vector3.Distance(combat.View.RightGrip.localPosition, rest.position) < 1e-3f && rest.position.x > 0f && rest.position.y < 0f,
+                        "right grip not at the lower-right rest pose " + combat.View.RightGrip.localPosition);
+                    Check(Mathf.Abs(_ar.SpawnedMob.transform.lossyScale.x - ArEncounterFraming.MobVisualScale) < 1e-3f,
+                        "spider visual scale " + _ar.SpawnedMob.transform.lossyScale.x);
+                    Check(_ar.SpawnedMob.Request != null && _ar.SpawnedMob.Request.Level == 5 && _ar.SpawnedMob.Request.MaxHp == 120,
+                        "spider gameplay stats changed");
+                    Check(_ar.Hud.ActionButtons[0].interactable && _ar.Hud.ActionButtons[1].interactable, "combat buttons not enabled");
+                    Pose pose = FppHandsView.SwordPose(FppCombatAction.Attack, 0.30f);
+                    Vector3 localMid = pose.position + pose.rotation * Vector3.Lerp(FppHandsView.BladeBase, FppHandsView.BladeTip, 0.5f);
+                    Transform target = _ar.SpawnedMob.transform;
+                    target.rotation = _ar.ArCamera.transform.rotation;
+                    target.position = _ar.ArCamera.transform.TransformPoint(localMid) - target.TransformVector(new Vector3(0, 0.33f, -0.13f));
+                    Check(combat.BladeIntersects(_ar.SpawnedMob, 0.30f), "near target should intersect blade");
+                    target.position += Vector3.right * 20f;
+                    Check(!combat.BladeIntersects(_ar.SpawnedMob, 0.30f), "distant target incorrectly intersects blade");
+                    // Nameplate: constant max angular size up close, authored size far away, out of the top HUD band.
+                    Camera arCam = _ar.ArCamera;
+                    Transform camT = arCam.transform;
+                    target.rotation = Quaternion.LookRotation(Vector3.ProjectOnPlane(-camT.forward, Vector3.up).normalized, Vector3.up);
+                    target.position = camT.position + Vector3.ProjectOnPlane(camT.forward, Vector3.up).normalized * 0.9f + Vector3.down * 0.3f;
+                    _ar.SpawnedMob.ClampLabel();
+                    float near = Vector3.Distance(camT.position, _ar.SpawnedMob.LabelRoot.position);
+                    Check(_ar.SpawnedMob.LabelScaleFactor < 0.6f, "nameplate not shrunk up close: " + _ar.SpawnedMob.LabelScaleFactor + " at " + near + " m");
+                    Check(Mathf.Abs(_ar.SpawnedMob.LabelRoot.lossyScale.x - _ar.SpawnedMob.LabelScaleFactor) < 1e-3f, "nameplate world scale " + _ar.SpawnedMob.LabelRoot.lossyScale.x);
+                    Vector3 labelVp = arCam.WorldToViewportPoint(_ar.SpawnedMob.LabelRoot.position);
+                    Check(labelVp.z <= 0f || labelVp.y <= (float)ArEncounterFraming.NameplateMaxViewportY + 0.05f
+                          || _ar.SpawnedMob.LabelClampedBelowHud, "nameplate in the top HUD band: vp " + labelVp);
+                    target.position = camT.position + Vector3.ProjectOnPlane(camT.forward, Vector3.up).normalized * 12f + Vector3.down * 1.2f;
+                    _ar.SpawnedMob.ClampLabel();
+                    Check(Mathf.Abs(_ar.SpawnedMob.LabelScaleFactor - 1f) < 1e-3f, "far nameplate not at authored size: " + _ar.SpawnedMob.LabelScaleFactor);
+                    Debug.Log("[ArSmoke] T10b nameplate near=" + near + " m label vp=" + labelVp + " clamped=" + _ar.SpawnedMob.LabelClampedBelowHud);
+                    target.rotation = camT.rotation;
+                    target.position = camT.TransformPoint(localMid) - target.TransformVector(new Vector3(0, 0.33f, -0.13f)) + Vector3.right * 20f;
+
+                    int before = combat.HitCount;
+                    _ar.Hud.ActionButtons[0].onClick.Invoke();
+                    Check(combat.Timeline.Action == FppCombatAction.Attack, "Attack button not bound");
+                    int swing = combat.Timeline.SwingId;
+                    _ar.Hud.ActionButtons[0].onClick.Invoke();
+                    _ar.Hud.ActionButtons[1].onClick.Invoke();
+                    Check(combat.Timeline.SwingId == swing && combat.Timeline.Action == FppCombatAction.Attack, "tap spam restarted/overlapped attack");
+                    yield return WaitUntil(() => combat.Timeline.Action == FppCombatAction.Idle, 3f);
+                    Check(combat.HitCount == before, "attack hit a distant target");
+                    target.position = _ar.ArCamera.transform.TransformPoint(localMid) - target.TransformVector(new Vector3(0, 0.33f, -0.13f));
+                    _ar.Hud.ActionButtons[0].onClick.Invoke();
+                    yield return WaitUntil(() => combat.Timeline.Action == FppCombatAction.Idle, 3f);
+                    Check(combat.HitCount == before + 1, "near swing must hit exactly once");
+                    before = combat.HitCount;
+                    _ar.Hud.ActionButtons[1].onClick.Invoke();
+                    Check(combat.Timeline.Action == FppCombatAction.Aura, "Aura button not bound");
+                    yield return WaitUntil(() => combat.Timeline.Elapsed >= 0.4f, 3f);
+                    Check(combat.Timeline.Action == FppCombatAction.Aura, "Aura cancelled too early");
+                    Vector3 expectedLeft = combat.View.RightGrip.localPosition + combat.View.RightGrip.localRotation * FppHandsView.LeftGripOffset;
+                    Check(Vector3.Distance(combat.View.LeftHand.localPosition, expectedLeft) < 0.015f, "left hand did not grip hilt");
+                    yield return WaitUntil(() => combat.Timeline.Action == FppCombatAction.Idle, 3f);
+                    Check(combat.Timeline.AuraActive, "Aura blade effect missing after activation");
+                    Check(combat.HitCount == before, "Aura must not deal hits");
+                    Check(!combat.RequestAura(), "active Aura can be spammed");
+                    _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionInitializing;
+                    yield return Frames(2);
+                    Check(!combat.Ready && !combat.Timeline.AuraActive && !combat.View.gameObject.activeSelf, "tracking loss did not cancel/hide FPP");
+                    Check(!combat.RequestAttack() && !combat.RequestAura(), "actions accepted with tracking lost");
+                }
+                finally
+                {
+                    combat.CancelActions();
+                    _ar.SpawnedMob.transform.SetPositionAndRotation(savedPosition, savedRotation);
+                    _ar.FrameSourceOverride = savedFrameSource;
                 }
             }
 
@@ -662,6 +783,7 @@ namespace MetinAR.Editor
                 Check(ActiveScenePath == ArEncounterScenes.WorldMapScenePath, "not back on world map: " + ActiveScenePath);
                 Check(FindAnyObjectByType<ArEncounterSceneController>() == null && MobCount() == 0, "AR objects left after exit");
                 Check(!ArEncounterHandoff.HasPending, "handoff pending after exit");
+                Check(FindAnyObjectByType<FppHandsView>() == null, "FPP view leaked after scene exit");
                 PrototypeWorldPlacement placement = FindAnyObjectByType<PrototypeWorldPlacement>();
                 yield return WaitUntil(() => placement != null && placement.IsInitialized, 10f);
                 Check(placement != null && placement.IsInitialized, "world map did not re-initialize");
@@ -707,7 +829,7 @@ namespace MetinAR.Editor
 
                 Transform cam = _ar.ArCamera.transform;
                 Vector3 fwd = Vector3.ProjectOnPlane(cam.forward, Vector3.up).normalized;
-                _syntheticTarget = cam.position + fwd * 1.5f + Vector3.down * 1.2f;
+                _syntheticTarget = cam.position + fwd * 0.8f + Vector3.down * 1.2f; // too close first (#31 A31 retest)
                 yield return Frames(3);
                 Check(_ar.State == ArEncounterState.Scanning, "phase0 state " + _ar.State);
                 Check(!_ar.Hud.IsPlaceButtonInteractable, "phase0 place interactable");
@@ -719,9 +841,19 @@ namespace MetinAR.Editor
                 yield return Frames(3);
                 Check(_ar.State == ArEncounterState.Scanning, "phase1 small plane state " + _ar.State);
 
-                _syntheticPhase = 2; // suitable floor
+                _syntheticPhase = 2; // suitable floor, but the target is closer than the minimum placement distance
                 yield return Frames(3);
-                Check(_ar.State == ArEncounterState.ReadyToPlace && _ar.HasPlacementTarget, "phase2 state " + _ar.State);
+                Check(_ar.State == ArEncounterState.ReadyToPlace && !_ar.HasPlacementTarget && _ar.PlacementTargetTooClose,
+                    "too-close target accepted: state " + _ar.State + " target " + _ar.HasPlacementTarget);
+                Check(!_ar.Hud.IsPlaceButtonInteractable && _ar.Hud.StatusLabel == ArEncounterHud.PlacementTooCloseNotice,
+                    "too-close hint missing: " + _ar.Hud.StatusLabel);
+                _ar.Hud.PlaceButton.onClick.Invoke();
+                yield return Frames(1);
+                Check(MobCount() == 0, "spawned on a too-close target");
+
+                _syntheticTarget = cam.position + fwd * 1.8f + Vector3.down * 1.2f; // far enough
+                yield return Frames(3);
+                Check(_ar.State == ArEncounterState.ReadyToPlace && _ar.HasPlacementTarget && !_ar.PlacementTargetTooClose, "phase2 state " + _ar.State);
                 Check(_ar.Hud.IsPlaceButtonInteractable, "phase2 place not interactable");
                 Check(_ar.PlacementReticle.gameObject.activeSelf && Vector3.Distance(_ar.PlacementReticle.position, _syntheticTarget) < 0.01f, "reticle not at target");
                 Check(MobCount() == 0, "spawned before confirm");
@@ -825,9 +957,87 @@ namespace MetinAR.Editor
 
             private IEnumerator T15_NoExceptionsLogged()
             {
+                InjectExceptionForGateCheck();
+                yield return Frames(2);
+                if (_infrastructureNoise.Count > 0)
+                {
+                    Debug.Log("[ArSmoke] T15 ignored known editor-infrastructure exceptions (" + _infrastructureNoise.Count + ", "
+                        + SmokeExceptionClassifier.SearchDatabaseSignatureId + "): " + FirstLines(_infrastructureNoise));
+                }
+
+                foreach (string d in _exceptionDiagnostics)
+                {
+                    Debug.Log("[ArSmoke] T15 failing exception classified " + d);
+                }
+
                 Check(_exceptions.Count == 0, "exceptions: " + string.Join(" | ", _exceptions));
                 Debug.Log("[ArSmoke] logged errors (" + _errors.Count + "): " + string.Join(" | ", _errors));
                 yield break;
+            }
+
+            private static string FirstLines(List<string> messages)
+            {
+                var parts = new List<string>();
+                foreach (string m in messages)
+                {
+                    parts.Add((m ?? string.Empty).Split('\n')[0]);
+                }
+
+                return string.Join(" | ", parts);
+            }
+
+            /// <summary>
+            /// METINAR-014 negative gate check. Off unless the environment variable METINAR_SMOKE_INJECT is set
+            /// (tools/qa/Invoke-MetinARQa.ps1 -Gates ArSmokeInjection). Values:
+            ///   metinar - a real exception thrown from MetinAR code and logged through Debug.LogException -> T15 must FAIL;
+            ///   unknown - a synthetic Unity runtime exception without MetinAR frames -> T15 must FAIL;
+            ///   searchdb - a synthetic copy of the known Search startup signature -> T15 must still PASS.
+            /// </summary>
+            private void InjectExceptionForGateCheck()
+            {
+                string mode = Environment.GetEnvironmentVariable("METINAR_SMOKE_INJECT");
+                if (string.IsNullOrEmpty(mode))
+                {
+                    return;
+                }
+
+                Debug.Log("[ArSmoke] T15 injecting exception for gate check: " + mode);
+                switch (mode.Trim().ToLowerInvariant())
+                {
+                    case "metinar":
+                        try
+                        {
+                            throw new InvalidOperationException("Injected project-code smoke exception (issue 014 gate check)");
+                        }
+                        catch (InvalidOperationException e)
+                        {
+                            Debug.LogException(e);
+                        }
+
+                        break;
+                    case "unknown":
+                        RecordLog(
+                            "NullReferenceException: injected unknown Unity exception (issue 014 gate check)",
+                            "UnityEngine.XR.ARFoundation.ARSession:Update ()\n",
+                            LogType.Exception);
+                        break;
+                    case "searchdb":
+                        RecordLog(
+                            "ArgumentOutOfRangeException: Index was out of range. Must be non-negative and less than the size of the collection.\n"
+                            + "Parameter name: index\n"
+                            + "  at System.Collections.Generic.List`1[T].get_Item (System.Int32 index) [0x00009] in <x>:0 \n"
+                            + "  at UnityEditor.Search.SearchDatabase+<EnumerateAll>d__78.MoveNext () [0x00089] in <x>:0 \n"
+                            + "  at System.Linq.Enumerable.First[TSource] (System.Collections.Generic.IEnumerable`1[T] source) [0x00000] in <x>:0 \n"
+                            + "  at UnityEditor.Search.SearchDatabase.GetDefaultSearchDatabase () [0x00005] in <x>:0 \n"
+                            + "  at UnityEditor.Search.SearchInit.IndexationOnStartup () [0x0000a] in <x>:0 \n"
+                            + "  at UnityEditor.EditorApplication.Internal_CallDelayFunctions () [0x00029] in <x>:0 ",
+                            string.Empty,
+                            LogType.Exception);
+                        break;
+                    default:
+                        Debug.LogError("[ArSmoke] unknown METINAR_SMOKE_INJECT value: " + mode);
+                        break;
+                }
             }
 
             private void WriteResultsAndExit()
@@ -867,3 +1077,4 @@ namespace MetinAR.Editor
         }
     }
 }
+
