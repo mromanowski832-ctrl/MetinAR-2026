@@ -109,8 +109,17 @@ namespace MetinAR.ArEncounter
 
         public ArEncounterMob SpawnedMob { get; private set; }
 
-        /// <summary>Anchor the monster is parented to (null if anchoring was unavailable).</summary>
+        /// <summary>Anchor the monster is parented to (null while pending or if anchoring was unavailable).</summary>
         public ARAnchor MobAnchor { get; private set; }
+
+        /// <summary>
+        /// How the monster is held in place: "world" (free ARAnchor at a fixed world pose, #31 A31 retest 2026-10-21),
+        /// "plane" (fallback: anchor attached to the detected plane), "session" (no anchor: fixed in session space) or "pending".
+        /// </summary>
+        public string MobAnchorKind { get; private set; } = "none";
+
+        /// <summary>Seconds between [ArAnchor] diagnostic log lines while a monster is placed (0 = off).</summary>
+        public float AnchorDiagnosticsIntervalSeconds { get; set; } = 2f;
 
         public ArPlacementResult? LastPlacementResult { get; private set; }
 
@@ -274,9 +283,33 @@ namespace MetinAR.ArEncounter
             if (_machine.State == ArEncounterState.Placed)
             {
                 HidePlaneVisuals();
+                LogAnchorDiagnostics();
             }
 
             RefreshHud();
+        }
+
+        private float _nextAnchorLog;
+
+        /// <summary>
+        /// #31 A31 retest: "the spider moves forward together with the phone". Logs camera, monster and anchor poses so
+        /// a device log shows whether the camera position is tracked and whether the monster stays at its world spot.
+        /// </summary>
+        private void LogAnchorDiagnostics()
+        {
+            if (AnchorDiagnosticsIntervalSeconds <= 0f || SpawnedMob == null || _arCamera == null || Time.unscaledTime < _nextAnchorLog)
+            {
+                return;
+            }
+
+            _nextAnchorLog = Time.unscaledTime + AnchorDiagnosticsIntervalSeconds;
+            Vector3 cam = _arCamera.transform.position;
+            Vector3 mob = SpawnedMob.transform.position;
+            Debug.Log("[ArAnchor] kind=" + MobAnchorKind
+                      + " anchorState=" + (MobAnchor != null ? MobAnchor.trackingState.ToString() : "-")
+                      + " session=" + LastSessionStatus
+                      + " cam=" + cam.ToString("F2") + " mob=" + mob.ToString("F2")
+                      + " d=" + ArEncounterFraming.HorizontalDistance(cam.x, cam.z, mob.x, mob.z).ToString("F2"));
         }
 
         private ARPlane _targetPlane;
@@ -503,28 +536,20 @@ namespace MetinAR.ArEncounter
 
             SpawnedMob.Configure(Request, _arCamera);
 
-            // Anchor to the detected plane so AR tracking keeps the monster in place.
-            if (plane != null && _anchorManager != null && _anchorManager.enabled && _anchorManager.subsystem != null)
+            // #31 A31 retest 2026-10-21 (spider moved with the phone): keep the monster at one fixed WORLD spot.
+            // It is never parented to the camera. First it sits in session space (TrackablesParent); a free ARAnchor
+            // at that world pose is then requested and the monster is re-parented to it. Plane-attached anchor and
+            // session space remain as fallbacks.
+            if (_origin != null && _origin.TrackablesParent != null)
             {
-                try
-                {
-                    MobAnchor = _anchorManager.AttachAnchor(plane, pose);
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning("[ArEncounter] AttachAnchor failed: " + ex.Message);
-                    MobAnchor = null;
-                }
+                go.transform.SetParent(_origin.TrackablesParent, true);
             }
 
-            if (MobAnchor != null)
+            MobAnchorKind = "session";
+            if (_anchorManager != null && _anchorManager.enabled && _anchorManager.subsystem != null)
             {
-                go.transform.SetParent(MobAnchor.transform, true);
-            }
-            else if (_origin != null && _origin.TrackablesParent != null)
-            {
-                // No anchor available: keep it in session space (fixed relative to the AR session origin).
-                go.transform.SetParent(_origin.TrackablesParent, true);
+                MobAnchorKind = "pending";
+                AnchorMobAtWorldPose(go.transform, pose, plane);
             }
 
             if (_placementReticle != null)
@@ -532,8 +557,64 @@ namespace MetinAR.ArEncounter
                 _placementReticle.gameObject.SetActive(false);
             }
 
-            Debug.Log("[ArEncounter] spawned " + Request.MobName + " at " + pose.position + " anchored=" + (MobAnchor != null));
+            Debug.Log("[ArEncounter] spawned " + Request.MobName + " at " + pose.position + " anchor=" + MobAnchorKind
+                      + " scale=" + ArEncounterFraming.MobVisualScale);
             MobPlaced?.Invoke(SpawnedMob);
+        }
+
+        private async void AnchorMobAtWorldPose(Transform mob, Pose pose, ARPlane plane)
+        {
+            ARAnchor anchor = null;
+            string kind = "session";
+            try
+            {
+                Result<ARAnchor> result = await _anchorManager.TryAddAnchorAsync(pose);
+                if (result.status.IsSuccess() && result.value != null)
+                {
+                    anchor = result.value;
+                    kind = "world";
+                }
+                else
+                {
+                    Debug.LogWarning("[ArEncounter] world anchor failed: " + result.status);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[ArEncounter] world anchor failed: " + ex.Message);
+            }
+
+            if (this == null || mob == null || IsExiting)
+            {
+                if (anchor != null && _anchorManager != null)
+                {
+                    _anchorManager.TryRemoveAnchor(anchor);
+                }
+
+                return;
+            }
+
+            if (anchor == null && plane != null)
+            {
+                try
+                {
+                    anchor = _anchorManager.AttachAnchor(plane, pose);
+                    kind = anchor != null ? "plane" : kind;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[ArEncounter] AttachAnchor failed: " + ex.Message);
+                }
+            }
+
+            MobAnchor = anchor;
+            MobAnchorKind = kind;
+            if (anchor != null)
+            {
+                mob.SetParent(anchor.transform, true);
+            }
+
+            Debug.Log("[ArEncounter] anchor=" + kind + (anchor != null ? " at " + anchor.transform.position.ToString("F2") : string.Empty));
         }
 
         private void HidePlaneVisuals()

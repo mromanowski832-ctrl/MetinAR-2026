@@ -555,7 +555,12 @@ namespace MetinAR.Editor
                     Check(Mathf.Abs(height) < 0.03f, "mob not on the plane surface, height " + height);
                 }
 
-                Check(_ar.MobAnchor != null && mob.transform.parent == _ar.MobAnchor.transform, "mob is not parented to an AR anchor");
+                // #31 retest: free world anchor (TryAddAnchorAsync) instead of a plane-attached one; it completes asynchronously.
+                Check(mob.transform.parent != _ar.ArCamera.transform && !mob.transform.IsChildOf(_ar.ArCamera.transform), "mob is parented to the camera");
+                yield return WaitUntil(() => _ar.MobAnchorKind != "pending", 5f);
+                Check(_ar.MobAnchor != null && mob.transform.parent == _ar.MobAnchor.transform, "mob is not parented to an AR anchor (kind " + _ar.MobAnchorKind + ")");
+                Check(_ar.MobAnchorKind == "world", "mob anchor is not a free world anchor: " + _ar.MobAnchorKind);
+                Check(Vector3.Distance(mob.transform.position, target.position) < 0.05f, "mob moved when anchored: " + mob.transform.position + " vs " + target.position);
                 Check(mob.GetComponentInParent<Canvas>() == null, "mob is a UI overlay");
                 Check(mob.GetComponentsInChildren<MeshRenderer>(true).Length >= 20, "mob has few 3D renderers: " + mob.GetComponentsInChildren<MeshRenderer>(true).Length);
                 Check(Vector3.Angle(mob.transform.up, Vector3.up) < 1f, "mob not upright");
@@ -572,7 +577,7 @@ namespace MetinAR.Editor
                 Check(iScan >= 0 && iReady > iScan && iPlaced > iReady, "state order " + string.Join(",", _ar.StateHistory));
                 _realPlacedPosition = mob.transform.position;
                 _realPlaced = true;
-                Debug.Log("[ArSmoke] T08 placed at " + mob.transform.position + " plane=" + planeId + " anchor=" + (_ar.MobAnchor != null)
+                Debug.Log("[ArSmoke] T08 placed at " + mob.transform.position + " plane=" + planeId + " anchor=" + _ar.MobAnchorKind
                           + " fromReticle=" + _ar.PlacementTargetFromReticle + " states=" + string.Join(",", _ar.StateHistory));
             }
 

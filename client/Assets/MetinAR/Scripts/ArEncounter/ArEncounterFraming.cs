@@ -15,8 +15,11 @@ namespace MetinAR.ArEncounter
         /// <summary>Tolerance so a target exactly at the minimum is not rejected by float noise.</summary>
         public const double PlacementDistanceTolerance = 0.01;
 
-        /// <summary>Uniform visual scale of the spawned procedural spider (~0.93 m leg span instead of ~1.24 m).</summary>
-        public const float MobVisualScale = 0.75f;
+        /// <summary>
+        /// Uniform visual scale of the spawned procedural spider. Owner retests on A31 (2026-10-21): 1.0 (~1.24 m leg span)
+        /// filled the screen, 0.75 (~0.93 m) was too small; 0.9 (~1.12 m) sits between them. Visual only.
+        /// </summary>
+        public const float MobVisualScale = 0.9f;
 
         /// <summary>Unscaled nameplate HP rim width of the procedural spider prefab (metres).</summary>
         public const double NameplateReferenceWidthMeters = 0.84;

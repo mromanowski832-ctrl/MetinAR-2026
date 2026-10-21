@@ -129,12 +129,13 @@ public class FppFramingTests
     public void PlacementRulesKeepSpiderSmallerAndFartherThanRetest()
     {
         Assert.InRange(ArEncounterFraming.MinPlacementDistanceMeters, 1.5, 2.0);
-        Assert.InRange(ArEncounterFraming.MobVisualScale, 0.5f, 0.9f);
-        // Whole leg span (1.24 m unscaled) fits the estimated A31 portrait width at the minimum slant distance
-        // of a phone held 1.2 m above the floor.
+        // Owner retests: 1.0 filled the screen, 0.75 was too small -> strictly between them.
+        Assert.InRange(ArEncounterFraming.MobVisualScale, 0.8f, 0.95f);
+        // Whole leg span (1.24 m unscaled) still fits the estimated A31 portrait width at the minimum slant distance
+        // of a phone held 1.2 m above the floor (0.9 after the second owner retest: ~93% of the width at 1.5 m).
         double slant = Math.Sqrt(1.5 * 1.5 + 1.2 * 1.2);
         double halfWidth = slant * Math.Tan(FppViewFraming.EstimatedA31VerticalFovDegrees * Math.PI / 360) * FppViewFraming.EstimatedA31PortraitAspect;
-        Assert.True(1.24 * ArEncounterFraming.MobVisualScale < 2 * halfWidth * 0.85);
+        Assert.True(1.24 * ArEncounterFraming.MobVisualScale < 2 * halfWidth * 0.95);
     }
 
     [Theory]

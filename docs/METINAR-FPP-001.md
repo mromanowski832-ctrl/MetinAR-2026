@@ -137,3 +137,16 @@ Projection checks use the ESTIMATED A31 portrait camera (69.4° vertical, 540×1
 Editor checks: `ArEncounterSmokeTest` T10b (sword scale, rest pose, spider scale/stats, nameplate scale and HUD band)
 and T12 (too-close synthetic target rejected with the hint, far target placed). The FPP hit tests run on the scaled
 blade.
+
+## Second owner retest (feat `8d0acee`, A31, 2026-10-21 ~14:00 Europe/Warsaw)
+
+Owner findings and what this change does (damage itself is S2a #47 / PR #67):
+
+| Finding | Change |
+|---|---|
+| Spider now too small | `ArEncounterFraming.MobVisualScale` 0.75 → **0.9** (between the first build, 1.0 = filled the screen, and 0.75). Visual only; level/HP unchanged; nameplate clamp unchanged. |
+| Spider moves forward together with the phone | The mob is no longer held by a plane-attached anchor. It is put in session space (`XROrigin.TrackablesParent`, never under the camera), then a **free world `ARAnchor`** is requested with `ARAnchorManager.TryAddAnchorAsync(pose)` and the mob is re-parented to it (fallbacks: plane anchor, then session space). `[ArAnchor]` log every 2 s: anchor kind and tracking state, session state, camera and mob positions, ground distance — so the next device log shows whether the camera position is tracked while the mob stays at its spot. Root cause on the device is **UNVERIFIED** until that log is read. |
+
+Owner request "an attacked mob must become aggressive, run to the player and attack" is **not** in this PR (audit plan
+D1–D4, 2026-10-21): it is a separate `[READY]` issue, implemented after #67. Hands stay virtual on-screen hands with a
+sword; there is no tracking of the player's real hands through the AR camera.
