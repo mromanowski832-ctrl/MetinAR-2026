@@ -83,3 +83,20 @@ A long stall cancels the action instead of applying an unseen delayed hit.
 There is no final combat balance, HP damage, multiplayer validation, audio, haptics, resource cost or copied Metin2 content.
 Physical Android/iOS quality and performance remain UNVERIFIED.
 
+
+## A31 crash on entering AR (52a1375 dev APK) — build artifact, not FPP code
+
+Symptom: tapping AR closed the game (native SIGTRAP in `Loading.Preload`, `CachedReader::OutOfBoundsError`,
+"different serialization layout" errors and `sharedassets1.assets is corrupted`).
+
+Root cause: the APK contained `assets/bin/Data/sharedassets1.assets` from the new build **and** stale
+`sharedassets1.assets.split0..14` from an older build (dated 2026-10-20, containing the #8 sword/hand-tracking
+assets). They came from the Gradle export folder in a `Library` copied from another checkout; the new build did not
+overwrite or delete them. The Android player prefers split chunks, so it read the old AR-scene data against the new
+`level1`/`globalgamemanagers` and crashed. The AR scene YAML and the FPP components (added at runtime via
+`AddComponent`, no serialized fields) were not the cause; no runtime MetinAR script has serialized fields under
+`#if UNITY_EDITOR`.
+
+Fix: `MetinARAndroidDevBuild` deletes `Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/src/main/assets/bin/Data`
+before building and, after the build, fails (exit 1) if the APK contains a serialized file both whole and split or
+with non-contiguous chunks (`AndroidPlayerDataValidator`, tested in `tests/MetinAR.QA.Tests`).
