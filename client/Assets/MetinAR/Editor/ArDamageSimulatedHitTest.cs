@@ -112,6 +112,7 @@ namespace MetinAR.Editor
 
             private readonly List<(string name, string failure)> _results = new List<(string, string)>();
             private readonly List<string> _exceptions = new List<string>();
+            private readonly List<string> _ignoredEditorExceptions = new List<string>();
             private string _currentFailure;
 
             private WorldMapHud _hud;
@@ -141,10 +142,22 @@ namespace MetinAR.Editor
 
             private void OnLog(string condition, string stackTrace, LogType type)
             {
-                if (type == LogType.Exception)
+                if (type != LogType.Exception)
                 {
-                    _exceptions.Add(condition);
+                    return;
                 }
+
+                // Unity 6000.6.4f1 editor-internal: the Search index startup (UnityEditor.Search.SearchInit.IndexationOnStartup)
+                // throws ArgumentOutOfRangeException once in a fresh batchmode project, independent of project code.
+                // It is listed in the log and the result, but does not fail the test. Anything else does.
+                string trace = stackTrace ?? string.Empty;
+                if (trace.Contains("UnityEditor.Search.") && !trace.Contains("MetinAR"))
+                {
+                    _ignoredEditorExceptions.Add(condition);
+                    return;
+                }
+
+                _exceptions.Add(condition + " @ " + trace);
             }
 
             private static IEnumerator Frames(int n)
@@ -429,6 +442,8 @@ namespace MetinAR.Editor
             private IEnumerator T11_NoExceptionsLogged()
             {
                 Check(_exceptions.Count == 0, "exceptions: " + string.Join(" | ", _exceptions));
+                Debug.Log("[ArDamageTest] project exceptions=" + _exceptions.Count + ", ignored editor-internal UnityEditor.Search exceptions="
+                          + _ignoredEditorExceptions.Count + (_ignoredEditorExceptions.Count > 0 ? " (" + string.Join(" | ", _ignoredEditorExceptions) + ")" : string.Empty));
                 yield break;
             }
 
