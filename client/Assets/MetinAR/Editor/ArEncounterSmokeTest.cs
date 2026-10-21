@@ -199,7 +199,10 @@ namespace MetinAR.Editor
                     ("T08_PlaceButtonSpawnsOneAnchoredMonsterOnGround", T08_PlaceButtonSpawnsOneAnchoredMonsterOnGround),
                     ("T09_RepeatedPlaceNeverDuplicatesAndStaysStable", T09_RepeatedPlaceNeverDuplicatesAndStaysStable),
                     ("T10_FppActionsAndRemainingPlaceholders", T10_FppActionsAndRemainingPlaceholders),
-                    ("T10b_FppAttackAuraAndHitGeometry", T10b_FppAttackAuraAndHitGeometry),
+                    ("T10b_FppArtClipsAttackAuraHitCancel", () => FppVariantChecks(FppViewVariant.Art)),
+                    ("T10c_FppProceduralAttackAuraHitCancel", () => FppVariantChecks(FppViewVariant.Procedural)),
+                    ("T10d_FppProceduralV2RestVisibleInPortraitPreview", () => FppFramingPreview(FppViewVariant.Procedural)),
+                    ("T10e_FppArtClipsRestVisibleInPortraitPreview", () => FppFramingPreview(FppViewVariant.Art)),
                     ("T11_ExitButtonReturnsToWorldMap", T11_ExitButtonReturnsToWorldMap),
                     ("T12_SyntheticFrames_ScanReadyPlacedSingleSpawn", T12_SyntheticFrames_ScanReadyPlacedSingleSpawn),
                     ("T13_UnsupportedStateIsClearAndNonCrashing", T13_UnsupportedStateIsClearAndNonCrashing),
@@ -650,7 +653,25 @@ namespace MetinAR.Editor
                 }
             }
 
-            private IEnumerator T10b_FppAttackAuraAndHitGeometry()
+            private const float A31EstimatedPortraitVerticalFov = 69.4f; // estimate (#34 doc §6), NOT measured on the phone
+            private const int PreviewWidth = 540, PreviewHeight = 1200;   // portrait 9:20 like the A31 screen
+
+            private static Vector3 CamLocal(Transform cam, Vector3 world) => cam.InverseTransformPoint(world);
+
+            private void PlaceTargetOnBlade(FppPoseContract contract)
+            {
+                Pose pose = contract.SwordPose(FppCombatAction.Attack, 0.30f);
+                Vector3 localMid = pose.position + pose.rotation * Vector3.Lerp(FppPoseContract.BladeBase, FppPoseContract.BladeTip, 0.5f);
+                Transform target = _ar.SpawnedMob.transform;
+                target.rotation = _ar.ArCamera.transform.rotation;
+                target.position = _ar.ArCamera.transform.TransformPoint(localMid) - target.TransformVector(new Vector3(0, 0.33f, -0.13f));
+            }
+
+            /// <summary>
+            /// Real Button.onClick combat for one visible variant: grips, tracked blade = visible model, near hit exactly once,
+            /// far miss, spam, Aura without damage, mid-swing cancel without stale replay, tracking-loss cancel.
+            /// </summary>
+            private IEnumerator FppVariantChecks(FppViewVariant variant)
             {
                 FppCombatController combat = _ar != null ? _ar.FppCombat : null;
                 Check(combat != null, "FPP component missing");
@@ -658,21 +679,45 @@ namespace MetinAR.Editor
                 var savedFrameSource = _ar.FrameSourceOverride;
                 Vector3 savedPosition = _ar.SpawnedMob.transform.position;
                 Quaternion savedRotation = _ar.SpawnedMob.transform.rotation;
-                _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionTracking;
-                yield return Frames(3);
+                Action<ArFrameSnapshot> tracking = frame => frame.SessionStatus = ArSessionStatus.SessionTracking;
+                _ar.FrameSourceOverride = tracking;
+                combat.SetVariant(variant);
+                yield return Frames(4);
+                Transform cam = _ar.ArCamera.transform;
+                float maxPos = 0f, maxAng = 0f, maxLeft = 0f;
+                int samples = 0, hitEvents = 0;
+                IFppHandsView view = combat.View;
+                Action<FppCombatAction, float> onRender = (action, t) =>
+                {
+                    if (view == null || action == FppCombatAction.Idle) return;
+                    Pose e = view.Contract.SwordPose(action, t);
+                    maxPos = Mathf.Max(maxPos, (CamLocal(cam, view.RightGrip.position) - e.position).magnitude);
+                    maxAng = Mathf.Max(maxAng, Quaternion.Angle(Quaternion.Inverse(cam.rotation) * view.RightGrip.rotation, e.rotation));
+                    maxLeft = Mathf.Max(maxLeft, (CamLocal(cam, view.LeftHand.position) - view.Contract.LeftHandPose(action, t).position).magnitude);
+                    samples++;
+                };
+                Action<ArEncounterMob, int> onHit = (mob, swing) => hitEvents++;
+                combat.Rendered += onRender;
+                combat.HitDetected += onHit;
                 try
                 {
-                    Check(combat.Ready && combat.View != null && combat.View.gameObject.activeInHierarchy, "FPP view not ready");
-                    if (combat.View == null) yield break;
-                    Check(combat.View.RightGrip != null && combat.View.LeftHand != null, "virtual hands missing");
+                    Check(combat.Ready && view != null && view.gameObject.activeInHierarchy, variant + ": FPP view not ready");
+                    if (view == null) yield break;
+                    Check(variant == FppViewVariant.Art ? view is FppArtArmsView : view is FppHandsView, variant + ": wrong view type " + view.GetType().Name);
+                    int activeViews = 0;
+                    foreach (FppArtArmsView v in FindObjectsByType<FppArtArmsView>(FindObjectsInactive.Exclude)) activeViews++;
+                    foreach (FppHandsView v in FindObjectsByType<FppHandsView>(FindObjectsInactive.Exclude)) activeViews++;
+                    Check(activeViews == 1, variant + ": active FPP views = " + activeViews + " (bones must never be driven twice)");
+                    Check(view.RightGrip != null && view.LeftHand != null, variant + ": virtual hands missing");
                     Check(_ar.Hud.ActionButtons[0].interactable && _ar.Hud.ActionButtons[1].interactable, "combat buttons not enabled");
-                    Pose pose = FppHandsView.SwordPose(FppCombatAction.Attack, 0.30f);
-                    Vector3 localMid = pose.position + pose.rotation * Vector3.Lerp(FppHandsView.BladeBase, FppHandsView.BladeTip, 0.5f);
-                    Transform target = _ar.SpawnedMob.transform;
-                    target.rotation = _ar.ArCamera.transform.rotation;
-                    target.position = _ar.ArCamera.transform.TransformPoint(localMid) - target.TransformVector(new Vector3(0, 0.33f, -0.13f));
+                    FppPoseContract contract = view.Contract;
+                    Pose rest = contract.SwordPose(FppCombatAction.Idle, 0f);
+                    float restErr = (CamLocal(cam, view.RightGrip.position) - rest.position).magnitude;
+                    Check(restErr < 0.008f, variant + ": idle grip off contract rest by " + (restErr * 1000f).ToString("0.0") + " mm");
+
+                    PlaceTargetOnBlade(contract);
                     Check(combat.BladeIntersects(_ar.SpawnedMob, 0.30f), "near target should intersect blade");
-                    target.position += Vector3.right * 20f;
+                    _ar.SpawnedMob.transform.position += Vector3.right * 20f;
                     Check(!combat.BladeIntersects(_ar.SpawnedMob, 0.30f), "distant target incorrectly intersects blade");
                     int before = combat.HitCount;
                     _ar.Hud.ActionButtons[0].onClick.Invoke();
@@ -682,32 +727,170 @@ namespace MetinAR.Editor
                     _ar.Hud.ActionButtons[1].onClick.Invoke();
                     Check(combat.Timeline.SwingId == swing && combat.Timeline.Action == FppCombatAction.Attack, "tap spam restarted/overlapped attack");
                     yield return WaitUntil(() => combat.Timeline.Action == FppCombatAction.Idle, 3f);
-                    Check(combat.HitCount == before, "attack hit a distant target");
-                    target.position = _ar.ArCamera.transform.TransformPoint(localMid) - target.TransformVector(new Vector3(0, 0.33f, -0.13f));
+                    Check(combat.HitCount == before && hitEvents == 0, "attack hit a distant target");
+
+                    PlaceTargetOnBlade(contract);
                     _ar.Hud.ActionButtons[0].onClick.Invoke();
                     yield return WaitUntil(() => combat.Timeline.Action == FppCombatAction.Idle, 3f);
-                    Check(combat.HitCount == before + 1, "near swing must hit exactly once");
+                    Check(combat.HitCount == before + 1 && hitEvents == 1, "near swing must hit exactly once (count " + (combat.HitCount - before) + ", events " + hitEvents + ")");
+
+                    // Cancel mid-swing (before the hit window): no hit, no stale replay after tracking returns.
+                    before = combat.HitCount;
+                    _ar.Hud.ActionButtons[0].onClick.Invoke();
+                    yield return WaitUntil(() => combat.Timeline.Elapsed >= 0.05f || combat.Timeline.Action != FppCombatAction.Attack, 2f);
+                    Check(combat.Timeline.Action == FppCombatAction.Attack && combat.Timeline.Elapsed < FppCombatTimeline.HitStartSeconds,
+                        "could not reach pre-hit part of swing (elapsed " + combat.Timeline.Elapsed + ")");
+                    _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionInitializing;
+                    yield return Frames(2);
+                    Check(combat.Timeline.Action == FppCombatAction.Idle && !view.gameObject.activeSelf, "tracking loss did not cancel the swing / hide FPP");
+                    _ar.FrameSourceOverride = tracking;
+                    yield return Frames(3);
+                    float waitEnd = Time.realtimeSinceStartup + 1f;
+                    while (Time.realtimeSinceStartup < waitEnd) yield return null;
+                    Check(combat.HitCount == before && combat.Timeline.Action == FppCombatAction.Idle, "cancelled swing replayed or hit after resume");
+                    Check(combat.Ready && view.gameObject.activeSelf, "FPP not ready again after tracking returned");
+
                     before = combat.HitCount;
                     _ar.Hud.ActionButtons[1].onClick.Invoke();
                     Check(combat.Timeline.Action == FppCombatAction.Aura, "Aura button not bound");
                     yield return WaitUntil(() => combat.Timeline.Elapsed >= 0.4f, 3f);
                     Check(combat.Timeline.Action == FppCombatAction.Aura, "Aura cancelled too early");
-                    Vector3 expectedLeft = combat.View.RightGrip.localPosition + combat.View.RightGrip.localRotation * new Vector3(0, -0.12f, 0);
-                    Check(Vector3.Distance(combat.View.LeftHand.localPosition, expectedLeft) < 0.015f, "left hand did not grip hilt");
+                    Vector3 expectedLeft = CamLocal(cam, view.RightGrip.TransformPoint(FppPoseContract.LeftGripOffset));
+                    float gripErr = (CamLocal(cam, view.LeftHand.position) - expectedLeft).magnitude;
+                    Check(gripErr < 0.015f, variant + ": left hand did not grip hilt (" + (gripErr * 1000f).ToString("0.0") + " mm)");
                     yield return WaitUntil(() => combat.Timeline.Action == FppCombatAction.Idle, 3f);
                     Check(combat.Timeline.AuraActive, "Aura blade effect missing after activation");
+                    yield return Frames(2);
+                    bool ribbons = view is FppArtArmsView art ? art.AuraRibbonsVisible : ((FppHandsView)view).AuraRibbonsVisible;
+                    Check(ribbons, variant + ": Aura ribbons not visible while Aura active");
                     Check(combat.HitCount == before, "Aura must not deal hits");
                     Check(!combat.RequestAura(), "active Aura can be spammed");
+                    Debug.Log("[FppInteg] " + variant + " contract=" + contract.Id + " tracked-blade vs visible grip over " + samples
+                        + " rendered action frames: max " + (maxPos * 1000f).ToString("0.00") + " mm / " + maxAng.ToString("0.00")
+                        + " deg; left hand max " + (maxLeft * 1000f).ToString("0.00") + " mm; Aura grip " + (gripErr * 1000f).ToString("0.0") + " mm; hits=" + combat.HitCount);
+                    Check(samples > 20, variant + ": too few rendered action frames sampled: " + samples);
+                    Check(maxPos < 0.002f && maxAng < 1f, variant + ": visible grip differs from hit contract: " + (maxPos * 1000f).ToString("0.00") + " mm / " + maxAng.ToString("0.00") + " deg");
+                    Check(maxLeft < 0.002f, variant + ": visible left hand differs from contract: " + (maxLeft * 1000f).ToString("0.00") + " mm");
                     _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionInitializing;
                     yield return Frames(2);
-                    Check(!combat.Ready && !combat.Timeline.AuraActive && !combat.View.gameObject.activeSelf, "tracking loss did not cancel/hide FPP");
+                    Check(!combat.Ready && !combat.Timeline.AuraActive && !view.gameObject.activeSelf, "tracking loss did not cancel/hide FPP");
                     Check(!combat.RequestAttack() && !combat.RequestAura(), "actions accepted with tracking lost");
                 }
                 finally
                 {
+                    combat.Rendered -= onRender;
+                    combat.HitDetected -= onHit;
                     combat.CancelActions();
                     _ar.SpawnedMob.transform.SetPositionAndRotation(savedPosition, savedRotation);
                     _ar.FrameSourceOverride = savedFrameSource;
+                }
+            }
+
+            /// <summary>
+            /// Portrait framing preview of the real runtime model (Play Mode, skinned) at Idle/Attack/Aura poses through a
+            /// separate probe camera with the ESTIMATED A31 portrait FOV. The AR camera projection/transform is not changed.
+            /// Requirement (#31): right grip, guard and left hand visible at rest. Screenshots: Builds/metinar-fpp-integ/.
+            /// </summary>
+            private IEnumerator FppFramingPreview(FppViewVariant variant)
+            {
+                FppCombatController combat = _ar != null ? _ar.FppCombat : null;
+                Check(combat != null, "FPP component missing");
+                if (combat == null) yield break;
+                var savedFrameSource = _ar.FrameSourceOverride;
+                _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionTracking;
+                combat.SetVariant(variant);
+                yield return Frames(4);
+                Camera arCam = _ar.ArCamera;
+                var probeGo = new GameObject("FppPortraitProbe");
+                probeGo.transform.SetParent(arCam.transform, false);
+                Camera probe = probeGo.AddComponent<Camera>();
+                probe.enabled = false;
+                probe.fieldOfView = A31EstimatedPortraitVerticalFov;
+                probe.aspect = (float)PreviewWidth / PreviewHeight;
+                probe.nearClipPlane = 0.05f;
+                probe.farClipPlane = 50f;
+                probe.clearFlags = CameraClearFlags.SolidColor;
+                probe.backgroundColor = new Color(0.42f, 0.44f, 0.47f);
+                string outDir = Path.Combine(Path.GetDirectoryName(ResultsPath)!, "metinar-fpp-integ");
+                Directory.CreateDirectory(outDir);
+                var poses = new (FppCombatAction action, float t)[]
+                {
+                    (FppCombatAction.Idle, 0f), (FppCombatAction.Attack, 0.18f), (FppCombatAction.Attack, 0.30f),
+                    (FppCombatAction.Attack, 0.42f), (FppCombatAction.Attack, 0.60f), (FppCombatAction.Aura, 0.39f),
+                    (FppCombatAction.Aura, 0.65f), (FppCombatAction.Aura, 1.00f),
+                };
+                var report = new StringBuilder();
+                bool restGrip = false, restGuard = false, restLeft = false;
+                int written = 0;
+                try
+                {
+                    IFppHandsView view = combat.View;
+                    Check(view != null && combat.Ready, variant + ": FPP view not ready for preview");
+                    if (view == null) yield break;
+                    report.Append("[FppInteg] framing ").Append(variant).Append(" contract=").Append(view.Contract.Id)
+                        .Append(" arCamera(fov=").Append(arCam.fieldOfView.ToString("0.0")).Append(", aspect=").Append(arCam.aspect.ToString("0.000"))
+                        .Append(", untouched) probe(fov=").Append(A31EstimatedPortraitVerticalFov).Append(" ESTIMATE, ").Append(PreviewWidth).Append('x').Append(PreviewHeight).Append(')');
+                    foreach (var (action, t) in poses)
+                    {
+                        float aura = action == FppCombatAction.Aura && t >= FppCombatTimeline.AuraBurstSeconds
+                            ? FppCombatTimeline.AuraDurationSeconds - (t - FppCombatTimeline.AuraBurstSeconds) : 0f;
+                        combat.SetPreviewPose(action, t, aura);
+                        yield return Frames(3); // pose held >= 1 full frame so skinning of the rendered frame matches
+                        bool grip = InView(probe, view.RightGrip.position);
+                        bool guard = InView(probe, view.RightGrip.TransformPoint(FppPoseContract.GuardCentre));
+                        bool tip = InView(probe, view.RightGrip.TransformPoint(FppPoseContract.BladeTip));
+                        bool left = InView(probe, view.LeftHand.position);
+                        Pose e = view.Contract.SwordPose(action, t);
+                        float err = (CamLocal(arCam.transform, view.RightGrip.position) - e.position).magnitude;
+                        Check(err < 0.008f, variant + ": preview grip off contract at " + action + " " + t + " by " + (err * 1000f).ToString("0.0") + " mm");
+                        if (action == FppCombatAction.Idle) { restGrip = grip; restGuard = guard; restLeft = left; }
+                        Vector3 vg = probe.WorldToViewportPoint(view.RightGrip.position), vl = probe.WorldToViewportPoint(view.LeftHand.position);
+                        report.Append("\n  ").Append(action).Append(' ').Append(t.ToString("0.00")).Append(": grip=").Append(grip)
+                            .Append(" (").Append(vg.x.ToString("0.00")).Append(',').Append(vg.y.ToString("0.00")).Append(") guard=").Append(guard)
+                            .Append(" tip=").Append(tip).Append(" left=").Append(left).Append(" (").Append(vl.x.ToString("0.00")).Append(',').Append(vl.y.ToString("0.00")).Append(')');
+                        string file = Path.Combine(outDir, "fpp_" + variant.ToString().ToLowerInvariant() + "_portrait_" + action + "_" + Mathf.RoundToInt(t * 100f).ToString("000") + ".png");
+                        if (Shot(probe, file)) written++;
+                    }
+                    Debug.Log(report.ToString());
+                    Check(written == poses.Length, variant + ": screenshots written " + written + "/" + poses.Length);
+                    Check(restGrip && restGuard && restLeft, variant + ": rest pose not visible in estimated portrait frame (grip=" + restGrip + ", guard=" + restGuard + ", left=" + restLeft + ")");
+                }
+                finally
+                {
+                    combat.ClearPreviewPose();
+                    combat.CancelActions();
+                    Object.Destroy(probeGo);
+                    _ar.FrameSourceOverride = savedFrameSource;
+                }
+            }
+
+            private static bool InView(Camera cam, Vector3 world)
+            {
+                Vector3 v = cam.WorldToViewportPoint(world);
+                return v.z > cam.nearClipPlane && v.x >= 0f && v.x <= 1f && v.y >= 0f && v.y <= 1f;
+            }
+
+            private static bool Shot(Camera cam, string file)
+            {
+                var rt = RenderTexture.GetTemporary(PreviewWidth, PreviewHeight, 24, RenderTextureFormat.ARGB32);
+                RenderTexture prev = RenderTexture.active;
+                try
+                {
+                    cam.targetTexture = rt;
+                    cam.Render();
+                    RenderTexture.active = rt;
+                    var tex = new Texture2D(PreviewWidth, PreviewHeight, TextureFormat.RGB24, false);
+                    tex.ReadPixels(new Rect(0, 0, PreviewWidth, PreviewHeight), 0, 0);
+                    tex.Apply();
+                    File.WriteAllBytes(file, tex.EncodeToPNG());
+                    Object.Destroy(tex);
+                    return true;
+                }
+                finally
+                {
+                    cam.targetTexture = null;
+                    RenderTexture.active = prev;
+                    RenderTexture.ReleaseTemporary(rt);
                 }
             }
 
@@ -725,7 +908,7 @@ namespace MetinAR.Editor
                 Check(ActiveScenePath == ArEncounterScenes.WorldMapScenePath, "not back on world map: " + ActiveScenePath);
                 Check(FindAnyObjectByType<ArEncounterSceneController>() == null && MobCount() == 0, "AR objects left after exit");
                 Check(!ArEncounterHandoff.HasPending, "handoff pending after exit");
-                Check(FindAnyObjectByType<FppHandsView>() == null, "FPP view leaked after scene exit");
+                Check(FindAnyObjectByType<FppHandsView>() == null && FindAnyObjectByType<FppArtArmsView>() == null, "FPP view leaked after scene exit");
                 PrototypeWorldPlacement placement = FindAnyObjectByType<PrototypeWorldPlacement>();
                 yield return WaitUntil(() => placement != null && placement.IsInitialized, 10f);
                 Check(placement != null && placement.IsInitialized, "world map did not re-initialize");

@@ -3,36 +3,77 @@ using UnityEngine;
 
 namespace MetinAR.ArEncounter
 {
+    /// <summary>Which visible FPP model is shown. Only one exists at a time.</summary>
+    public enum FppViewVariant
+    {
+        /// <summary>#34 / PR #36 rig + Idle/Attack/AuraActivate clips on the #31 timeline (integration preview default).</summary>
+        Art,
+        /// <summary>Original #31 procedural blockout, kept as a comparison variant.</summary>
+        Procedural,
+    }
+
     /// <summary>First-person button combat over the existing world-anchored encounter.</summary>
     public sealed class FppCombatController : MonoBehaviour
     {
         private ArEncounterSceneController _encounter;
-        private FppHandsView _view;
+        private IFppHandsView _view;
+        private FppViewVariant _variant = FppViewVariant.Art;
+        private bool _hasPreview;
+        private FppCombatAction _previewAction;
+        private float _previewElapsed, _previewAuraRemaining;
         private bool _paused, _unfocused;
         private bool _hasCameraPose;
         private Vector3 _lastCameraPosition;
         private Quaternion _lastCameraRotation;
         public FppCombatTimeline Timeline { get; } = new FppCombatTimeline();
-        public FppHandsView View => _view;
+        public IFppHandsView View => ViewAlive ? _view : null;
+        private bool ViewAlive => _view is UnityEngine.Object o && o != null;
+        public FppViewVariant Variant => _variant;
+        /// <summary>Raised after the visible model was posed for this frame (test-observable).</summary>
+        public event Action<FppCombatAction, float> Rendered;
         public int HitCount { get; private set; }
         public event Action<ArEncounterMob, int> HitDetected;
         public bool Ready => isActiveAndEnabled && !_paused && !_unfocused && _encounter != null
             && !_encounter.IsExiting && _encounter.State == ArEncounterState.Placed
             && _encounter.LastSessionStatus == ArSessionStatus.SessionTracking
-            && _encounter.SpawnedMob != null && _encounter.ArCamera != null && _view != null;
+            && _encounter.SpawnedMob != null && _encounter.ArCamera != null && ViewAlive;
 
         public void Initialize(ArEncounterSceneController encounter)
         {
             _encounter = encounter;
         }
 
-        public bool RequestAttack() => Timeline.TryAttack(Ready);
-        public bool RequestAura() => Timeline.TryAura(Ready);
+        public bool RequestAttack() => !_hasPreview && Timeline.TryAttack(Ready);
+        public bool RequestAura() => !_hasPreview && Timeline.TryAura(Ready);
+
+        /// <summary>Switches the visible variant; cancels any action and rebuilds the view on the next frame.</summary>
+        public void SetVariant(FppViewVariant variant)
+        {
+            if (variant == _variant && ViewAlive) return;
+            CancelActions();
+            DestroyView();
+            _variant = variant;
+        }
+
+        /// <summary>
+        /// Editor framing preview only: hold the visible model at a fixed pose of the contract (no input, no hits).
+        /// Used for portrait screenshots; the gameplay timeline is cancelled while a preview pose is held.
+        /// </summary>
+        public void SetPreviewPose(FppCombatAction action, float elapsed, float auraRemaining)
+        {
+            Timeline.Cancel();
+            _hasPreview = true;
+            _previewAction = action;
+            _previewElapsed = elapsed;
+            _previewAuraRemaining = auraRemaining;
+        }
+
+        public void ClearPreviewPose() => _hasPreview = false;
 
         private void LateUpdate()
         {
             if (_encounter == null) return;
-            if (_view == null && _encounter.SpawnedMob != null && _encounter.ArCamera != null)
+            if (!ViewAlive && _encounter.SpawnedMob != null && _encounter.ArCamera != null)
                 CreateView();
             bool ready = Ready;
             if (ready)
@@ -48,14 +89,23 @@ namespace MetinAR.ArEncounter
             }
             else _hasCameraPose = false;
 
-            Timeline.Tick(Time.unscaledDeltaTime, ready);
-            if (_view != null)
+            Timeline.Tick(Time.unscaledDeltaTime, ready && !_hasPreview);
+            if (ViewAlive)
             {
                 _view.gameObject.SetActive(ready);
                 if (ready)
                 {
-                    if (Timeline.HasHitWindow) CheckBladeSweep();
-                    _view.Render(Timeline, Time.unscaledTime);
+                    if (_hasPreview)
+                    {
+                        _view.Render(_previewAction, _previewElapsed, _previewAuraRemaining, _previewElapsed);
+                        Rendered?.Invoke(_previewAction, _previewElapsed);
+                    }
+                    else
+                    {
+                        if (Timeline.HasHitWindow) CheckBladeSweep();
+                        _view.Render(Timeline.Action, Timeline.Elapsed, Timeline.AuraRemaining, Time.unscaledTime);
+                        Rendered?.Invoke(Timeline.Action, Timeline.Elapsed);
+                    }
                 }
             }
             _encounter.Hud?.RefreshCombatButtons(ready, Timeline);
@@ -77,12 +127,37 @@ namespace MetinAR.ArEncounter
                 enabled = false;
                 return;
             }
-            var root = new GameObject("FppHandsView");
-            root.transform.SetParent(_encounter.ArCamera.transform, false);
-            _view = root.AddComponent<FppHandsView>();
-            _view.Build(body, energy);
-            _view.Render(Timeline, 0f);
-            root.SetActive(false);
+            if (_variant == FppViewVariant.Art)
+            {
+                var config = Resources.Load<FppArtPreviewConfig>(FppArtPreviewConfig.ResourcePath);
+                FppArtArmsView art = FppArtArmsView.Create(_encounter.ArCamera.transform, config, energy);
+                if (art == null)
+                {
+                    // No silent fallback to the procedural variant: the art preview must be visibly broken.
+                    Debug.LogError("[FppCombat] FPP art preview config/prefab/clips missing or invalid; cannot build art view.");
+                    enabled = false;
+                    return;
+                }
+                _view = art;
+            }
+            else
+            {
+                var root = new GameObject("FppHandsView");
+                root.transform.SetParent(_encounter.ArCamera.transform, false);
+                var procedural = root.AddComponent<FppHandsView>();
+                procedural.Build(body, energy, FppPoseContract.FramingV2Candidate);
+                _view = procedural;
+            }
+            _view.Render(FppCombatAction.Idle, 0f, 0f, 0f);
+            _view.gameObject.SetActive(false);
+        }
+
+        private void DestroyView()
+        {
+            if (!ViewAlive) { _view = null; return; }
+            GameObject go = _view.gameObject;
+            _view = null;
+            Destroy(go);
         }
 
         private void CheckBladeSweep()
@@ -110,10 +185,11 @@ namespace MetinAR.ArEncounter
         {
             if (mob == null || _encounter == null || _encounter.ArCamera == null
                 || float.IsNaN(attackTime) || float.IsInfinity(attackTime)) return false;
-            Pose pose = FppHandsView.SwordPose(FppCombatAction.Attack, attackTime);
+            Pose pose = ViewAlive ? _view.Contract.SwordPose(FppCombatAction.Attack, attackTime)
+                : FppPoseContract.BakedClipsV1.SwordPose(FppCombatAction.Attack, attackTime);
             Transform camera = _encounter.ArCamera.transform;
-            Vector3 a = mob.transform.InverseTransformPoint(camera.TransformPoint(pose.position + pose.rotation * FppHandsView.BladeBase));
-            Vector3 b = mob.transform.InverseTransformPoint(camera.TransformPoint(pose.position + pose.rotation * FppHandsView.BladeTip));
+            Vector3 a = mob.transform.InverseTransformPoint(camera.TransformPoint(pose.position + pose.rotation * FppPoseContract.BladeBase));
+            Vector3 b = mob.transform.InverseTransformPoint(camera.TransformPoint(pose.position + pose.rotation * FppPoseContract.BladeTip));
             // Covers the existing abdomen/cephalothorax plus a 2.5 cm prototype tolerance. Legs/label are excluded.
             return FppHitGeometry.IntersectsBox(Point(a), Point(b), new FppPoint(-0.285, 0.125, -0.605), new FppPoint(0.285, 0.595, 0.345));
         }
@@ -122,8 +198,9 @@ namespace MetinAR.ArEncounter
         public void CancelActions()
         {
             Timeline.Cancel();
+            _hasPreview = false;
             _hasCameraPose = false;
-            if (_view != null) _view.gameObject.SetActive(false);
+            if (ViewAlive) _view.gameObject.SetActive(false);
             _encounter?.Hud?.RefreshCombatButtons(false, Timeline);
         }
         private void OnApplicationPause(bool paused) { _paused = paused; if (paused) CancelActions(); }
@@ -132,7 +209,7 @@ namespace MetinAR.ArEncounter
         private void OnDestroy()
         {
             CancelActions();
-            if (_view != null) Destroy(_view.gameObject);
+            DestroyView();
         }
     }
 }

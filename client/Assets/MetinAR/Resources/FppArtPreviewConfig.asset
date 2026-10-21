@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 27e40ba8ddc248309d1b63872a8585d9, type: 3}
+  m_Name: FppArtPreviewConfig
+  m_EditorClassIdentifier: 
+  ArmsPrefab: {fileID: 6217380364688890643, guid: 430e2e46e8d02704189683a1fb9cde0f, type: 3}
+  Idle: {fileID: -623603649343465320, guid: 50a3dd6231664e64e8245946e5935aae, type: 3}
+  Attack: {fileID: -623603649343465320, guid: 5e069cdda32e56f46881b346ca7c8db4, type: 3}
+  AuraActivate: {fileID: -623603649343465320, guid: 8624d9d3953938547b16189d42b68b1a, type: 3}

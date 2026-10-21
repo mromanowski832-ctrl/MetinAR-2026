@@ -5,26 +5,26 @@ using UnityEngine.Rendering;
 namespace MetinAR.ArEncounter
 {
     /// <summary>
-    /// Original procedural glove/forearm blockout, sword and energy ribbons. No extracted art or inference.
-    /// Animation and hit sampling use the SAME sword pose. Visual approval on a physical phone is pending.
+    /// Procedural comparison variant (#31): original glove/forearm blockout, sword and energy ribbons. No extracted art.
+    /// Animation and hit sampling use the SAME contract pose. Visual approval on a physical phone is pending.
     /// </summary>
-    public sealed class FppHandsView : MonoBehaviour
+    public sealed class FppHandsView : MonoBehaviour, IFppHandsView
     {
-        private static readonly Vector3 RestPosition = new Vector3(0.18f, -0.19f, 0.46f);
-        private static readonly Quaternion RestRotation = Quaternion.Euler(15f, 0f, -14f);
-        private static readonly Vector3 LeftRest = new Vector3(-0.19f, -0.25f, 0.43f);
-        public static readonly Vector3 BladeBase = new Vector3(0f, 0.13f, 0f);
-        public static readonly Vector3 BladeTip = new Vector3(0f, 0.94f, 0f);
+        public static readonly Vector3 BladeBase = FppPoseContract.BladeBase;
+        public static readonly Vector3 BladeTip = FppPoseContract.BladeTip;
 
         private readonly List<Mesh> _meshes = new List<Mesh>();
         private readonly List<Material> _materials = new List<Material>();
         private Transform _rightGrip, _leftHand, _rightArm, _leftArm;
-        private LineRenderer _ribbonA, _ribbonB, _burst;
+        private FppAuraFx _aura;
         public Transform RightGrip => _rightGrip;
         public Transform LeftHand => _leftHand;
+        public FppPoseContract Contract { get; private set; } = FppPoseContract.FramingV2Candidate;
+        public bool AuraRibbonsVisible => _aura != null && _aura.RibbonsVisible;
 
-        public void Build(Material bodySource, Material energySource)
+        public void Build(Material bodySource, Material energySource, FppPoseContract contract)
         {
+            Contract = contract ?? FppPoseContract.FramingV2Candidate;
             Material glove = MaterialCopy(bodySource, new Color(0.22f, 0.12f, 0.075f), "FppLeather");
             Material steel = MaterialCopy(bodySource, new Color(0.7f, 0.77f, 0.82f), "FppSteel");
             Material gold = MaterialCopy(bodySource, new Color(0.78f, 0.52f, 0.14f), "FppGold");
@@ -54,80 +54,18 @@ namespace MetinAR.ArEncounter
             Mesh armMesh = arm.Finish();
             _rightArm = DrawMesh("RightForearm", transform, armMesh, glove);
             _leftArm = DrawMesh("LeftForearm", transform, armMesh, glove);
-            _ribbonA = Ribbon("AuraRibbonA", energy, 24, false);
-            _ribbonB = Ribbon("AuraRibbonB", energy, 24, false);
-            _burst = Ribbon("AuraBurst", energy, 32, true);
+            _aura = new FppAuraFx(_rightGrip, energy);
         }
 
-        public static Pose SwordPose(FppCombatAction action, float time)
+        public void Render(FppCombatAction action, float elapsed, float auraRemaining, float visualTime)
         {
-            if (action == FppCombatAction.Attack)
-            {
-                Vector3 windup = new Vector3(0.25f, -0.08f, 0.48f);
-                Quaternion windRotation = Quaternion.Euler(0f, -10f, -65f);
-                Vector3 end = new Vector3(-0.15f, -0.22f, 0.50f);
-                Quaternion endRotation = Quaternion.Euler(70f, 30f, 60f);
-                if (time < FppCombatTimeline.HitStartSeconds)
-                    return Blend(RestPosition, RestRotation, windup, windRotation, Ease(time / FppCombatTimeline.HitStartSeconds));
-                if (time <= FppCombatTimeline.HitEndSeconds)
-                    return Blend(windup, windRotation, end, endRotation,
-                        Ease((time - FppCombatTimeline.HitStartSeconds) / (FppCombatTimeline.HitEndSeconds - FppCombatTimeline.HitStartSeconds)));
-                return Blend(end, endRotation, RestPosition, RestRotation,
-                    Ease((time - FppCombatTimeline.HitEndSeconds) / (FppCombatTimeline.AttackSeconds - FppCombatTimeline.HitEndSeconds)));
-            }
-            if (action == FppCombatAction.Aura)
-            {
-                float blend = time < 0.9f ? Ease(time / 0.25f) : 1f - Ease((time - 0.9f) / 0.25f);
-                return Blend(RestPosition, RestRotation, new Vector3(0.02f, -0.18f, 0.52f), Quaternion.Euler(12, 0, 0), blend);
-            }
-            return new Pose(RestPosition, RestRotation);
-        }
-
-        public static float LeftGripBlend(FppCombatAction action, float time)
-        {
-            if (action != FppCombatAction.Aura) return 0f;
-            return time < 0.9f ? Ease(time / 0.35f) : 1f - Ease((time - 0.9f) / 0.25f);
-        }
-
-        public void Render(FppCombatTimeline timeline, float visualTime)
-        {
-            Pose pose = SwordPose(timeline.Action, timeline.Elapsed);
+            Pose pose = Contract.SwordPose(action, elapsed);
             _rightGrip.SetLocalPositionAndRotation(pose.position, pose.rotation);
-            float grip = LeftGripBlend(timeline.Action, timeline.Elapsed);
-            Vector3 leftTarget = pose.position + pose.rotation * new Vector3(0f, -0.12f, 0f);
-            _leftHand.SetLocalPositionAndRotation(Vector3.Lerp(LeftRest, leftTarget, grip),
-                Quaternion.Slerp(Quaternion.Euler(0, 0, 12), pose.rotation, grip));
+            Pose left = Contract.LeftHandPose(action, elapsed);
+            _leftHand.SetLocalPositionAndRotation(left.position, left.rotation);
             Arm(_rightArm, new Vector3(0.28f, -0.46f, 0.19f), pose.position + pose.rotation * new Vector3(0.065f, -0.04f, 0));
             Arm(_leftArm, new Vector3(-0.28f, -0.46f, 0.19f), _leftHand.localPosition + _leftHand.localRotation * new Vector3(-0.065f, -0.04f, 0));
-            _ribbonA.enabled = _ribbonB.enabled = timeline.AuraActive;
-            if (timeline.AuraActive)
-            {
-                float fade = Mathf.Min(1f, timeline.AuraRemaining / 0.4f);
-                _ribbonA.widthMultiplier = _ribbonB.widthMultiplier = 0.012f * fade;
-                for (int i = 0; i < 24; i++)
-                {
-                    float f = i / 23f, angle = f * Mathf.PI * 5f + visualTime * 6f;
-                    float radius = 0.045f + 0.01f * Mathf.Sin(visualTime * 8f + f * 6f);
-                    Vector3 offset = new Vector3(Mathf.Cos(angle) * radius, 0, Mathf.Sin(angle) * radius);
-                    Vector3 centre = Vector3.Lerp(BladeBase, BladeTip, f);
-                    _ribbonA.SetPosition(i, centre + offset);
-                    _ribbonB.SetPosition(i, centre - offset);
-                }
-            }
-            float burstTime = timeline.Elapsed - FppCombatTimeline.AuraBurstSeconds;
-            bool burst = timeline.Action == FppCombatAction.Aura && burstTime >= 0f && burstTime < 0.28f;
-            _burst.enabled = burst;
-            if (burst)
-            {
-                float phase = burstTime / 0.28f;
-                _burst.widthMultiplier = 0.035f * (1f - phase);
-                for (int i = 0; i < 32; i++)
-                {
-                    float angle = i * Mathf.PI * 2f / 32f;
-                    _burst.SetPosition(i, new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * Mathf.Lerp(0.08f, 0.35f, phase)
-                        + new Vector3(0, 0.38f, 0));
-                }
-            }
+            _aura.Render(action, elapsed, auraRemaining, visualTime);
         }
 
         private static void Arm(Transform arm, Vector3 a, Vector3 b)
@@ -136,9 +74,6 @@ namespace MetinAR.ArEncounter
             arm.localRotation = Quaternion.FromToRotation(Vector3.up, b - a);
             arm.localScale = new Vector3(0.075f, Vector3.Distance(a, b), 0.075f);
         }
-        private static float Ease(float t) => Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t));
-        private static Pose Blend(Vector3 a, Quaternion ar, Vector3 b, Quaternion br, float t)
-            => new Pose(Vector3.Lerp(a, b, t), Quaternion.Slerp(ar, br, t));
         private static Transform Child(string name, Transform parent)
         {
             var child = new GameObject(name).transform;
@@ -163,18 +98,6 @@ namespace MetinAR.ArEncounter
             renderer.receiveShadows = false;
             if (!_meshes.Contains(mesh)) _meshes.Add(mesh);
             return t;
-        }
-        private LineRenderer Ribbon(string name, Material material, int count, bool loop)
-        {
-            var line = Child(name, _rightGrip).gameObject.AddComponent<LineRenderer>();
-            line.useWorldSpace = false;
-            line.positionCount = count;
-            line.loop = loop;
-            line.sharedMaterial = material;
-            line.shadowCastingMode = ShadowCastingMode.Off;
-            line.receiveShadows = false;
-            line.enabled = false;
-            return line;
         }
         private Mesh HandMesh(float side)
         {
