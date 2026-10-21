@@ -39,13 +39,14 @@ namespace AssetPipeline.Tests
             return b;
         }
 
-        internal static string Meta(int loadType, int compression, string quality = "1", int mono = 1, int bg = 0, int preload = 1, bool android = true)
+        internal static string Meta(int loadType, int compression, string quality = "1", int mono = 1, int bg = 0, int preload = 1, bool android = true, bool ios = true, int normalize = 0, bool legacyKeys = false)
         {
             string s = "      serializedVersion: 2\n      loadType: " + loadType + "\n      sampleRateSetting: 0\n      sampleRateOverride: 44100\n      compressionFormat: " + compression +
                        "\n      quality: " + quality + "\n      conversionMode: 0\n      preloadAudioData: " + preload + "\n";
-            return "fileFormatVersion: 2\nguid: 0123456789abcdef0123456789abcdef\nAudioImporter:\n  externalObjects: {}\n  serializedVersion: 7\n  defaultSettings:\n" +
-                   s.Replace("      ", "    ") + "  platformSettingOverrides:" + (android ? "\n    7:\n" + s : " {}\n") +
-                   "  forceToMono: " + mono + "\n  normalize: 0\n  loadInBackground: " + bg + "\n  ambisonic: 0\n  3D: 1\n  userData: \n";
+            string overrides = (android ? "    " + (legacyKeys ? "7" : "Android") + ":\n" + s : string.Empty) + (ios ? "    " + (legacyKeys ? "4" : "iPhone") + ":\n" + s : string.Empty);
+            return "fileFormatVersion: 2\nguid: 0123456789abcdef0123456789abcdef\nAudioImporter:\n  externalObjects: {}\n  serializedVersion: " + (legacyKeys ? 7 : 8) + "\n  defaultSettings:\n" +
+                   s.Replace("      ", "    ") + "  platformSettingOverrides:" + (overrides.Length > 0 ? "\n" + overrides : " {}\n") +
+                   "  forceToMono: " + mono + "\n  normalize: " + normalize + "\n  loadInBackground: " + bg + "\n  ambisonic: 0\n  3D: 1\n  userData: \n";
         }
 
         private static string Ledger(string file, string origin = "original", string license = "MetinAR-Owned", string source = "procedural", string sha = Sha, string author = "MetinAR project")
@@ -149,6 +150,22 @@ namespace AssetPipeline.Tests
         }
 
         [Fact]
+        public void MetaReaderAcceptsUnity6PlatformNamesAndLegacyNumericKeys()
+        {
+            AudioImportProfile sfx = AudioPipelineRules.GetProfile(AudioCategory.UiSfx);
+            AudioMetaSettings v8 = AudioMetaSettings.Parse(Meta(0, 2));
+            AudioMetaSettings v7 = AudioMetaSettings.Parse(Meta(0, 2, legacyKeys: true));
+            Assert.Equal(8, v8.SerializedVersion);
+            Assert.Equal(7, v7.SerializedVersion);
+            Assert.NotNull(v8.Android);
+            Assert.NotNull(v8.Ios);
+            Assert.NotNull(v7.Android);
+            Assert.NotNull(v7.Ios);
+            Assert.Empty(sfx.Compare(v8));
+            Assert.Empty(sfx.Compare(v7));
+        }
+
+        [Fact]
         public void MetaReaderReportsWrongSettings()
         {
             AudioImportProfile sfx = AudioPipelineRules.GetProfile(AudioCategory.CombatSfx);
@@ -156,6 +173,8 @@ namespace AssetPipeline.Tests
             Assert.Contains(sfx.Compare(AudioMetaSettings.Parse(Meta(2, 2))), p => p.Contains("loadType"));
             Assert.Contains(sfx.Compare(AudioMetaSettings.Parse(Meta(0, 2, mono: 0))), p => p.Contains("forceToMono"));
             Assert.Contains(sfx.Compare(AudioMetaSettings.Parse(Meta(0, 2, android: false))), p => p.Contains("Android"));
+            Assert.Contains(sfx.Compare(AudioMetaSettings.Parse(Meta(0, 2, ios: false))), p => p.Contains("iOS"));
+            Assert.Contains(sfx.Compare(AudioMetaSettings.Parse(Meta(0, 2, normalize: 1))), p => p.Contains("normalize"));
             Assert.Contains(sfx.Compare(AudioMetaSettings.Parse("fileFormatVersion: 2\nTextScriptImporter:\n")), p => p.Contains("AudioImporter"));
             AudioImportProfile music = AudioPipelineRules.GetProfile(AudioCategory.Music);
             Assert.Empty(music.Compare(AudioMetaSettings.Parse(Meta(2, 1, "0.5", mono: 0, bg: 1, preload: 0))));
@@ -302,6 +321,21 @@ namespace AssetPipeline.Tests
             };
             var existing = new HashSet<string>(AudioFiles().Select(AudioPipelineRules.LedgerPath));
             Assert.All(required, r => Assert.Contains(r, existing));
+        }
+
+        [Fact]
+        public void CommittedMetasUseTheUnity6000_6AudioImporterLayout()
+        {
+            // Layout confirmed on LuzMen (Unity 6000.6.4f1, METINAR-018): AudioImporter serializedVersion 8,
+            // platformSettingOverrides keyed by platform name (Android, iPhone).
+            foreach (string f in AudioFiles())
+            {
+                AudioMetaSettings m = AudioMetaSettings.Parse(File.ReadAllText(f + ".meta"));
+                Assert.True(m.SerializedVersion == 8, f + ".meta AudioImporter serializedVersion " + m.SerializedVersion + " (expected 8)");
+                string text = File.ReadAllText(f + ".meta");
+                Assert.Contains("\n    Android:\n", text.Replace("\r\n", "\n"));
+                Assert.Contains("\n    iPhone:\n", text.Replace("\r\n", "\n"));
+            }
         }
 
         [Fact]

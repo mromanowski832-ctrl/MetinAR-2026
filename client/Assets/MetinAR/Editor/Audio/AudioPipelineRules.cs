@@ -24,9 +24,15 @@ namespace MetinAR.Editor.Audio
         public const string AmbienceFolder = Root + "/Ambience";
         public const string LicenseLedgerFileName = "LICENSES.md";
 
-        /// <summary>Unity BuildTargetGroup keys used in AudioImporter platformSettingOverrides.</summary>
-        public const string AndroidOverrideKey = "7";
-        public const string IosOverrideKey = "4";
+        /// <summary>
+        /// Keys of AudioImporter platformSettingOverrides. Unity 6000.6 (AudioImporter serializedVersion 8) writes
+        /// platform names; older layouts (serializedVersion 7) used BuildTargetGroup numbers (Android 7, iOS 4).
+        /// Both are accepted when reading.
+        /// </summary>
+        public const string AndroidOverrideKey = "Android";
+        public const string IosOverrideKey = "iPhone";
+        public const string LegacyAndroidOverrideKey = "7";
+        public const string LegacyIosOverrideKey = "4";
 
         public static readonly string[] AudioExtensions = { ".wav", ".ogg", ".mp3", ".aif", ".aiff", ".flac", ".m4a", ".aac" };
 
@@ -347,6 +353,7 @@ namespace MetinAR.Editor.Audio
 
             CompareFlag(problems, "forceToMono", meta.ForceToMono, ForceToMono);
             CompareFlag(problems, "loadInBackground", meta.LoadInBackground, LoadInBackground);
+            CompareFlag(problems, "normalize", meta.Normalize, false);
             CompareSample(problems, "defaultSettings", meta.Default);
             if (meta.Android == null)
             {
@@ -355,6 +362,15 @@ namespace MetinAR.Editor.Audio
             else
             {
                 CompareSample(problems, "Android", meta.Android);
+            }
+
+            if (meta.Ios == null)
+            {
+                problems.Add("iOS override (platformSettingOverrides." + AudioPipelineRules.IosOverrideKey + ") missing");
+            }
+            else
+            {
+                CompareSample(problems, "iOS", meta.Ios);
             }
 
             return problems;
@@ -821,6 +837,10 @@ namespace MetinAR.Editor.Audio
         public string Guid { get; private set; }
         public bool? ForceToMono { get; private set; }
         public bool? LoadInBackground { get; private set; }
+
+        /// <summary>Unity "Normalize" import flag. Must be 0: peak levels are set at synthesis/mastering time.</summary>
+        public bool? Normalize { get; private set; }
+        public int SerializedVersion { get; private set; }
         public AudioMetaSampleSettings Default { get; private set; }
         public AudioMetaSampleSettings Android { get; private set; }
         public AudioMetaSampleSettings Ios { get; private set; }
@@ -897,6 +917,15 @@ namespace MetinAR.Editor.Audio
                     {
                         m.LoadInBackground = value == "1";
                     }
+                    else if (key == "normalize")
+                    {
+                        m.Normalize = value == "1";
+                    }
+                    else if (key == "serializedVersion")
+                    {
+                        int sv;
+                        m.SerializedVersion = int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out sv) ? sv : 0;
+                    }
 
                     continue;
                 }
@@ -905,11 +934,11 @@ namespace MetinAR.Editor.Audio
                 {
                     current = new AudioMetaSampleSettings();
                     currentIndent = indent;
-                    if (key == AudioPipelineRules.AndroidOverrideKey)
+                    if (key == AudioPipelineRules.AndroidOverrideKey || key == AudioPipelineRules.LegacyAndroidOverrideKey)
                     {
                         m.Android = current;
                     }
-                    else if (key == AudioPipelineRules.IosOverrideKey)
+                    else if (key == AudioPipelineRules.IosOverrideKey || key == AudioPipelineRules.LegacyIosOverrideKey)
                     {
                         m.Ios = current;
                     }
