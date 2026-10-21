@@ -36,7 +36,8 @@ Owner of this area: the "Dźwięk i muzyka" bot. Unity / A31 time only through r
 | Music | Ogg Vorbis | Streaming | Vorbis q 0.50 | no | no | yes |
 | Ambience | Ogg Vorbis | Compressed In Memory | Vorbis q 0.40 | no | no | yes |
 
-Set in `defaultSettings` and in the Android (`7`) and iOS (`4`) overrides of every `.meta`. PCM output is rejected by the
+Set in `defaultSettings` and in the `Android` and `iPhone` overrides of every `.meta` (Unity 6000.6 AudioImporter
+layout, serializedVersion 8; the gate also reads the older numeric keys 7/4). `normalize` must be 0. PCM output is rejected by the
 gate. Why ADPCM + Decompress On Load for SFX: short, frequently replayed clips; ADPCM is ~3.5× smaller than PCM in the
 APK and decoding cost at load is negligible; at runtime they play from PCM with no per-play CPU decode, which matters on
 the A31 while AR tracking runs. The whole starter set is ~0.34 MB as PCM in RAM.
@@ -103,6 +104,11 @@ and an AudioMixer with groups Master / SFX / UI / Music, created in the Unity Ed
 
 - `dotnet test tests/AssetPipeline.Tests` — run on the cloud computer (see PR).
 - `tools/qa/Test-RepoHygiene.ps1 -BaseRef origin/main` and `Test-DocLinks.ps1` — run on the cloud computer.
-- Unity import / compile of `AudioImportPostprocessor.cs` and the `.meta` platform overrides: **NOT RUN** (LuzMen slot not
-  requested; needs a short editor-only slot in #33).
+- Unity 6000.6.4f1 on LuzMen (slot in #33, separate fresh checkout `MetinAR-042-audio018`, batchmode): import + compile
+  exit 0, 0 `error CS`; `AudioImportVerifier.RunBatch` (menu *MetinAR/Audio/Verify Audio Import Settings*) PASS for all
+  clips: default/Android/iOS = ADPCM + Decompress On Load + preload, mono, clips 1 ch 44.1 kHz. A probe WAV without
+  `.meta` got the profile from `AudioImportPostprocessor` (incl. `normalize: 0`) and was deleted again. The committed
+  `.meta` files are in the layout Unity writes itself and were not rewritten by a re-import.
+- AudioMixer: not added. Unity has no public API to create an `.mixer` asset from a script; it needs one manual
+  Editor step (Create > Audio Mixer, groups Master/SFX/UI/Music) in a later slot.
 - Listening test on the A31 speaker: **UNVERIFIED**.

@@ -46,6 +46,21 @@ namespace MetinAR.Editor.Audio
             importer.defaultSampleSettings = settings;
             importer.SetOverrideSampleSettings(AndroidPlatform, settings);
             importer.SetOverrideSampleSettings(IosPlatform, settings);
+
+            // Peak levels are set when the sound is made (LICENSES.md / docs); Unity's Normalize would undo them.
+            // AudioImporter has no public property for it, so the serialized field is set; if a future Unity renames
+            // it, the warning below fires and tests/AssetPipeline.Tests still rejects "normalize: 1" in the .meta.
+            var serialized = new SerializedObject(importer);
+            SerializedProperty normalize = serialized.FindProperty("m_Normalize");
+            if (normalize != null)
+            {
+                normalize.boolValue = false;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+            else
+            {
+                Debug.LogWarning("[MetinAR Audio] " + assetPath + ": could not clear Normalize (m_Normalize not found); untick it in the Inspector.");
+            }
         }
     }
 }
