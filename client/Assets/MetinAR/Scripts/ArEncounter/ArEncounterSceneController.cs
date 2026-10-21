@@ -139,6 +139,9 @@ namespace MetinAR.ArEncounter
 
         public bool IsExiting { get; private set; }
 
+        /// <summary>METINAR-020: hit → damage → mob HP → death → EXP/talary (added at runtime in Awake).</summary>
+        public ArEncounterCombat Combat { get; private set; }
+
         public FppCombatController FppCombat { get; private set; }
 
         public void Configure(
@@ -181,6 +184,13 @@ namespace MetinAR.ArEncounter
             }
 
             Debug.Log("[ArEncounter] request " + Request + (RequestFromWorldMap ? " (world map)" : " (direct open)"));
+            Combat = GetComponent<ArEncounterCombat>();
+            if (Combat == null)
+            {
+                Combat = gameObject.AddComponent<ArEncounterCombat>();
+            }
+
+            Combat.Initialize(this);
             if (_hud != null)
             {
                 _hud.Bind(this);
@@ -197,6 +207,8 @@ namespace MetinAR.ArEncounter
             // Owner-approved FPP prototype (#31). Main has no live-hand inference dependency.
             FppCombat = gameObject.AddComponent<FppCombatController>();
             FppCombat.Initialize(this);
+            // METINAR-020 (S2a) x #31: a geometric FPP sword hit on the placed mob becomes damage.
+            FppCombat.HitDetected += Combat.HandleHitDetected;
 
             if (!_availabilityCheckStarted && FrameSourceOverride == null)
             {
@@ -213,6 +225,11 @@ namespace MetinAR.ArEncounter
             if (_machine != null)
             {
                 _machine.StateChanged -= OnMachineStateChanged;
+            }
+
+            if (FppCombat != null && Combat != null)
+            {
+                FppCombat.HitDetected -= Combat.HandleHitDetected;
             }
         }
 
