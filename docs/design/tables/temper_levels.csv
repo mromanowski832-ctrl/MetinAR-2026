@@ -1,0 +1,11 @@
+temperLevel,baseStatBonusPct,successChancePct,onFail,oreShards,goldFeeFormula,notes
+1,6,100,nothing,1,round5(5*iL*(t)^1.6),
+2,12,100,nothing,2,round5(5*iL*(t)^1.6),
+3,18,95,nothing,2,round5(5*iL*(t)^1.6),
+4,24,90,nothing,3,round5(5*iL*(t)^1.6),
+5,30,80,nothing,4,round5(5*iL*(t)^1.6),
+6,36,70,drop_one_level,5,round5(5*iL*(t)^1.6),Olej Kowalski chroni przed spadkiem
+7,42,60,drop_one_level,6,round5(5*iL*(t)^1.6),
+8,48,50,drop_one_level,8,round5(5*iL*(t)^1.6),
+9,54,40,drop_one_level,10,round5(5*iL*(t)^1.6),
+10,60,30,drop_one_level,12,round5(5*iL*(t)^1.6),przedmiot nigdy nie jest niszczony

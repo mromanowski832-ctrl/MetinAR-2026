@@ -1,0 +1,4 @@
+    runtime permissions:
+      android.permission.ACCESS_FINE_LOCATION: granted=true, flags=[ USER_SET ]
+      android.permission.ACCESS_COARSE_LOCATION: granted=true, flags=[ USER_SET ]
+      android.permission.CAMERA: granted=false, flags=[ USER_SET ]

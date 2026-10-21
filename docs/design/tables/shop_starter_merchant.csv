@@ -1,0 +1,14 @@
+itemId,namePl,category,itemLevel,rarity,stack,buyPrice,sellToNpcPrice,effect
+potion_hp_s,Mała Mikstura Życia,consumable,1,common,50,25,5,+80 HP w 2 s
+potion_hp_m,Mikstura Życia,consumable,15,common,50,90,18,+320 HP w 2 s
+potion_mp_s,Mała Mikstura Many,consumable,1,common,50,25,5,+50 MP w 2 s
+antidote,Antidotum,consumable,1,common,50,40,8,zdejmuje truciznę + odporność 10 s
+smith_oil,Olej Kowalski,material,1,common,20,400,80,chroni przed spadkiem poziomu hartowania (od +6)
+forget_draught,Napar Zapomnienia,consumable,10,common,5,1500,0,reset punktów statystyk (cena x poziom/10)
+bag_expansion,Sakwa +8 miejsc,service,1,common,1,2000,0,kolejne: x2 ceny; maks. 56 miejsc
+starter_sword,Miecz Rekruta,weapon,1,common,1,120,24,Atk 6 (ten sam miecz co FPP #36)
+starter_buckler,Lipowy Puklerz,off_hand,1,common,1,90,18,Def 3 / blok 8%
+starter_jerkin,Kaftan Wędrowca,armor,1,common,1,110,22,Def 4 / +10 HP
+starter_boots,Buty Traktowe,boots,1,common,1,70,14,Def 2 / unik +2
+starter_gloves,Rękawice Rekruta,gloves,1,common,1,60,12,Def 1 / celność +2 (rękawice FPP)
+treatise_proficiency_<classId>,Traktat Biegłości (wersja dla klasy gracza),consumable,20,common,20,1200,0,od poz. postaci 20; cena round5(60 × L) min. 1200; limit zakupu 2/dobę; skup 0 (patrz skill_tier_items.csv)

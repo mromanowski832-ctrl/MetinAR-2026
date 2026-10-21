@@ -1,0 +1,4 @@
+10-20 04:30:18.123  4242  4242 I Unity   : MetinAR world map started
+10-20 04:30:18.500  1500  1600 I ActivityManager: Displayed com.metinar.game/com.unity3d.player.UnityPlayerGameActivity: +2s100ms
+10-20 04:30:31.000  999   999 F libc    : Fatal signal 11 (SIGSEGV) in unrelated pid
+10-20 04:30:32.000  1500  1610 E ActivityManager: ANR in com.other.app

@@ -1,0 +1,8 @@
+Applications Memory Usage (in Kilobytes):
+ App Summary
+                       Pss(KB)                        Rss(KB)
+                        ------                         ------
+           Java Heap:     5120                          20000
+         Native Heap:    81920                          90000
+            Graphics:   120000                         120000
+               TOTAL PSS:   312345            TOTAL RSS:   400000       TOTAL SWAP PSS:       12

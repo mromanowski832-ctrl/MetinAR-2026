@@ -110,6 +110,7 @@ InitTestScene*.unity*
 
 # Independent .NET test project. Unity-generated csproj files stay ignored.
 !tests/GeoCore.Tests/GeoCore.Tests.csproj
+!tests/MetinAR.QA.Tests/MetinAR.QA.Tests.csproj
 !tests/AssetPipeline.Tests/AssetPipeline.Tests.csproj
 
 # Independent .NET test build outputs (do not ignore the .csproj itself).
@@ -134,3 +135,6 @@ tests/**/obj/
 # Visual Studio Unity workload config (machine-local)
 /.vsconfig
 /client/.vsconfig
+
+# METINAR-011 QA runner output (reports, Unity logs, redacted logcat) stays local.
+/[Bb]uilds/qa/
