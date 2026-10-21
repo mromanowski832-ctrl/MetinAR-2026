@@ -263,6 +263,81 @@ function Get-MetinARZipEntries {
     try { return @($zip.Entries | ForEach-Object { $_.FullName }) } finally { $zip.Dispose() }
 }
 
+function Find-MetinARConditionalSerializedFields {
+    <#
+      #31 follow-up (static, engine-free): serialized field declarations inside #if/#elif/#else regions whose condition
+      mentions UNITY_EDITOR or DEVELOPMENT_BUILD in RUNTIME scripts. Such fields give the Editor and the player different
+      serialization layouts for the same component, so scenes/prefabs serialized in the Editor are read with the wrong
+      layout in a player (the same class of failure as CachedReader::OutOfBoundsError). Method bodies under #if are fine.
+      Detects [SerializeField] / [SerializeReference] fields and public instance fields (heuristic, line based).
+      Returns objects { Line, Condition, Text }.
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines)
+    $out = New-Object System.Collections.Generic.List[object]
+    $stack = New-Object System.Collections.Generic.List[string]
+    $attrPending = $false
+    for ($i = 0; $i -lt $Lines.Count; $i++) {
+        $l = [string]$Lines[$i]
+        $t = $l.Trim()
+        if ($t -match '^#\s*if\s+(.+)$') { $stack.Add($Matches[1]); continue }
+        if ($t -match '^#\s*elif\s+(.+)$') { if ($stack.Count) { $stack[$stack.Count - 1] = $stack[$stack.Count - 1] + ' / elif ' + $Matches[1] }; continue }
+        if ($t -match '^#\s*else\b') { if ($stack.Count) { $stack[$stack.Count - 1] = $stack[$stack.Count - 1] + ' / else' }; continue }
+        if ($t -match '^#\s*endif\b') { if ($stack.Count) { $stack.RemoveAt($stack.Count - 1) }; continue }
+        $cond = @($stack | Where-Object { $_ -match '\bUNITY_EDITOR\b|\bDEVELOPMENT_BUILD\b' })
+        $isSerializeAttr = $t -match '^\[[^\]]*\bSerialize(Field|Reference)\b[^\]]*\]'
+        $attrOnly = $isSerializeAttr -and ($t -match '^\[[^\]]*\]\s*$')
+        $hasDecl = $t -match '^(\[[^\]]*\]\s*)*(public|private|protected|internal)?\s*(readonly\s+)?[\w\.<>\[\],\? ]+\s+\w+\s*(=[^;]*)?;\s*(//.*)?$' -and $t -notmatch '\b(static|const|return|using|delegate|event|abstract)\b' -and $t -notmatch '=>|\(|\{'
+        $publicField = $hasDecl -and $t -match '^(\[[^\]]*\]\s*)*public\s'
+        $serialized = ($isSerializeAttr -and $hasDecl) -or ($attrPending -and $hasDecl) -or $publicField
+        if ($cond.Count -and $serialized) { $out.Add([pscustomobject]@{ Line = $i + 1; Condition = ($cond -join ' && '); Text = $t }) }
+        if ($attrOnly) { $attrPending = $true } elseif ($t.Length -gt 0 -and $t -notmatch '^\[' -and $t -notmatch '^//') { $attrPending = $false }
+    }
+    return $out.ToArray()
+}
+
+function Test-MetinARApkPlayerData {
+    <#
+      #31 / METINAR-014: consistency of Unity serialized player data inside an APK (entries directly under
+      assets/bin/Data/). A file may be packed whole (sharedassets1.assets) or as 1 MB chunks (.split0..N); the player
+      prefers chunks. The crashing 52a1375 APK carried sharedassets1.assets plus stale sharedassets1.assets.split0..14
+      from an older Gradle export -> CachedReader::OutOfBoundsError on AR scene load.
+      Same rules as AndroidPlayerDataValidator (2ec7a47, feat/fpp-hands-aura-prototype), re-implemented here so the QA
+      gate does not depend on the unmerged branch: (1) whole + split of the same file, (2) chunks not contiguous from 0.
+      Returns Problems (empty = consistent), WholeFiles, SplitFiles (name -> chunk count).
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Entries)
+    $prefix = 'assets/bin/Data/'
+    $whole = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    $splits = New-Object 'System.Collections.Generic.SortedDictionary[string,System.Collections.Generic.List[int]]' ([StringComparer]::Ordinal)
+    foreach ($raw in $Entries) {
+        if ([string]::IsNullOrEmpty($raw)) { continue }
+        $name = $raw.Replace('\', '/')
+        if (-not $name.StartsWith($prefix, [StringComparison]::Ordinal)) { continue }
+        $rel = $name.Substring($prefix.Length)
+        if ($rel.Length -eq 0 -or $rel.Contains('/')) { continue }
+        if ($rel -cmatch '^(.+)\.split([0-9]+)$') {
+            $base = $Matches[1]; $idx = [int]$Matches[2]
+            if (-not $splits.ContainsKey($base)) { $splits[$base] = New-Object 'System.Collections.Generic.List[int]' }
+            if (-not $splits[$base].Contains($idx)) { $splits[$base].Add($idx) }
+        } else {
+            [void]$whole.Add($rel)
+        }
+    }
+    $problems = New-Object System.Collections.Generic.List[string]
+    $splitInfo = [ordered]@{}
+    foreach ($kv in $splits.GetEnumerator()) {
+        $idx = @($kv.Value | Sort-Object)
+        $splitInfo[$kv.Key] = $idx.Count
+        if ($whole.Contains($kv.Key)) {
+            $problems.Add("$prefix$($kv.Key) exists both whole and as $($idx.Count) .split chunk(s); the player reads the chunks, which come from an older build")
+        }
+        for ($i = 0; $i -lt $idx.Count; $i++) {
+            if ($idx[$i] -ne $i) { $problems.Add("$prefix$($kv.Key) split chunks are not contiguous: missing .split$i"); break }
+        }
+    }
+    [pscustomobject]@{ Problems = $problems.ToArray(); WholeFiles = @($whole | Sort-Object); SplitFiles = [pscustomobject]$splitInfo }
+}
+
 function Get-MetinARApkReport {
     param([Parameter(Mandatory = $true)][string]$ApkPath, [string]$AaptPath)
     $item = Get-Item $ApkPath
@@ -283,6 +358,7 @@ function Get-MetinARApkReport {
         HasIl2Cpp      = [bool](@($entries | Where-Object { $_ -match '^lib/[^/]+/libil2cpp\.so$' }).Count)
         HasGlobalMetadata = [bool](@($entries | Where-Object { $_ -match 'global-metadata\.dat$' }).Count)
         HasMonoAssemblies = [bool](@($entries | Where-Object { $_ -match '^assets/bin/Data/Managed/.+\.dll$' }).Count)
+        PlayerData     = Test-MetinARApkPlayerData -Entries @($entries)
         Badging        = $badging
     }
 }

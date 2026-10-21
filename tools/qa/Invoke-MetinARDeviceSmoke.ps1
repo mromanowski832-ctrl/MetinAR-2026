@@ -121,6 +121,10 @@ if ($ApkPath) {
 if (-not $SkipInstall) {
     if (-not $ApkPath -or -not (Test-Path $ApkPath)) {
         Add-Result (New-MetinARGateResult -Name 'Install' -Status 'FAIL' -Detail 'no -ApkPath given (or use -SkipInstall)')
+    } elseif (@((Test-MetinARApkPlayerData -Entries @(Get-MetinARZipEntries -Path $ApkPath)).Problems).Count) {
+        # #31: never install an APK whose player data mixes whole files with stale .split chunks (crashes on scene load).
+        $pd = Test-MetinARApkPlayerData -Entries @(Get-MetinARZipEntries -Path $ApkPath)
+        Add-Result (New-MetinARGateResult -Name 'Install' -Status 'FAIL' -Detail 'APK rejected before install: inconsistent player data (stale .split chunks)' -Evidence @($pd.Problems))
     } else {
         $t0 = Get-Date
         $out = Adb install '-r' '-t' $ApkPath

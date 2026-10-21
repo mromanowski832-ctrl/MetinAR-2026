@@ -136,6 +136,30 @@ if (-not $git) {
     }
     Add 'PowerShellAscii' $(if ($nonAscii.Count) { 'FAIL' } else { 'PASS' }) $(if ($nonAscii.Count) { "non-ASCII bytes in: $($nonAscii -join ', ')" } else { 'all PowerShell files ASCII-only' })
 
+    # 8b. (#31 follow-up) runtime serialization layout must not depend on UNITY_EDITOR / DEVELOPMENT_BUILD
+    $condFields = @()
+    $runtimeCs = @($files | Where-Object { $_ -match '^client/Assets/MetinAR/.+\.cs$' -and $_ -notmatch '/Editor/' -and $_ -notmatch '/Tests?/' })
+    foreach ($f in $runtimeCs) {
+        foreach ($hit in @(Find-MetinARConditionalSerializedFields -Lines @(Get-Content -LiteralPath (Join-Path $RepoRoot $f)))) { $condFields += "$($f):$($hit.Line) [$($hit.Condition)] $($hit.Text)" }
+    }
+    Add 'EditorOnlySerializedFields' $(if ($condFields.Count) { 'FAIL' } else { 'PASS' }) $(if ($condFields.Count) { $condFields -join '; ' } else { "$($runtimeCs.Count) runtime scripts, no serialized field under #if UNITY_EDITOR/DEVELOPMENT_BUILD" })
+
+    # 8c. (#31 follow-up) managed stripping vs [SerializeReference] / link.xml (static report; types actually stripped need a build report)
+    $psFile = Join-Path $RepoRoot 'client/ProjectSettings/ProjectSettings.asset'
+    $stripLine = if (Test-Path $psFile) { @(Get-Content $psFile | Where-Object { $_ -match '^\s*managedStrippingLevel:' }) | Select-Object -First 1 } else { $null }
+    $stripIdx = if (Test-Path $psFile) { @(Get-Content $psFile).IndexOf($stripLine) } else { -1 }
+    $stripAndroid = 'default (Minimal for IL2CPP)'
+    if ($stripLine -and $stripLine -notmatch '\{\}') {
+        $after = @(Get-Content $psFile)[($stripIdx + 1)..($stripIdx + 8)]
+        $a = @($after | Where-Object { $_ -match '^\s+Android:\s*(\d+)' }) | Select-Object -First 1
+        if ($a -match 'Android:\s*(\d+)') { $stripAndroid = @('Disabled', 'Low', 'Medium', 'High', 'Minimal')[[int]$Matches[1]] }
+    }
+    $linkXml = @($files | Where-Object { $_ -match '^client/Assets/.*link\.xml$' })
+    $serRef = @()
+    foreach ($f in $runtimeCs) { $serRef += @(Select-String -LiteralPath (Join-Path $RepoRoot $f) -Pattern '\[SerializeReference\b' | ForEach-Object { "$($f):$($_.LineNumber)" }) }
+    $stripRisk = ($serRef.Count -gt 0 -and $linkXml.Count -eq 0 -and $stripAndroid -match 'Low|Medium|High')
+    Add 'ManagedStripping' $(if ($stripRisk) { 'WARN' } else { 'PASS' }) ("Android stripping={0}; link.xml={1}; [SerializeReference] in runtime={2}{3}" -f $stripAndroid, $(if ($linkXml.Count) { $linkXml -join ',' } else { 'none' }), $serRef.Count, $(if ($stripRisk) { " -> SerializeReference types may be stripped; add link.xml preserve entries: $($serRef -join ', ')" } else { '' }))
+
     # 9. test projects reference existing production source
     $badRefs = @()
     $testProjects = @(Get-MetinARTestProjects -RepoRoot $RepoRoot -Config $config | ForEach-Object { $_.Path })

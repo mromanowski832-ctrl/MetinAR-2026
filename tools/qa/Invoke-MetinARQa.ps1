@@ -272,6 +272,7 @@ try {
                 if ($badAbi.Count) { $problems += "unexpected ABIs: $($badAbi -join ', ')" }
                 if (-not $rep.HasIl2Cpp -or -not $rep.HasGlobalMetadata) { $problems += 'IL2CPP markers missing (libil2cpp.so / global-metadata.dat)' }
                 if ($rep.HasMonoAssemblies) { $problems += 'Mono managed assemblies present (expected IL2CPP)' }
+                foreach ($pd in @($rep.PlayerData.Problems)) { $problems += "PLAYER DATA: $pd" }   # #31 stale .split chunks
                 if ($rep.SizeMB -gt [double]$budgets.apk.maxDevApkMB) { $problems += "APK $($rep.SizeMB) MB > prototype budget $($budgets.apk.maxDevApkMB) MB" }
                 elseif ($rep.SizeMB -gt [double]$budgets.apk.warnDevApkMB) { $warnings += "APK $($rep.SizeMB) MB > warn level $($budgets.apk.warnDevApkMB) MB" }
                 $st = if ($problems.Count) { 'FAIL' } elseif ($warnings.Count) { 'WARN' } else { 'PASS' }
@@ -279,7 +280,10 @@ try {
                     "apk: $(Rel $rep.Path)",
                     "size: $($rep.SizeBytes) bytes ($($rep.SizeMB) MB)",
                     "sha256: $($rep.Sha256)",
-                    "abis: $($rep.Abis -join ',')  il2cpp: $($rep.HasIl2Cpp)  global-metadata: $($rep.HasGlobalMetadata)"
+                    "abis: $($rep.Abis -join ',')  il2cpp: $($rep.HasIl2Cpp)  global-metadata: $($rep.HasGlobalMetadata)",
+                    ("player data (assets/bin/Data): {0} whole, split: {1}; consistency {2}" -f @($rep.PlayerData.WholeFiles).Count,
+                        ((@($rep.PlayerData.SplitFiles.PSObject.Properties) | ForEach-Object { "$($_.Name) x$($_.Value)" }) -join ', '),
+                        $(if (@($rep.PlayerData.Problems).Count) { 'FAIL' } else { 'OK' }))
                 )
                 if ($b) {
                     $ev += "package: $($b.Package)  version: $($b.VersionName) ($($b.VersionCode))  minSdk: $($b.MinSdk)  targetSdk: $($b.TargetSdk)  debuggable: $($b.Debuggable)"

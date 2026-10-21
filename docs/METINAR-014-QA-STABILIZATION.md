@@ -84,6 +84,32 @@ The hook is inert when the variable is unset. After the gate runs, the AR result
 - An Android build failure caused by a full disk (`No space left on device`) is reported in the gate evidence.
 - The #31 device acceptance checklist is in [qa/METINAR-031-FPP-ACCEPTANCE.md](qa/METINAR-031-FPP-ACCEPTANCE.md).
 
-## 5. Verification
+## 5. APK player-data validation (#31 crash follow-up)
+
+The 52a1375 FPP APK crashed on AR scene load (`CachedReader::OutOfBoundsError`). It shipped `assets/bin/Data/sharedassets1.assets`
+together with stale `sharedassets1.assets.split0..14` from an older Gradle export, and the player reads the chunks.
+
+- `Test-MetinARApkPlayerData` (MetinARQa.psm1) is engine-free and uses the same rules as `AndroidPlayerDataValidator` from
+  `feat/fpp-hands-aura-prototype` @ 2ec7a47. It fails when a file exists both whole and split, or when the chunks are not contiguous from `.split0`.
+  It is reimplemented in PowerShell, so the QA gate does not depend on the unmerged branch and the two branches do not conflict. Once #32 merges,
+  the C# validator in `MetinARAndroidDevBuild` fails the build, and this QA check independently audits the finished APK.
+- It is wired into:
+  - `ApkAudit` (`PLAYER DATA:` problems → FAIL, plus a layout summary in the evidence), which runs for every Android build in the QA runner;
+  - `Invoke-MetinARDeviceSmoke.ps1`, which refuses to install an inconsistent APK;
+  - the standalone `tools/qa/Test-ApkPlayerData.ps1 -ApkPath <apk>`, which needs no Unity, adb or phone.
+- Tests in `Invoke-QaToolTests.ps1` (CI `qa-static`, no phone) cover:
+  - the exact 52a1375 crash layout is rejected;
+  - the clean layout passes;
+  - a missing chunk is detected, as are chunks that don't start at 0;
+  - backslashes are normalised and subfolders are ignored;
+  - end-to-end checks over real zip files, including the CLI exit codes.
+
+Hygiene, also static and run in CI:
+- `EditorOnlySerializedFields` fails on serialized fields (`[SerializeField]`/`[SerializeReference]`/public fields) inside
+  `#if`/`#else` regions that mention `UNITY_EDITOR` or `DEVELOPMENT_BUILD` in runtime scripts, because those make the Editor and player serialization layouts differ.
+- `ManagedStripping` reports the Android stripping level, link.xml and `[SerializeReference]` usage. It warns when SerializeReference meets Low/Medium/High
+  stripping with no link.xml. Detecting which scene types were actually stripped needs a build report and is out of scope.
+
+## 6. Verification
 
 See the AGENT READY FOR REVIEW comment on issue #26 for the run evidence.
