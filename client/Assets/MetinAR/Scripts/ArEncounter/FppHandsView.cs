@@ -15,7 +15,8 @@ namespace MetinAR.ArEncounter
         private static readonly Quaternion RestRotation = Quaternion.Euler(V(FppViewFraming.RestEuler));
         private static readonly Vector3 AuraPosition = V(FppViewFraming.AuraPosition);
         private static readonly Quaternion AuraRotation = Quaternion.Euler(V(FppViewFraming.AuraEuler));
-        private static readonly Vector3 LeftRest = new Vector3(-0.19f, -0.25f, 0.43f);
+        private static readonly Vector3 LeftRest = V(FppViewFraming.LeftRestPosition);
+        private static readonly Quaternion LeftRestRotation = Quaternion.Euler(V(FppViewFraming.LeftRestEuler));
         public static readonly float SwordScale = (float)FppViewFraming.SwordScale;
         /// <summary>Scaled blade segment in the RightGrip frame; the hit sweep samples exactly this visible blade.</summary>
         public static readonly Vector3 BladeBase = new Vector3(0f, (float)FppViewFraming.BladeBaseY, 0f);
@@ -109,7 +110,7 @@ namespace MetinAR.ArEncounter
             float grip = LeftGripBlend(timeline.Action, timeline.Elapsed);
             Vector3 leftTarget = pose.position + pose.rotation * LeftGripOffset;
             _leftHand.SetLocalPositionAndRotation(Vector3.Lerp(LeftRest, leftTarget, grip),
-                Quaternion.Slerp(Quaternion.Euler(0, 0, 12), pose.rotation, grip));
+                Quaternion.Slerp(LeftRestRotation, pose.rotation, grip));
             Arm(_rightArm, new Vector3(0.28f, -0.46f, 0.19f), pose.position + pose.rotation * new Vector3(0.065f, -0.04f, 0));
             Arm(_leftArm, new Vector3(-0.28f, -0.46f, 0.19f), _leftHand.localPosition + _leftHand.localRotation * new Vector3(-0.065f, -0.04f, 0));
             _ribbonA.enabled = _ribbonB.enabled = timeline.AuraActive;
