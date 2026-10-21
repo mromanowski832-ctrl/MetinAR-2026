@@ -1,0 +1,22 @@
+{
+  "buildScenes": [
+    {"path": "Assets/MetinAR/Scenes/WorldMapPrototype.unity", "enabled": true, "exists": true},
+    {"path": "Assets/MetinAR/Scenes/ArEncounterPrototype.unity", "enabled": true, "exists": true},
+    {"path": "Assets/Scenes/SampleScene.unity", "enabled": false, "exists": true}
+  ],
+  "scenes": [
+    {"path": "Assets/MetinAR/Scenes/WorldMapPrototype.unity", "missingScripts": 0},
+    {"path": "Assets/MetinAR/Scenes/ArEncounterPrototype.unity", "missingScripts": 0}
+  ],
+  "prefabs": [
+    {"path": "Assets/MetinAR/Characters/Player/FppArms/Prefabs/PF_Player_FppArms.prefab", "missingScripts": 0},
+    {"path": "Assets/MetinAR/Prefabs/ArGroundPlane.prefab", "missingScripts": 0},
+    {"path": "Assets/MetinAR/Prefabs/ArPrototypeSpider.prefab", "missingScripts": 0},
+    {"path": "Assets/MetinAR/Weapons/FppSword/Prefabs/PF_Weapon_FppSword.prefab", "missingScripts": 0}
+  ],
+  "expectedScenes": ["Assets/MetinAR/Scenes/WorldMapPrototype.unity", "Assets/MetinAR/Scenes/ArEncounterPrototype.unity"],
+  "prefabsScanned": 4,
+  "totalMissingScripts": 0,
+  "failures": [],
+  "result": "PASS"
+}

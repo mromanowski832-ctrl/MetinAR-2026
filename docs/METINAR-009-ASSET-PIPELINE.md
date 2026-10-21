@@ -37,6 +37,7 @@ later the METINAR-007 hand-tracking inference). Character budgets are therefore 
 | Boss | ≤ 20 000 | ≤ 60 % | ≤ 30 % | 75 | ≤ 3 | 2048² | one boss on screen at a time |
 | NPC | 10 000–20 000 (Blacksmith target from #15) | ≤ 60 % | ≤ 30 % | 75 (humanoid) | ≤ 3 (body, clothing/hair, prop) | 2048² max | humanoid rig |
 | Weapon / hand prop | ≤ 3 000 | optional | — | 0 (static) | 1 | 512²–1024² | attached to a socket/hand bone |
+| Player FPP arms (METINAR-FPP-ART-001) | ≤ 10 000 | — (no LOD: constant screen size) | — | 40 | ≤ 2 | 1024² (2048² justified) | `Characters/Player/<Id>/`, camera-local pivot, shadows off; see docs/METINAR-FPP-ART-001.md |
 
 - Skin weights: max 4 bones per vertex (Unity *Standard* skin weights).
 - Blend shapes: none unless an issue requires facial animation.
@@ -91,6 +92,7 @@ Assets/MetinAR/
     Mobs/<MobId>/            regular mobs            e.g. Mobs/VenomousSpider/
     Bosses/<BossId>/         bosses
     NPC/<NpcId>/             NPCs (humanoid)         e.g. NPC/Blacksmith/
+    Player/<Id>/             first-person player arms (METINAR-FPP-ART-001)  e.g. Player/FppArms/
   Weapons/<WeaponId>/        weapons + hand props    e.g. Weapons/BlacksmithHammer/
   Animations/<SetId>/        animation sets shared by several characters
   Materials/[<SetId>/]       shared URP materials
@@ -124,15 +126,15 @@ underscores in ids. Display names ("Trujący Pająk", "Kowal") are game data, no
 
 | Asset | Pattern | Example |
 |---|---|---|
-| Skinned model | `SK_<Mob|Boss|Npc|Weapon>_<Id>[_Part].fbx` | `SK_Mob_VenomousSpider.fbx` |
-| Static model | `SM_<Mob|Boss|Npc|Weapon>_<Id>[_Part].fbx` | `SM_Weapon_BlacksmithHammer.fbx` |
+| Skinned model | `SK_<Mob|Boss|Npc|Weapon|Player>_<Id>[_Part].fbx` | `SK_Mob_VenomousSpider.fbx` |
+| Static model | `SM_<Mob|Boss|Npc|Weapon|Player>_<Id>[_Part].fbx` | `SM_Weapon_BlacksmithHammer.fbx` |
 | LOD meshes (inside the FBX) | `<ModelName>_LOD0`, `_LOD1`, `_LOD2` | `SK_Mob_VenomousSpider_LOD1` |
 | Animation clip file | `A_<Id>_<State>[_NN].fbx` | `A_Blacksmith_Hammering.fbx` |
 | Animator controller | `AC_<Id>.controller` | `AC_VenomousSpider.controller` |
 | Avatar mask | `AM_<Id>[_Part].mask` | `AM_Blacksmith_UpperBody.mask` |
 | Texture | `T_<Id>[_Part]_<BC|N|MS|AO|E|M>.png/.tga` | `T_VenomousSpider_Eyes_E.png` |
 | Material | `M_<Id>[_Part].mat` | `M_VenomousSpider.mat` |
-| Prefab | `PF_<Mob|Boss|Npc|Weapon>_<Id>[_Variant].prefab` | `PF_Mob_VenomousSpider.prefab` |
+| Prefab | `PF_<Mob|Boss|Npc|Weapon|Player>_<Id>[_Variant].prefab` | `PF_Mob_VenomousSpider.prefab` |
 | Bones | `B_<Name>[_L|_R][_NN]` (generic rigs); humanoid rigs keep the DCC/Rigify names mapped by Unity's avatar | `B_LegL_01_Upper` |
 | Sockets (empty transforms) | `Socket_<Name>` | `Socket_HandR`, `Socket_Mouth` |
 | Anchors (prefab children) | `Anchor_<Name>` | `Anchor_Label` |
@@ -272,6 +274,8 @@ on mobs/bosses (warning), `Anchor_Label` present (warning), no MeshColliders (wa
 | Gesture | — | optional | no | #15 "Talk/Gesture" |
 | Interact | — | required | no | player interaction / hand-over |
 | Hammering | — | Blacksmith | yes | NPC-specific work loop |
+
+Player FPP arms (`Player` category, METINAR-FPP-ART-001): required `Idle` (loop), `Attack`, `AuraActivate`; timings follow #31 FppCombatTimeline.
 
 The Animator Controller (`AC_<Id>`) and its parameters/transitions are **not** designed here: they depend on the
 combat (METINAR-007) and NPC interaction systems that do not exist yet. The pipeline only guarantees the clips.

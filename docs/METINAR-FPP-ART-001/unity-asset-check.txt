@@ -1,0 +1,74 @@
+[METINAR-FPP-ART-001] FPP hands + sword asset check: errors=0
+INFO  Unity 6000.6.4f1 | 2026-10-21 01:00:05Z
+OK    PF_Player_FppArms loads
+OK    PF_Weapon_FppSword loads
+OK    PF_Player_FppArms: missing scripts = 0
+OK    PF_Player_FppArms/Model: 1 material(s), all URP (M_FppSword:Universal Render Pipeline/Lit)
+OK    PF_Player_FppArms/Model: shadows off (camera-attached FPP)
+OK    M_FppSword._BaseMap assigned (T_FppSword_BC 1024x1024)
+OK    M_FppSword._BumpMap assigned (T_FppSword_N 1024x1024)
+OK    M_FppSword._MetallicGlossMap assigned (T_FppSword_MS 1024x1024)
+OK    PF_Player_FppArms/Model: mesh assigned
+INFO  PF_Player_FppArms/Model: 1452 tris, 1132 verts, 1 submesh(es), uv0=True, bones=0
+OK    PF_Player_FppArms/Model: UV0 present
+OK    PF_Player_FppArms/SK_Player_FppArms: 1 material(s), all URP (M_FppArms:Universal Render Pipeline/Lit)
+OK    PF_Player_FppArms/SK_Player_FppArms: shadows off (camera-attached FPP)
+OK    M_FppArms._BaseMap assigned (T_FppArms_BC 1024x1024)
+OK    M_FppArms._BumpMap assigned (T_FppArms_N 1024x1024)
+OK    M_FppArms._MetallicGlossMap assigned (T_FppArms_MS 1024x1024)
+OK    PF_Player_FppArms/SK_Player_FppArms: mesh assigned
+INFO  PF_Player_FppArms/SK_Player_FppArms: 4932 tris, 4277 verts, 1 submesh(es), uv0=True, bones=29
+OK    PF_Player_FppArms/SK_Player_FppArms: UV0 present
+OK    PF_Weapon_FppSword: missing scripts = 0
+OK    PF_Weapon_FppSword/Model: 1 material(s), all URP (M_FppSword:Universal Render Pipeline/Lit)
+OK    PF_Weapon_FppSword/Model: shadows off (camera-attached FPP)
+OK    M_FppSword._BaseMap assigned (T_FppSword_BC 1024x1024)
+OK    M_FppSword._BumpMap assigned (T_FppSword_N 1024x1024)
+OK    M_FppSword._MetallicGlossMap assigned (T_FppSword_MS 1024x1024)
+OK    PF_Weapon_FppSword/Model: mesh assigned
+INFO  PF_Weapon_FppSword/Model: 1452 tris, 1132 verts, 1 submesh(es), uv0=True, bones=0
+OK    PF_Weapon_FppSword/Model: UV0 present
+OK    sword socket Socket_GripR at (0,000, 0,000, 0,000)
+OK    sword socket Socket_GripL at (0,000, -0,120, 0,000)
+OK    sword socket Socket_FxBladeBase at (0,000, 0,130, 0,000)
+OK    sword socket Socket_FxBladeTip at (0,000, 0,940, 0,000)
+OK    sword socket Socket_FxAuraBurst at (0,000, 0,380, 0,000)
+OK    sword socket Socket_FxGuardGem at (0,000, 0,116, 0,000)
+OK    sword socket Socket_GripR within 1 mm of contract (0,000, 0,000, 0,000) (off 0,00 mm)
+OK    sword socket Socket_GripL within 1 mm of contract (0,000, -0,120, 0,000) (off 0,00 mm)
+OK    sword socket Socket_FxBladeBase within 1 mm of contract (0,000, 0,130, 0,000) (off 0,00 mm)
+OK    sword socket Socket_FxBladeTip within 1 mm of contract (0,000, 0,940, 0,000) (off 0,00 mm)
+OK    sword socket Socket_FxAuraBurst within 1 mm of contract (0,000, 0,380, 0,000) (off 0,00 mm)
+OK    sword socket Socket_GripR frame = RightGrip frame (rotation off by 0,00 deg, local euler (0,000, 0,000, 0,000))
+OK    sword socket Socket_FxBladeTip frame = RightGrip frame (rotation off by 0,00 deg, local euler (0,000, 0,000, 0,000))
+OK    sword nested under B_Socket_Sword with identity local transform
+OK    Animator with AC_FppArms, no root motion
+INFO  controller clips: A_FppArms_Idle 2,000s loop=True, A_FppArms_Attack 0,720s loop=False, A_FppArms_AuraActivate 1,150s loop=False
+OK    SK_Player_FppArms.fbx: Generic + Preserve Hierarchy
+OK    A_FppArms_Idle.fbx: Generic + Preserve Hierarchy
+OK    A_FppArms_Attack.fbx: Generic + Preserve Hierarchy
+OK    A_FppArms_AuraActivate.fbx: Generic + Preserve Hierarchy
+OK    socket bones present
+OK    Idle: clip loads
+OK    Idle: length 2,000 s (contract 2 s), frameRate 100, loop True
+OK    Idle: loop flag True
+OK    Idle: B_Socket_Sword start/end vs rest pose: max 0,00 mm / 0,00 deg (worst local delta euler (0,000, 0,000, 0,000))
+OK    Idle: B_Socket_GripL start/end vs rest pose: max 0,00 mm / 0,00 deg
+OK    Idle: sway amplitude 4,0 mm (<= 6 mm)
+OK    Idle: hand vertices inside sword proxies = 0 over 101 sampled frames (min grip clearance 3,1 mm)
+WARN  Idle: visible in estimated A31 portrait view (69,4 deg v): grip 0/201, blade tip 0/201, left hand 0/201 (framing is owned by the #31 contract; see doc §6)
+OK    Attack: clip loads
+OK    Attack: length 0,720 s (contract 0,72 s), frameRate 100, loop False
+OK    Attack: loop flag False
+OK    Attack: B_Socket_Sword vs PR #32 pose (73 samples): max 0,60 mm / 0,00 deg (worst local delta euler (0,000, 0,000, 0,000))
+OK    Attack: B_Socket_GripL vs PR #32 pose (73 samples): max 0,00 mm / 0,00 deg
+OK    Attack: hand vertices inside sword proxies = 0 over 37 sampled frames (min grip clearance 3,1 mm)
+INFO  Attack: visible in estimated A31 portrait view (69,4 deg v): grip 40/73, blade tip 17/73, left hand 0/73
+OK    AuraActivate: clip loads
+OK    AuraActivate: length 1,150 s (contract 1,15 s), frameRate 100, loop False
+OK    AuraActivate: loop flag False
+OK    AuraActivate: B_Socket_Sword vs PR #32 pose (116 samples): max 0,50 mm / 0,00 deg (worst local delta euler (0,000, 0,000, 0,000))
+OK    AuraActivate: B_Socket_GripL vs PR #32 pose (116 samples): max 0,69 mm / 0,00 deg
+OK    AuraActivate: hand vertices inside sword proxies = 0 over 58 sampled frames (min grip clearance 2,9 mm)
+INFO  AuraActivate: visible in estimated A31 portrait view (69,4 deg v): grip 100/116, blade tip 0/116, left hand 99/116
+OK    screenshots written: 28 into Builds/metinar-fpp-art

@@ -5,7 +5,7 @@ namespace MetinAR.Editor.AssetPipeline
 {
     /// <summary>
     /// METINAR-009: applies the mobile import defaults from docs/METINAR-009-ASSET-PIPELINE.md to NEW files
-    /// inside the pipeline folders only (Characters/Mobs|Bosses|NPC, Weapons, Animations, Materials, Textures under
+    /// inside the pipeline folders only (Characters/Mobs|Bosses|NPC|Player, Weapons, Animations, Materials, Textures under
     /// Assets/MetinAR). It runs only when the asset has no import settings yet (first import), so deliberate
     /// per-asset overrides made later in the Inspector are kept. Existing prototype art (Art/, Prefabs/, Scenes/)
     /// is never touched.
@@ -71,6 +71,20 @@ namespace MetinAR.Editor.AssetPipeline
             else
             {
                 importer.animationType = ModelImporterAnimationType.None;
+            }
+
+            // METINAR-FPP-ART-001: the first-person arms are bound by transform paths shared between SK_ and A_
+            // files; keep the FBX root node so both resolve to the same hierarchy.
+            if (category == AssetCategory.Player)
+            {
+                importer.preserveHierarchy = true;
+                if (kind == AssetKind.AnimationSource)
+                {
+                    // camera-attached arms: compression error is visible at the hands (end of a 4-bone chain)
+                    importer.animationRotationError = 0.05f;
+                    importer.animationPositionError = 0.05f;
+                    importer.animationScaleError = 0.05f;
+                }
             }
 
             // Animation: clips only from A_*.fbx files; mesh files carry no takes.
