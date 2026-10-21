@@ -68,6 +68,10 @@ namespace MetinAR.ArEncounter
         private ArEncounterStateMachine _machine;
         private float _notTrackingSeconds;
         private bool _availabilityCheckStarted;
+        private ArTrackingRecovery _recovery;
+        private int _anchorGeneration;
+        private string _loggedTargetPlane;
+        private bool _loggedTargetAccepted;
 
         /// <summary>Raised on every encounter state change (new state).</summary>
         public event Action<ArEncounterState> StateChanged;
@@ -139,6 +143,18 @@ namespace MetinAR.ArEncounter
 
         public bool IsExiting { get; private set; }
 
+        /// <summary>#31 MANAGER DECISION 18:50: hide + pause on tracking loss, ARSession reset after the prototype timeout.</summary>
+        public ArTrackingRecovery TrackingRecovery => _recovery;
+
+        /// <summary>The placed mob may be drawn and fought (tracking, and not waiting for a new anchor after a session reset).</summary>
+        public bool MobUsable => _recovery == null || _recovery.MobUsable;
+
+        /// <summary>The AR session was reset and the mob still waits for new ground to be anchored on.</summary>
+        public bool IsRelocatingMob => _recovery != null && _recovery.AwaitingRelocation;
+
+        /// <summary>Ground was found but the target surface is too far below the camera (#31 P1).</summary>
+        public bool PlacementTargetTooLow { get; private set; }
+
         /// <summary>METINAR-020: hit → damage → mob HP → death → EXP/talary (added at runtime in Awake).</summary>
         public ArEncounterCombat Combat { get; private set; }
 
@@ -169,6 +185,7 @@ namespace MetinAR.ArEncounter
         private void Awake()
         {
             _machine = new ArEncounterStateMachine(_placementSettings);
+            _recovery = new ArTrackingRecovery(_machine.Settings.trackingLostResetSeconds);
             _stateHistory.Add(_machine.State);
             _machine.StateChanged += OnMachineStateChanged;
 
@@ -272,9 +289,17 @@ namespace MetinAR.ArEncounter
                              && _frame.TargetPlaneId != null
                              && ContainsSuitable(_frame.TargetPlaneId);
             bool farEnough = candidate && IsFarEnough(_frame.TargetPose.position);
+            bool heightOk = candidate && IsPlaneHeightAcceptable(_frame.TargetPose.position);
+            if (candidate)
+            {
+                LogTargetPlaneHeight(_frame.TargetPlaneId, _frame.TargetPose.position, farEnough && heightOk);
+            }
+
             PlacementTargetTooClose = _machine.State == ArEncounterState.ReadyToPlace
                                       && ((candidate && !farEnough) || (!_frame.HasTarget && _frame.TargetTooClose));
-            HasPlacementTarget = candidate && farEnough;
+            PlacementTargetTooLow = _machine.State == ArEncounterState.ReadyToPlace
+                                    && ((candidate && farEnough && !heightOk) || (!_frame.HasTarget && _frame.TargetTooLow));
+            HasPlacementTarget = candidate && farEnough && heightOk;
             if (HasPlacementTarget)
             {
                 PlacementTargetPose = _frame.TargetPose;
@@ -300,7 +325,7 @@ namespace MetinAR.ArEncounter
             if (_machine.State == ArEncounterState.Placed)
             {
                 HidePlaneVisuals();
-                UpdateMobTrackingVisibility();
+                UpdateTrackingRecovery();
                 LogAnchorDiagnostics();
             }
 
@@ -308,22 +333,154 @@ namespace MetinAR.ArEncounter
         }
 
         /// <summary>
-        /// #31 v0 A31 P0-2: when the AR session stops tracking (VIO reset), the camera pose freezes while the camera image
-        /// keeps moving, so a drawn mob looks glued to the phone. Hide it until tracking returns; its world pose is untouched.
+        /// #31 v0 A31 P0-2 + MANAGER DECISION 18:50. When the AR session stops tracking (VIO reset) the camera pose freezes
+        /// while the camera image keeps moving, so a drawn mob looks glued to the phone. The mob is hidden and combat paused
+        /// at once; after <see cref="ArPlacementSettings.trackingLostResetSeconds"/> (prototype 15 s) the ARSession is reset.
+        /// The mob object and its fight (HP, once-only reward) survive; when tracking is back it is anchored again on new ground.
         /// </summary>
-        private void UpdateMobTrackingVisibility()
+        private void UpdateTrackingRecovery()
         {
-            if (SpawnedMob == null)
+            if (SpawnedMob == null || _recovery == null)
             {
                 return;
             }
 
-            bool visible = LastSessionStatus == ArSessionStatus.SessionTracking;
+            bool tracking = LastSessionStatus == ArSessionStatus.SessionTracking;
+            ArRecoveryAction action = _recovery.Tick(true, tracking, Time.unscaledDeltaTime);
+            if (action == ArRecoveryAction.ResetSession)
+            {
+                ResetSessionKeepingMob();
+            }
+            else if (action == ArRecoveryAction.Relocate)
+            {
+                TryRelocateMob();
+            }
+
+            bool visible = _recovery.MobUsable;
             if (visible != SpawnedMob.IsTrackingVisible)
             {
                 SpawnedMob.SetTrackingVisible(visible);
-                Debug.Log("[ArEncounter] mob " + (visible ? "shown (tracking)" : "hidden (tracking lost: " + LastSessionStatus + ")"));
+                if (!visible)
+                {
+                    FppCombat?.CancelActions();
+                }
+
+                Debug.Log("[ArEncounter] mob " + (visible
+                    ? "shown (tracking)"
+                    : "hidden (" + (IsRelocatingMob ? "waiting for new ground after reset" : "tracking lost") + ": " + LastSessionStatus + ")"));
             }
+        }
+
+        private string FightState()
+        {
+            var fight = Combat != null ? Combat.Session : null;
+            return fight == null ? "hp=- defeated=-" : "hp=" + fight.MobHp + "/" + fight.MobMaxHp + " defeated=" + fight.MobDefeated;
+        }
+
+        private void ResetSessionKeepingMob()
+        {
+            Debug.Log("[ArSession] reset reason=tracking-lost lostFor=" + _recovery.LastResetLostSeconds.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)
+                      + "s limit=" + _recovery.ResetAfterSeconds.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)
+                      + "s count=" + _recovery.ResetCount + " session=" + LastSessionStatus + " anchor=" + MobAnchorKind
+                      + " " + FightState() + " t=" + Time.realtimeSinceStartup.ToString("F1", System.Globalization.CultureInfo.InvariantCulture));
+            FppCombat?.CancelActions();
+            Transform mob = SpawnedMob.transform;
+            // Keep the mob object (and its fight) alive: anchors are removed by the reset and would take their children with them.
+            mob.SetParent(_origin != null ? _origin.TrackablesParent : null, true);
+            _anchorGeneration++;
+            if (MobAnchor != null && _anchorManager != null)
+            {
+                try
+                {
+                    _anchorManager.TryRemoveAnchor(MobAnchor);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[ArSession] old anchor removal failed: " + ex.Message);
+                }
+            }
+
+            MobAnchor = null;
+            MobAnchorKind = "relocating";
+            if (_session != null && _session.subsystem != null)
+            {
+                _session.Reset();
+            }
+        }
+
+        private void TryRelocateMob()
+        {
+            if (!_frame.HasTarget || string.IsNullOrEmpty(_frame.TargetPlaneId) || !IsFrameTargetSuitable())
+            {
+                return;
+            }
+
+            Vector3 p = _frame.TargetPose.position;
+            if (!IsFarEnough(p) || !IsPlaneHeightAcceptable(p))
+            {
+                return;
+            }
+
+            var pose = new Pose(p, FacingCamera(p));
+            Transform mob = SpawnedMob.transform;
+            mob.SetPositionAndRotation(pose.position, pose.rotation);
+            MobAnchorKind = "session";
+            if (_anchorManager != null && _anchorManager.enabled && _anchorManager.subsystem != null)
+            {
+                MobAnchorKind = "pending";
+                AnchorMobAtWorldPose(mob, pose, _frame.TargetPlane);
+            }
+
+            _recovery.MarkRelocated();
+            ResetAnchorProbe();
+            Vector3 c = _arCamera != null ? _arCamera.transform.position : p;
+            Debug.Log("[ArSession] relocated mob at " + pose.position.ToString("F2")
+                      + " planeBelowCam=" + ArEncounterFraming.PlaneDropBelowCamera(c.y, p.y).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                      + " d=" + ArEncounterFraming.HorizontalDistance(c.x, c.z, p.x, p.z).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                      + " anchor=" + MobAnchorKind + " resets=" + _recovery.ResetCount + " " + FightState());
+        }
+
+        private bool IsFrameTargetSuitable()
+        {
+            foreach (ArPlaneObservation plane in _frame.Planes)
+            {
+                if (plane.Id == _frame.TargetPlaneId)
+                {
+                    return _machine.IsSuitable(plane);
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>#31 P1: placement surface not more than the prototype limit below the AR camera (true without a camera).</summary>
+        public bool IsPlaneHeightAcceptable(Vector3 target)
+        {
+            if (_arCamera == null)
+            {
+                return true;
+            }
+
+            return ArEncounterFraming.IsPlaneHeightAcceptable(_arCamera.transform.position.y, target.y, _machine.Settings.maxPlaneDropBelowCameraMeters);
+        }
+
+        /// <summary>Logs the target plane height relative to the camera once per plane / verdict change (#31 P1).</summary>
+        private void LogTargetPlaneHeight(string planeId, Vector3 target, bool accepted)
+        {
+            if (planeId == _loggedTargetPlane && accepted == _loggedTargetAccepted)
+            {
+                return;
+            }
+
+            _loggedTargetPlane = planeId;
+            _loggedTargetAccepted = accepted;
+            Vector3 c = _arCamera != null ? _arCamera.transform.position : target;
+            double drop = ArEncounterFraming.PlaneDropBelowCamera(c.y, target.y);
+            Debug.Log("[ArEncounter] target plane=" + planeId
+                      + " planeBelowCam=" + drop.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                      + " maxBelow=" + _machine.Settings.maxPlaneDropBelowCameraMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                      + " d=" + ArEncounterFraming.HorizontalDistance(c.x, c.z, target.x, target.z).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                      + (accepted ? " accepted" : " rejected"));
         }
 
         private float _nextAnchorLog;
@@ -443,7 +600,8 @@ namespace MetinAR.ArEncounter
                 Request != null ? Request.MobName : string.Empty,
                 SpawnedMob != null ? SpawnedMob.transform : null,
                 _arCamera != null ? _arCamera.transform : null,
-                PlacementTargetTooClose);
+                PlacementTargetTooClose,
+                !MobUsable);
         }
 
         /// <summary>Placement target at least the minimum ground distance from the AR camera (true without a camera).</summary>
@@ -537,6 +695,12 @@ namespace MetinAR.ArEncounter
                             continue;
                         }
 
+                        if (!IsPlaneHeightAcceptable(hit.pose.position))
+                        {
+                            frame.TargetTooLow = true;
+                            continue;
+                        }
+
                         SetTarget(frame, plane, hit.pose.position, true);
                         return;
                     }
@@ -547,6 +711,12 @@ namespace MetinAR.ArEncounter
             if (!IsFarEnough(nearestSuitable.center))
             {
                 frame.TargetTooClose = true;
+                return;
+            }
+
+            if (!IsPlaneHeightAcceptable(nearestSuitable.center))
+            {
+                frame.TargetTooLow = true;
                 return;
             }
 
@@ -659,13 +829,16 @@ namespace MetinAR.ArEncounter
             }
 
             ResetAnchorProbe();
+            Vector3 camAtSpawn = _arCamera != null ? _arCamera.transform.position : pose.position;
             Debug.Log("[ArEncounter] spawned " + Request.MobName + " at " + pose.position + " anchor=" + MobAnchorKind
-                      + " scale=" + ArEncounterFraming.MobVisualScale);
+                      + " scale=" + ArEncounterFraming.MobVisualScale
+                      + " planeBelowCam=" + ArEncounterFraming.PlaneDropBelowCamera(camAtSpawn.y, pose.position.y).ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
             MobPlaced?.Invoke(SpawnedMob);
         }
 
         private async void AnchorMobAtWorldPose(Transform mob, Pose pose, ARPlane plane)
         {
+            int generation = _anchorGeneration;
             ARAnchor anchor = null;
             string kind = "session";
             try
@@ -686,7 +859,7 @@ namespace MetinAR.ArEncounter
                 Debug.LogWarning("[ArEncounter] world anchor failed: " + ex.Message);
             }
 
-            if (this == null || mob == null || IsExiting)
+            if (this == null || mob == null || IsExiting || generation != _anchorGeneration)
             {
                 if (anchor != null && _anchorManager != null)
                 {

@@ -231,6 +231,7 @@ namespace MetinAR.Editor
                     ("T10c_RealSwingsKillSpider_RewardOnce", T10c_RealSwingsKillSpider_RewardOnce),
                     ("T11_ExitButtonReturnsToWorldMap", T11_ExitButtonReturnsToWorldMap),
                     ("T12_SyntheticFrames_ScanReadyPlacedSingleSpawn", T12_SyntheticFrames_ScanReadyPlacedSingleSpawn),
+                    ("T12b_TrackingLostOver15s_ResetKeepsHpAndRewardOnce", T12b_TrackingLostOver15s_ResetKeepsHpAndRewardOnce),
                     ("T13_UnsupportedStateIsClearAndNonCrashing", T13_UnsupportedStateIsClearAndNonCrashing),
                     ("T14_SessionStartTimeoutFailsThenRecovers", T14_SessionStartTimeoutFailsThenRecovers),
                     ("T15_NoExceptionsLogged", T15_NoExceptionsLogged),
@@ -1106,6 +1107,16 @@ namespace MetinAR.Editor
                 yield return Frames(1);
                 Check(MobCount() == 0, "spawned on a too-close target");
 
+                // #31 P1: the A31 picked a plane 2.91 m below the phone. More than 2.5 m below the camera is no spawn surface.
+                _syntheticTarget = cam.position + fwd * 1.8f + Vector3.down * 2.91f;
+                yield return Frames(3);
+                Check(_ar.State == ArEncounterState.ReadyToPlace && !_ar.HasPlacementTarget && _ar.PlacementTargetTooLow,
+                    "plane 2.91 m below the camera accepted: target " + _ar.HasPlacementTarget + " tooLow " + _ar.PlacementTargetTooLow);
+                Check(!_ar.Hud.IsPlaceButtonInteractable, "place button enabled for a plane 2.91 m below the camera");
+                _ar.Hud.PlaceButton.onClick.Invoke();
+                yield return Frames(1);
+                Check(MobCount() == 0, "spawned on a plane 2.91 m below the camera");
+
                 _syntheticTarget = cam.position + fwd * 1.8f + Vector3.down * 1.2f; // far enough
                 yield return Frames(3);
                 Check(_ar.State == ArEncounterState.ReadyToPlace && _ar.HasPlacementTarget && !_ar.PlacementTargetTooClose, "phase2 state " + _ar.State);
@@ -1131,7 +1142,7 @@ namespace MetinAR.Editor
                 _syntheticStatus = ArSessionStatus.SessionInitializing;
                 yield return Frames(5);
                 Check(_ar.State == ArEncounterState.Placed && _ar.Machine.IsTrackingLimited, "tracking-limited not reported");
-                Check(_ar.Hud.StatusLabel != null && _ar.Hud.StatusLabel.StartsWith("Śledzenie ograniczone"), "status " + _ar.Hud.StatusLabel);
+                Check(_ar.Hud.StatusLabel != null && _ar.Hud.StatusLabel == ArEncounterHud.SearchingSurroundingsNotice, "status " + _ar.Hud.StatusLabel);
                 Check(Vector3.Distance(_ar.SpawnedMob.transform.position, placedAt) < 0.001f && MobCount() == 1, "mob moved/duplicated during tracking loss");
                 _syntheticStatus = ArSessionStatus.SessionTracking;
                 yield return Frames(3);
@@ -1141,6 +1152,104 @@ namespace MetinAR.Editor
                 int iPlaced = IndexOf(ArEncounterState.Placed);
                 Check(iScan >= 0 && iReady > iScan && iPlaced > iReady, "state order " + string.Join(",", _ar.StateHistory));
                 Debug.Log("[ArSmoke] T12 states " + string.Join(",", _ar.StateHistory));
+                // T12b continues in this synthetic encounter and exits to the world map.
+            }
+
+            /// <summary>
+            /// #31 MANAGER DECISION 18:50: without tracking the mob is hidden and combat paused at once ("Szukam otoczenia…");
+            /// after more than 15 s (prototype setting) the ARSession is reset ([ArSession] reset …). The same mob object keeps its
+            /// HP, is anchored again on new ground when tracking returns, and the kill reward is granted only once across resets.
+            /// </summary>
+            private IEnumerator T12b_TrackingLostOver15s_ResetKeepsHpAndRewardOnce()
+            {
+                ArEncounterCombat combat = _ar != null ? _ar.Combat : null;
+                ArEncounterMob mob = _ar != null ? _ar.SpawnedMob : null;
+                Check(combat != null && mob != null && _ar.State == ArEncounterState.Placed && _ar.TrackingRecovery != null,
+                    "no placed synthetic encounter (T12)");
+                if (combat == null || mob == null || _ar.TrackingRecovery == null) yield break;
+                int defeatedEvents = 0;
+                Action<ArEncounterMob, MobKillReward> onDefeated = (m, r) => defeatedEvents++;
+                var resetLogs = new List<string>();
+                var relocateLogs = new List<string>();
+                Application.LogCallback onLog = (message, stack, type) =>
+                {
+                    if (message.StartsWith("[ArSession] reset")) resetLogs.Add(message);
+                    if (message.StartsWith("[ArSession] relocated")) relocateLogs.Add(message);
+                };
+                combat.MobDefeated += onDefeated;
+                Application.logMessageReceived += onLog;
+                try
+                {
+                    LocalPlayerSession.Reset();
+                    combat.SeedOverride = 20261021UL;
+                    combat.Bind(mob);
+                    int swing = 700000;
+                    while (combat.Session != null && combat.Session.MobHp == combat.Session.MobMaxHp && swing < 700010)
+                        combat.HandleHitDetected(mob, swing++);
+                    int hp = combat.Session != null ? combat.Session.MobHp : -1;
+                    Check(hp > 0 && hp < 120, "precondition: partial damage, hp " + hp);
+                    float limit = _ar.Machine.Settings.trackingLostResetSeconds;
+                    Check(Mathf.Approximately(limit, 15f), "prototype reset limit " + limit + " s, expected 15 s");
+
+                    // (1) tracking lost: hidden + paused at once.
+                    float lostAt = Time.realtimeSinceStartup;
+                    _syntheticStatus = ArSessionStatus.SessionInitializing;
+                    yield return Frames(2);
+                    Check(!_ar.MobUsable && DrawnRenderers(mob) == 0, "mob not hidden at once on tracking loss");
+                    Check(_ar.FppCombat == null || (!_ar.FppCombat.Ready && !_ar.FppCombat.RequestAttack()), "combat not paused on tracking loss");
+                    Check(_ar.Hud.StatusLabel == ArEncounterHud.SearchingSurroundingsNotice, "status " + _ar.Hud.StatusLabel);
+                    Check(_ar.TrackingRecovery.ResetCount == 0, "reset before the limit");
+
+                    // (2) more than 15 s: exactly one reset, same mob object, same HP.
+                    yield return WaitUntil(() => _ar.TrackingRecovery.ResetCount >= 1, limit + 5f);
+                    float resetAfter = Time.realtimeSinceStartup - lostAt;
+                    Check(_ar.TrackingRecovery.ResetCount == 1 && resetLogs.Count == 1, "resets " + _ar.TrackingRecovery.ResetCount + " logs " + resetLogs.Count);
+                    Check(resetAfter >= limit - 0.1f, "reset too early: " + resetAfter + " s");
+                    Check(_ar.SpawnedMob == mob && mob != null && MobCount() == 1 && _ar.SpawnCount == 1, "mob destroyed or duplicated by the reset");
+                    Check(combat.Session != null && combat.Session.MobHp == hp, "HP changed by the reset: " + hp + " -> " + (combat.Session != null ? combat.Session.MobHp : -1));
+                    Check(_ar.IsRelocatingMob && _ar.MobAnchorKind == "relocating" && DrawnRenderers(mob) == 0, "not waiting for new ground: kind " + _ar.MobAnchorKind);
+                    yield return Frames(10);
+                    Check(_ar.TrackingRecovery.ResetCount == 1, "reset repeated right away");
+
+                    // (3) tracking back on new ground: anchored again there, shown, HP unchanged.
+                    Transform cam = _ar.ArCamera.transform;
+                    Vector3 fwd = Vector3.ProjectOnPlane(cam.forward, Vector3.up).normalized;
+                    _syntheticTarget = cam.position + fwd * 2.0f + Vector3.down * 1.2f;
+                    _syntheticStatus = ArSessionStatus.SessionTracking;
+                    yield return WaitUntil(() => !_ar.IsRelocatingMob, 5f);
+                    Check(!_ar.IsRelocatingMob && relocateLogs.Count == 1, "mob not relocated after tracking returned (logs " + relocateLogs.Count + ")");
+                    Check(Vector3.Distance(mob.transform.position, _syntheticTarget) < 0.01f, "mob not on the new ground: " + mob.transform.position + " vs " + _syntheticTarget);
+                    yield return WaitUntil(() => _ar.MobAnchorKind != "pending", 5f);
+                    Check(_ar.MobAnchorKind == "world" || _ar.MobAnchorKind == "plane" || _ar.MobAnchorKind == "session", "anchor after relocation " + _ar.MobAnchorKind);
+                    Check(_ar.MobUsable && DrawnRenderers(mob) > 0, "mob not shown after relocation");
+                    Check(combat.Session.MobHp == hp, "HP changed after relocation");
+
+                    // (4) kill, lose tracking > 15 s again, relocate: still one reward.
+                    while (!combat.Session.MobDefeated && swing < 700200) combat.HandleHitDetected(mob, swing++);
+                    Check(combat.Session.MobDefeated && defeatedEvents == 1, "kill: defeated " + combat.Session.MobDefeated + " events " + defeatedEvents);
+                    PlayerProgress p0 = LocalPlayerSession.Progress;
+                    long exp = p0.TotalExp, talary = p0.Talary;
+                    _syntheticStatus = ArSessionStatus.SessionInitializing;
+                    yield return WaitUntil(() => _ar.TrackingRecovery.ResetCount >= 2, limit + 5f);
+                    Check(_ar.TrackingRecovery.ResetCount == 2 && resetLogs.Count == 2, "second reset missing: " + _ar.TrackingRecovery.ResetCount);
+                    _syntheticTarget = cam.position + fwd * 1.8f + Vector3.down * 1.2f;
+                    _syntheticStatus = ArSessionStatus.SessionTracking;
+                    yield return WaitUntil(() => !_ar.IsRelocatingMob, 5f);
+                    combat.HandleHitDetected(mob, swing++);
+                    Check(combat.LastReport != null && combat.LastReport.Status == CombatHitStatus.MobAlreadyDefeated,
+                        "hit after reset+relocation on a dead mob " + (combat.LastReport != null ? combat.LastReport.Status.ToString() : "-"));
+                    PlayerProgress p1 = LocalPlayerSession.Progress;
+                    Check(defeatedEvents == 1 && p1.TotalExp == exp && p1.Talary == talary, "double reward across reset: events " + defeatedEvents + " exp " + p1.TotalExp + " talary " + p1.Talary);
+                    Check(mob.IsBodyHidden && mob.HpLabel == ArEncounterMob.DefeatedLabel, "dead mob revived by relocation");
+                    Debug.Log("[ArSmoke] T12b reset after " + resetAfter.ToString("F1") + " s, hp kept " + hp + ", resets=" + _ar.TrackingRecovery.ResetCount
+                              + ", reward events=" + defeatedEvents + " | " + (resetLogs.Count > 0 ? resetLogs[0] : "-"));
+                }
+                finally
+                {
+                    combat.MobDefeated -= onDefeated;
+                    Application.logMessageReceived -= onLog;
+                    _syntheticStatus = ArSessionStatus.SessionTracking;
+                }
 
                 _ar.Hud.ExitButton.onClick.Invoke();
                 yield return WaitUntil(() => ActiveScenePath == ArEncounterScenes.WorldMapScenePath, 10f);

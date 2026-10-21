@@ -49,6 +49,20 @@ namespace MetinAR.ArEncounter
             return !double.IsNaN(d) && !double.IsInfinity(d) && d >= MinPlacementDistanceMeters - PlacementDistanceTolerance;
         }
 
+        /// <summary>Height of the camera above a placement surface (metres, positive = surface below the camera).</summary>
+        public static double PlaneDropBelowCamera(double cameraY, double planeY) => cameraY - planeY;
+
+        /// <summary>
+        /// False when the surface is more than <paramref name="maxDropMeters"/> below the camera (#31 P1, prototype 2.5 m)
+        /// or any value is not finite. Surfaces above the camera are left to the existing plane rules.
+        /// </summary>
+        public static bool IsPlaneHeightAcceptable(double cameraY, double planeY, double maxDropMeters)
+        {
+            double drop = PlaneDropBelowCamera(cameraY, planeY);
+            return !double.IsNaN(drop) && !double.IsInfinity(drop) && !double.IsNaN(maxDropMeters)
+                   && drop <= maxDropMeters + PlacementDistanceTolerance;
+        }
+
         /// <summary>
         /// World scale of the nameplate at <paramref name="distanceMeters"/> from the camera: constant angular size
         /// (<see cref="NameplateMaxAngleDegrees"/>) when close, never larger than the authored size (scale 1).

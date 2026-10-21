@@ -33,6 +33,9 @@ namespace MetinAR.ArEncounter
         /// <summary>Suitable ground was hit, but only closer than the minimum placement distance.</summary>
         public bool TargetTooClose;
 
+        /// <summary>Suitable ground was hit, but only more than the allowed height below the camera (#31 P1).</summary>
+        public bool TargetTooLow;
+
         public void Clear()
         {
             SessionStatus = ArSessionStatus.None;
@@ -43,6 +46,7 @@ namespace MetinAR.ArEncounter
             TargetPlane = null;
             TargetFromReticle = false;
             TargetTooClose = false;
+            TargetTooLow = false;
         }
     }
 }

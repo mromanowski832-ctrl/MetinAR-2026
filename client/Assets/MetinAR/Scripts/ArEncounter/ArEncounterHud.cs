@@ -189,7 +189,10 @@ namespace MetinAR.ArEncounter
         /// <summary>Updates status / place button / failure panel / radar from the controller state.</summary>
         public const string PlacementTooCloseNotice = "Za blisko. Odsuń się albo wyceluj dalej w podłoże (min. 1,5 m).";
 
-        public void Refresh(ArEncounterState state, ArEncounterStateMachine machine, bool hasPlacementTarget, float notTrackingSeconds, string mobName, Transform mob, Transform viewer, bool targetTooClose = false)
+        /// <summary>Placed, tracking lost or waiting for new ground after an AR session reset (#31 MANAGER DECISION 18:50).</summary>
+        public const string SearchingSurroundingsNotice = "Szukam otoczenia…";
+
+        public void Refresh(ArEncounterState state, ArEncounterStateMachine machine, bool hasPlacementTarget, float notTrackingSeconds, string mobName, Transform mob, Transform viewer, bool targetTooClose = false, bool mobHidden = false)
         {
             string status;
             switch (state)
@@ -211,8 +214,8 @@ namespace MetinAR.ArEncounter
                         : targetTooClose ? PlacementTooCloseNotice : "Podłoże wykryte. Wyceluj w podłoże.";
                     break;
                 case ArEncounterState.Placed:
-                    status = machine != null && machine.IsTrackingLimited
-                        ? "Śledzenie ograniczone — potwór ukryty. Powoli przesuń telefon nad podłogą."
+                    status = mobHidden || (machine != null && machine.IsTrackingLimited)
+                        ? SearchingSurroundingsNotice
                         : mobName + " stoi na podłożu.";
                     break;
                 default:

@@ -208,3 +208,30 @@ Protocol and causes: #31 (session protocol 6320633550, causes 6321030003). Summa
   provider), not the spider: walk 3.82→2.82→1.82→3.82→4.82→3.82 m at 1.25 m height / 30° pitch (mob world pose
   unchanged, distance follows), no reach at 3.82 m, approach to 1.0 m + real HUD ATAK must lower HP, and with tracking
   lost the mob must not be drawn. Engine-free: `FppCombatTests.ReachColumn*`.
+
+### MANAGER DECISION 18:50 (#31): auto-reset, plane height, reach
+
+- **Tracking loss → reset** (`ArTrackingRecovery`, engine-free). While placed and the session is not `SessionTracking`, the
+  mob is hidden and combat is paused at once (`FppCombatController.Ready` also requires `MobUsable`). The HUD shows
+  „Szukam otoczenia…”. After `ArPlacementSettings.trackingLostResetSeconds` (PROTOTYPE 15 s) without tracking,
+  `ARSession.Reset()` runs and logs `[ArSession] reset reason=tracking-lost lostFor=…s limit=…s count=… session=… anchor=…
+  hp=…/… defeated=… t=…`. Before the reset the mob is moved out of its anchor (under `TrackablesParent`), because removed
+  anchors take their children with them. The old anchor is removed, and any anchor request still running is discarded.
+  The same `ArEncounterMob` and the same `EncounterCombatSession` stay alive, so HP and the once-only reward carry over.
+  When tracking returns, the mob is moved to the first suitable target and anchored again (`[ArSession] relocated mob at …
+  planeBelowCam=… d=… anchor=…`). The target must be suitable, ≥ 1.5 m away and pass the plane-height rule. Only then
+  is the mob shown again. If tracking does not return, the reset repeats every 15 s.
+- **Plane height (#31 P1).** The A31 put the spider on a plane 2.91 m below the phone. Targets more than
+  `maxPlaneDropBelowCameraMeters` (PROTOTYPE 2.5 m, 1 cm tolerance) below the camera are not spawn surfaces. The rule
+  applies to both reticle points and the plane-centre fallback, and the place button stays disabled
+  (`PlacementTargetTooLow`). Logs: `[ArEncounter] target plane=… planeBelowCam=… maxBelow=2.50 d=… accepted|rejected`
+  (once per plane/verdict) and `planeBelowCam=` on `[ArEncounter] spawned …`.
+- **Reach versus spawn distance.** This is spec text only; no new numbers were added.
+  - [MOBS_NPC.md §4.2](design/MOBS_NPC.md) has `Spawn` 2.5 m from the camera, then `Approach`, where the mob walks to the
+    1.2 m combat distance.
+  - For v0, [AUDIT_2026-10-21_UPDATE_1.md §2.3 "Nie wchodzi do v0"](audit/AUDIT_2026-10-21_UPDATE_1.md) excludes aggro
+    (#74), §3 says "dla v0 mob nie porusza się wcale", and §8.3 P2 says "v0 = mob stoi, aggro w E4". In v0 the player
+    walks up. This matches [DEVICE-ACCEPTANCE-LOOP-V0.md](qa/DEVICE-ACCEPTANCE-LOOP-V0.md) L4: "stand within sword reach".
+  - The reach column makes that walk-up hit possible (T10d (c)).
+  - No spec text covers a „Podejdź” prompt or a maximum spawn distance. §8.3 P10 leaves the minimum at 1.5 m (code)
+    vs 2.5 m (spec) open until the A31 A4 test. **Neither was added here**; both are reported for a decision.

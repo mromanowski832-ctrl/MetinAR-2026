@@ -19,6 +19,18 @@ namespace MetinAR.ArEncounter
         /// </summary>
         public float startTimeoutSeconds = 20f;
 
+        /// <summary>
+        /// Seconds a placed encounter may stay without session tracking before the ARSession is reset
+        /// (#31 MANAGER DECISION 18:50). PROTOTYPE: 15 s.
+        /// </summary>
+        public float trackingLostResetSeconds = 15f;
+
+        /// <summary>
+        /// A placement surface more than this far below the AR camera is rejected (#31 P1: A31 picked a plane 2.91 m below
+        /// a handheld phone). PROTOTYPE: 2.5 m.
+        /// </summary>
+        public float maxPlaneDropBelowCameraMeters = 2.5f;
+
         public static ArPlacementSettings CreatePrototypeDefaults()
         {
             return new ArPlacementSettings();

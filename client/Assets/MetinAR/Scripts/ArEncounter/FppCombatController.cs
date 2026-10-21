@@ -18,7 +18,7 @@ namespace MetinAR.ArEncounter
         public event Action<ArEncounterMob, int> HitDetected;
         public bool Ready => isActiveAndEnabled && !_paused && !_unfocused && _encounter != null
             && !_encounter.IsExiting && _encounter.State == ArEncounterState.Placed
-            && _encounter.LastSessionStatus == ArSessionStatus.SessionTracking
+            && _encounter.LastSessionStatus == ArSessionStatus.SessionTracking && _encounter.MobUsable
             && _encounter.SpawnedMob != null && _encounter.ArCamera != null && _view != null;
 
         public void Initialize(ArEncounterSceneController encounter)

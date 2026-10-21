@@ -201,7 +201,7 @@ public class FppCombatTests
     public void ReachColumnKeepsFootprintAndExtendsAboveBodyTop()
     {
         Assert.True(FppHitGeometry.ReachColumnTopY >= 3.0);
-        Assert.Equal(FppHitGeometry.BodyMin.Y, 0.125);
+        Assert.Equal(0.125, FppHitGeometry.BodyMin.Y);
         Assert.Equal(0.285, FppHitGeometry.ReachColumnMax.X);
         Assert.Equal(0.345, FppHitGeometry.ReachColumnMax.Z);
         // A blade segment 1 m above the floor over the spider centre misses the literal body box but hits the column.
