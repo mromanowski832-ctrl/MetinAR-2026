@@ -1,0 +1,32 @@
+[METINAR-032] Starter buckler asset check: checks=18 failures=0
+INFO Unity 6000.6.4f1 | 2026-10-21 08:27:49Z
+PASS C01 model import: no rig, no animation, no materials, Read/Write off, scale 1, Bake Axis Conversion, Preserve Hierarchy — None anim=False readable=False bakeAxis=True preserve=True
+INFO model hierarchy: SM_Weapon_StarterBuckler pos(0.0000, 0.0000, 0.0000) rot(0.00, 0.00, 0.00), SM_Weapon_StarterBuckler/SM_Weapon_StarterBuckler pos(0.0000, 0.0000, 0.0000) rot(89.98, 0.00, 0.00), SM_Weapon_StarterBuckler/SM_Weapon_StarterBuckler/Socket_FxBlock pos(0.0000, 0.1104, 0.0000) rot(270.02, 0.00, 0.00), SM_Weapon_StarterBuckler/SM_Weapon_StarterBuckler/Socket_Grip pos(0.0000, 0.0000, 0.0000) rot(270.02, 0.00, 0.00)
+PASS C02 exactly one mesh, no SkinnedMeshRenderer (0 bones) — 1 mesh(es)
+INFO mesh SM_Weapon_StarterBuckler: 1368 tris, 1075 verts, 1 submesh, uv0=True, tangents=True
+PASS C03 triangles <= 1500 (ITEMS_COMBAT_SPEC section 8), 1 sub-mesh, UV0 + tangents — 1368
+INFO bounds in model space (m): min (-0.1810, -0.1810, -0.0135) max (0.1810, 0.1810, 0.1104) size (0.3620, 0.3620, 0.1239)
+PASS C04 size: diameter 0.36 m (±2 cm) in X and Y, depth <= 0.15 m — (0.3620, 0.3620, 0.1239)
+PASS C05 pivot = grip: origin inside the shield footprint (|x|,|y| centred within 5 mm), front of the shield at +Z (max z > 0.08, min z > -0.03) — (0.0000, 0.0000, 0.0485)
+PASS C06 faces +Z: normals of the most forward vertices (boss top) point to +Z — n=49 mean normal (0.000, 0.000, 1.000)
+INFO socket Socket_Grip: pos (0.0000, 0.0000, 0.0000), rotation vs model 0,00 deg
+PASS C07 socket Socket_Grip present with the model's frame (rotation <= 0.5 deg) — 0,00 deg
+INFO socket Socket_FxBlock: pos (0.0000, 0.0000, 0.1104), rotation vs model 0,00 deg
+PASS C07 socket Socket_FxBlock present with the model's frame (rotation <= 0.5 deg) — 0,00 deg
+PASS C08 Socket_Grip at the pivot (<= 1 mm)
+PASS C09 Socket_FxBlock on the boss front (x,y ≈ 0, z = front, ±2 mm) — (0.0000, 0.0000, 0.1104)
+INFO texture BC: 512x512 type=Default sRGB=True max=1024 Android=ASTC_6x6 mips=True
+PASS C10 texture BC 512x512, correct type/colour space, ASTC override — 512x512 Default ASTC_6x6
+INFO texture N: 512x512 type=NormalMap sRGB=False max=1024 Android=ASTC_4x4 mips=True
+PASS C10 texture N 512x512, correct type/colour space, ASTC override — 512x512 NormalMap ASTC_4x4
+INFO texture MS: 512x512 type=Default sRGB=False max=1024 Android=ASTC_6x6 mips=True
+PASS C10 texture MS 512x512, correct type/colour space, ASTC override — 512x512 Default ASTC_6x6
+PASS C11 M_StarterBuckler: URP Lit, BC/N/MS assigned — Universal Render Pipeline/Lit
+PASS C12 PF_Weapon_StarterBuckler loads (root identity, scale 1)
+PASS C13 prefab: 0 missing scripts, no MonoBehaviours, no colliders (visual only) — 0
+PASS C14 prefab: 1 renderer, 1 material (M_StarterBuckler), shadow casting off (FPP) — 1 renderer(s)
+PASS C15 asset pipeline validator on Weapons/StarterBuckler: 0 errors, 0 warnings — 7 files, 0 issues
+INFO screenshot unity_front.png
+INFO screenshot unity_hero_34.png
+INFO screenshot unity_back_34.png
+INFO screenshot unity_side.png

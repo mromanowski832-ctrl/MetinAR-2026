@@ -36,6 +36,7 @@ UV_RECTS = {
 }
 PART_ORDER = list(UV_RECTS)
 RIVETS = 8
+HANDLE_PATH = []
 RIVET_R = 0.145
 
 
@@ -179,6 +180,7 @@ def build(name="SM_Weapon_StarterBuckler"):
     # --- handle: leather-wrapped bar along +Z (Unity +Y) behind the boss, ends bent into the back of the planks
     path = [Vector((0, -(d_back(0.08) + 0.004), -0.082)), Vector((0, -0.018, -0.068)), Vector((0, 0.0, -0.042)),
             Vector((0, 0.0, 0.0)), Vector((0, 0.0, 0.042)), Vector((0, -0.018, 0.068)), Vector((0, -(d_back(0.08) + 0.004), 0.082))]
+    HANDLE_PATH[:] = path
     sides = 8
     rh = 0.0135
     length = [0.0]
@@ -202,7 +204,47 @@ def build(name="SM_Weapon_StarterBuckler"):
     return obj
 
 
+def _inside_point(part, c):
+    """A point 'inside' the part (behind / under its outer surface); face normals must point away from it."""
+    if part in ("front", "boss", "rivet"):
+        return Vector((c.x * 0.2, 1.0, c.z * 0.2))   # far behind the shield: outer side looks forward (-Y)
+    if part == "back":
+        return Vector((c.x * 0.2, -1.0, c.z * 0.2))  # far in front: outer side looks backward (+Y)
+    if part == "edge":
+        return Vector((0.0, c.y, 0.0))               # the shield axis: outer side looks radially out
+    if part == "rim":
+        r = math.hypot(c.x, c.z)
+        k = (R_EDGE + 0.002) / max(r, 1e-6)
+        return Vector((c.x * k, -(BACK_D + THICK * 0.5), c.z * k))  # centre line of the rim channel
+    if part == "handle":
+        best, bd = None, 1e9
+        for a, b in zip(HANDLE_PATH[:-1], HANDLE_PATH[1:]):
+            ab = b - a
+            t = max(0.0, min(1.0, (c - a).dot(ab) / ab.length_squared))
+            q = a + ab * t
+            if (c - q).length < bd:
+                best, bd = q, (c - q).length
+        return best
+    raise ValueError(part)
+
+
+def _orient(m):
+    """Wind every face so its normal points away from the part's inside point (no reliance on recalc)."""
+    out = []
+    for ids, uvs, part in m.faces:
+        pts = [m.verts[j] for j in ids]
+        c = sum(pts, Vector()) / len(pts)
+        n = (pts[1] - pts[0]).cross(pts[2] - pts[0])
+        if len(pts) == 4 and n.length < 1e-12:
+            n = (pts[2] - pts[1]).cross(pts[3] - pts[1])
+        if n.dot(c - _inside_point(part, c)) < 0.0:
+            ids, uvs = ids[::-1], uvs[::-1]
+        out.append((ids, uvs, part))
+    m.faces = out
+
+
 def _to_object(m, name):
+    _orient(m)
     me = bpy.data.meshes.new(name)
     me.from_pydata([tuple(v) for v in m.verts], [], [f[0] for f in m.faces])
     me.update()
@@ -221,7 +263,6 @@ def _to_object(m, name):
     for idx in range(len(PART_ORDER)):
         vs = list({v for f in bm.faces if f[layer] == idx for v in f.verts})
         bmesh.ops.remove_doubles(bm, verts=vs, dist=1e-6)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bmesh.ops.triangulate(bm, faces=bm.faces)
     bm.to_mesh(me)
     bm.free()
