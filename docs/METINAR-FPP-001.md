@@ -244,13 +244,21 @@ This supersedes the "neither was added" note above.
 - **„Podejdź – x,x m”** (`ArApproachPrompt`, engine-free): this is the HUD status line while the placed mob is usable
   (tracking, anchored), alive and **out of attack reach**. The distance is the horizontal camera-to-mob distance, with one
   decimal and a Polish comma.
-  - **Attack reach** is not a new number. It is `FppCombatController.SwingWouldHit`: the same blade sweep over the ATAK
-    hit window that combat uses (reach column, see P0-1).
-  - Because of that rule, the prompt also shows when the player is close but the phone is pointed away from the mob.
-  - The prompt is hidden in reach, after the kill, and while tracking is lost or the mob is waiting for relocation.
+  - **Attack reach for the prompt is distance only** (correction 19:00; it does not depend on where the phone aims). In
+    reach means: the horizontal camera-to-hit-footprint distance ≤ the blade's horizontal reach. There is no new constant:
+    - the footprint is `FppHitGeometry.BodyMin`..`ReachColumnMax` in x/z, with the mob scale applied;
+    - `FppCombatController.BladeReachMeters` = `ArApproachPrompt.BladeReach` over the same `FppHandsView.SwordPose`
+      blade base/tip samples across the ATAK hit window as the hit sweep. It is the longest camera-local blade point,
+      the upper bound of horizontal reach for any aim (about 1.21 m by an offline estimate; the Unity value is logged
+      as `bladeReach=`).
+    - Up close but aiming away gives no prompt; far away gives the prompt. The aimed sweep (`SwingWouldHit`) is used
+      for hits only.
+    - Because the bound ignores pitch, there is a band (about 1.4–1.5 m to the spider centre when facing it) with no
+      prompt where a pitched handheld swing may still miss.
+  - The prompt is hidden in reach, after the kill (confirmed by the lead), and while tracking is lost or the mob is waiting for relocation.
     Priority: „Szukam otoczenia…” > „Podejdź – …” > „… stoi na podłożu.”
-  - Log: `[ArEncounter] approach prompt shown|hidden reason=out-of-reach|in-reach|tracking|defeated d=…` on every
-    visibility change.
+  - Log: `[ArEncounter] approach prompt shown|hidden reason=out-of-reach|in-reach|tracking|defeated d=… toFootprint=…
+    bladeReach=…` on every visibility change.
 - **v0 spawn range** `ArPlacementSettings.minSpawnDistanceMeters` / `maxSpawnDistanceMeters` = **PROTOTYPE 1.5 / 3.0 m**
   (horizontal, 1 cm tolerance, `ArEncounterFraming.ClassifySpawnDistance`).
   - **Targets outside it are rejected, not clamped**, in the same way for the reticle points, the plane-centre fallback
@@ -266,5 +274,7 @@ This supersedes the "neither was added" note above.
 - **Tests:**
   - Box: `ArApproachAndSpawnRangeTests` covers the format, visibility, the 1.5/3.0 m boundaries, 3.82 m (A31) and
     invalid settings.
-  - Unity: T10e covers the prompt at 2.4 m and 3.82 m, its absence at 1.0 m in reach, and the tracking-lost priority.
+  - Box: blade reach, aim independence, footprint distance, and close-aiming-away / far cases.
+  - Unity: T10e covers the prompt at 2.4 m and 3.82 m, none at 1.0 m in reach, **none at 1.0 m while aiming away** (where
+    a swing cannot hit), **the prompt at 3.82 m while aiming away**, and the tracking-lost priority.
     T12 covers 3.5 m rejected and 2.95 m accepted. T12b covers relocation at 3.5 m refused.

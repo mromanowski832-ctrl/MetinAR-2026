@@ -161,8 +161,14 @@ namespace MetinAR.ArEncounter
         /// <summary>Horizontal camera-to-mob distance of the placed mob (NaN before placement).</summary>
         public float ApproachDistance { get; private set; } = float.NaN;
 
-        /// <summary>An ATAK from the current camera pose would hit the placed mob (<see cref="FppCombatController.SwingWouldHit"/>).</summary>
+        /// <summary>
+        /// Distance-only attack reach (#31 18:58 correction): horizontal camera-to-hit-footprint distance ≤ blade reach.
+        /// Independent of where the phone aims; the aimed blade sweep is used for hits only.
+        /// </summary>
         public bool InAttackReach { get; private set; }
+
+        /// <summary>Horizontal distance from the camera to the mob's hit footprint (NaN before placement).</summary>
+        public float FootprintDistance { get; private set; } = float.NaN;
 
         /// <summary>„Podejdź – x,x m” is shown (#31 decision 18:58).</summary>
         public bool ApproachPromptVisible { get; private set; }
@@ -474,7 +480,9 @@ namespace MetinAR.ArEncounter
             Vector3 c = _arCamera.transform.position;
             Vector3 m = SpawnedMob.transform.position;
             ApproachDistance = (float)ArEncounterFraming.HorizontalDistance(c.x, c.z, m.x, m.z);
-            InAttackReach = FppCombat != null && FppCombat.SwingWouldHit(SpawnedMob);
+            FootprintDistance = FppCombat != null ? FppCombat.HorizontalDistanceToHitFootprint(SpawnedMob) : float.NaN;
+            InAttackReach = FppCombat != null && !float.IsNaN(FootprintDistance)
+                            && !ArApproachPrompt.IsOutOfReach(FootprintDistance, FppCombatController.BladeReachMeters);
             bool defeated = Combat != null && Combat.Session != null && Combat.Session.MobDefeated;
             bool show = ArApproachPrompt.ShouldShow(true, MobUsable, defeated, InAttackReach, ApproachDistance);
             string reason = !MobUsable ? "tracking" : defeated ? "defeated" : InAttackReach ? "in-reach" : "out-of-reach";
@@ -492,7 +500,9 @@ namespace MetinAR.ArEncounter
             ApproachPromptVisible = show;
             Debug.Log("[ArEncounter] approach prompt " + (show ? "shown" : "hidden")
                       + " reason=" + reason
-                      + " d=" + (float.IsNaN(distance) ? "n/a" : distance.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)));
+                      + " d=" + (float.IsNaN(distance) ? "n/a" : distance.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))
+                      + " toFootprint=" + (float.IsNaN(FootprintDistance) ? "n/a" : FootprintDistance.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))
+                      + " bladeReach=" + FppCombatController.BladeReachMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
         }
 
         private bool IsFrameTargetSuitable()

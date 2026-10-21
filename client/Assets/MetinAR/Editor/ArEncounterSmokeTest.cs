@@ -873,9 +873,10 @@ namespace MetinAR.Editor
             }
 
             /// <summary>
-            /// #31 decision 18:58: v0 mob stands still, the player walks up. „Podejdź – x,x m” (horizontal camera-mob distance)
-            /// is shown only while a swing from the current pose cannot reach the mob; hidden in reach (1.0 m, device pose) and
-            /// while tracking is lost, where „Szukam otoczenia…” has priority. The mob never moves.
+            /// #31 decision 18:58 + correction: v0 mob stands still, the player walks up. „Podejdź – x,x m” (horizontal
+            /// camera-mob distance) is shown only while the camera is farther from the hit footprint than the blade's horizontal
+            /// reach — DISTANCE ONLY, independent of aim. Up close but aiming away: no prompt (even though a swing cannot hit);
+            /// far away aiming away: prompt. Hidden while tracking is lost („Szukam otoczenia…” has priority). Mob never moves.
             /// </summary>
             private IEnumerator T10e_ApproachPrompt_OnlyOutOfReach()
             {
@@ -918,12 +919,31 @@ namespace MetinAR.Editor
                         if (Mathf.Approximately(d, 2.4f)) Check(expected == "Podejdź – 2,4 m", "format " + expected);
                     }
 
+                    float bladeReach = FppCombatController.BladeReachMeters;
+                    Check(bladeReach > 0.3f && bladeReach < 2f, "blade reach derived from the sword geometry: " + bladeReach);
+
                     // In reach (same device pose as T10d (c)): prompt hidden.
                     yield return PlaceArCamera(simCam, mobPos + dir * 1.0f + Vector3.up * DeviceCameraHeight, look);
                     yield return Frames(2);
                     Check(_ar.InAttackReach && !_ar.ApproachPromptVisible, "prompt in reach at 1.0 m (inReach " + _ar.InAttackReach + ")");
                     Check(_ar.Hud.StatusLabel != null && !_ar.Hud.StatusLabel.StartsWith(ArApproachPrompt.Prefix, StringComparison.Ordinal)
                           && _ar.Hud.StatusLabel != ArEncounterHud.SearchingSurroundingsNotice, "status in reach '" + _ar.Hud.StatusLabel + "'");
+
+                    // Up close but aiming AWAY from the mob: a swing cannot hit, yet no „Podejdź” (distance only).
+                    Quaternion lookAway = Quaternion.LookRotation(dir, Vector3.up) * Quaternion.Euler(DeviceCameraPitch, 0f, 0f);
+                    yield return PlaceArCamera(simCam, mobPos + dir * 1.0f + Vector3.up * DeviceCameraHeight, lookAway);
+                    yield return Frames(2);
+                    Check(!fpp.SwingWouldHit(mob), "aiming away at 1.0 m still hits (hit test must use the aim)");
+                    Check(_ar.InAttackReach && !_ar.ApproachPromptVisible, "prompt shown up close while aiming away (inReach " + _ar.InAttackReach
+                          + " toFootprint " + _ar.FootprintDistance + " bladeReach " + bladeReach + ")");
+                    Check(_ar.Hud.StatusLabel != null && !_ar.Hud.StatusLabel.StartsWith(ArApproachPrompt.Prefix, StringComparison.Ordinal),
+                        "status up close aiming away '" + _ar.Hud.StatusLabel + "'");
+
+                    // Far away and aiming away: prompt shown.
+                    yield return PlaceArCamera(simCam, mobPos + dir * DevicePlacementDistance + Vector3.up * DeviceCameraHeight, lookAway);
+                    yield return Frames(2);
+                    Check(!_ar.InAttackReach && _ar.ApproachPromptVisible && _ar.Hud.StatusLabel == ArApproachPrompt.Format(_ar.ApproachDistance),
+                        "no prompt far away aiming away: '" + _ar.Hud.StatusLabel + "'");
 
                     // Out of reach but tracking lost: „Szukam otoczenia…” wins, no prompt; back with tracking.
                     yield return PlaceArCamera(simCam, mobPos + dir * 2.4f + Vector3.up * DeviceCameraHeight, look);
@@ -936,8 +956,8 @@ namespace MetinAR.Editor
                     Check(_ar.ApproachPromptVisible && _ar.Hud.StatusLabel == ArApproachPrompt.Format(_ar.ApproachDistance),
                         "prompt not back after tracking: '" + _ar.Hud.StatusLabel + "'");
                     Check(Vector3.Distance(mob.transform.position, mobPos) < 0.01f, "v0 mob moved");
-                    Check(promptLogs.Count >= 3, "approach prompt logs " + promptLogs.Count);
-                    Debug.Log("[ArSmoke] T10e prompt logs=" + promptLogs.Count + " | " + string.Join(" | ", promptLogs));
+                    Check(promptLogs.Count >= 4, "approach prompt logs " + promptLogs.Count);
+                    Debug.Log("[ArSmoke] T10e bladeReach=" + bladeReach.ToString("F2") + " prompt logs=" + promptLogs.Count + " | " + string.Join(" | ", promptLogs));
                 }
                 finally
                 {

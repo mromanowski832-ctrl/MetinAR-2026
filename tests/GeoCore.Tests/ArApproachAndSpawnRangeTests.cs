@@ -90,4 +90,67 @@ public class ArApproachAndSpawnRangeTests
         s.maxSpawnDistanceMeters = max;
         Assert.Throws<ArgumentOutOfRangeException>(() => new ArEncounterStateMachine(s));
     }
+
+    // ---- #31 18:58 correction: attack reach for the prompt is DISTANCE ONLY (aim-independent) ----
+
+    private static readonly FppPoint[] Blade =
+    {
+        new FppPoint(0.25, -0.08, 0.48), new FppPoint(0.20, 0.55, 0.80), new FppPoint(-0.15, -0.22, 0.50), new FppPoint(-0.40, -0.30, 1.05),
+    };
+
+    [Fact]
+    public void BladeReachIsLongestBladePointAndIgnoresNonFinite()
+    {
+        var pts = new System.Collections.Generic.List<FppPoint>(Blade) { new FppPoint(double.NaN, 0, 9) };
+        double expected = Math.Sqrt(0.40 * 0.40 + 0.30 * 0.30 + 1.05 * 1.05);
+        Assert.Equal(expected, ArApproachPrompt.BladeReach(pts), 9);
+        Assert.Equal(0.0, ArApproachPrompt.BladeReach(null));
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(180, 30)]   // aiming straight away from the mob, pitched down
+    [InlineData(90, -20)]
+    [InlineData(-135, 60)]
+    public void BladeReachDoesNotDependOnAim(double yaw, double pitch)
+    {
+        var aimed = new FppPoint[Blade.Length];
+        for (int i = 0; i < Blade.Length; i++) aimed[i] = FppViewFraming.Rotate(new FppPoint(pitch, yaw, 0), Blade[i]);
+        Assert.Equal(ArApproachPrompt.BladeReach(Blade), ArApproachPrompt.BladeReach(aimed), 9);
+    }
+
+    private static double ToFootprint(double x, double z) => ArApproachPrompt.DistanceToFootprint(
+        x, z, FppHitGeometry.BodyMin.X, FppHitGeometry.ReachColumnMax.X, FppHitGeometry.BodyMin.Z, FppHitGeometry.ReachColumnMax.Z);
+
+    [Fact]
+    public void FootprintDistanceUsesTheExistingHitFootprint()
+    {
+        Assert.Equal(0.0, ToFootprint(0, 0));                                 // inside
+        Assert.Equal(1.0 - FppHitGeometry.ReachColumnMax.Z, ToFootprint(0, 1.0), 9);  // in front (mob faces +Z)
+        Assert.Equal(1.0 + FppHitGeometry.BodyMin.Z, ToFootprint(0, -1.0), 9);        // behind
+        Assert.Equal(0.5, ToFootprint(FppHitGeometry.ReachColumnMax.X + 0.3, FppHitGeometry.ReachColumnMax.Z + 0.4), 9);
+        Assert.True(double.IsNaN(ToFootprint(double.NaN, 0)));
+    }
+
+    [Fact]
+    public void UpCloseAimingAwayNoPrompt_FarAwayPrompt()
+    {
+        double reach = ArApproachPrompt.BladeReach(Blade);
+        // Same camera position whatever the aim: the decision has no aim input at all.
+        bool closeOut = ArApproachPrompt.IsOutOfReach(ToFootprint(0, 1.0), reach);
+        Assert.False(closeOut);
+        Assert.False(ArApproachPrompt.ShouldShow(true, true, false, !closeOut, 1.0));
+        bool farOut = ArApproachPrompt.IsOutOfReach(ToFootprint(0, 3.82), reach);
+        Assert.True(farOut);
+        Assert.True(ArApproachPrompt.ShouldShow(true, true, false, !farOut, 3.82));
+    }
+
+    [Fact]
+    public void OutOfReachBoundaryAndInvalid()
+    {
+        Assert.False(ArApproachPrompt.IsOutOfReach(1.2, 1.2));
+        Assert.True(ArApproachPrompt.IsOutOfReach(1.2001, 1.2));
+        Assert.False(ArApproachPrompt.IsOutOfReach(double.NaN, 1.2));
+        Assert.False(ArApproachPrompt.IsOutOfReach(2.0, double.NaN));
+    }
 }
