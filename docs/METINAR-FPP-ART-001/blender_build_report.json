@@ -1,0 +1,185 @@
+{
+  "triangles": {
+    "SK_Player_FppArms": 4932,
+    "SM_Weapon_FppSword": 1452
+  },
+  "vertices": {
+    "SK_Player_FppArms": 2588,
+    "SM_Weapon_FppSword": 765
+  },
+  "bones": 29,
+  "bone_names": [
+    "B_Root",
+    "B_UpperArm_R",
+    "B_Forearm_R",
+    "B_Hand_R",
+    "B_Index1_R",
+    "B_Index2_R",
+    "B_Middle1_R",
+    "B_Middle2_R",
+    "B_Ring1_R",
+    "B_Ring2_R",
+    "B_Pinky1_R",
+    "B_Pinky2_R",
+    "B_Thumb1_R",
+    "B_Thumb2_R",
+    "B_Socket_Sword",
+    "B_UpperArm_L",
+    "B_Forearm_L",
+    "B_Hand_L",
+    "B_Index1_L",
+    "B_Index2_L",
+    "B_Middle1_L",
+    "B_Middle2_L",
+    "B_Ring1_L",
+    "B_Ring2_L",
+    "B_Pinky1_L",
+    "B_Pinky2_L",
+    "B_Thumb1_L",
+    "B_Thumb2_L",
+    "B_Socket_GripL"
+  ],
+  "materials": {
+    "SK_Player_FppArms": 1,
+    "SM_Weapon_FppSword": 1
+  },
+  "texture_size": 1024,
+  "textures": {
+    "FppArms": [
+      "BC",
+      "MS",
+      "N"
+    ],
+    "FppSword": [
+      "BC",
+      "E",
+      "MS",
+      "N"
+    ]
+  },
+  "sword_sockets_unity": {
+    "Grip_Right": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "Grip_Left": [
+      0.0,
+      -0.11999999731779099,
+      0.0
+    ],
+    "FX_BladeBase": [
+      0.0,
+      0.12999999523162842,
+      0.0
+    ],
+    "FX_BladeTip": [
+      0.0,
+      0.9399999976158142,
+      0.0
+    ],
+    "FX_AuraBurst": [
+      0.0,
+      0.3799999952316284,
+      0.0
+    ],
+    "FX_GuardGem": [
+      0.0,
+      0.116,
+      0.0
+    ]
+  },
+  "shoulders_unity": {
+    "R": [
+      0.16,
+      -0.295,
+      0.025
+    ],
+    "L": [
+      -0.16,
+      -0.295,
+      -0.1
+    ]
+  },
+  "upper_forearm_len_m": [
+    0.3,
+    0.285
+  ],
+  "hand_yaw_deg": -45.0,
+  "fps": 100,
+  "clips": {
+    "Idle": {
+      "frames": 201,
+      "seconds": 2.0,
+      "loop": true,
+      "max_wrist_gap_m": 0.0,
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "Attack": {
+      "frames": 73,
+      "seconds": 0.72,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "left_finger_fit_frames": 29,
+      "left_finger_fit_range": [
+        -0.6,
+        0.0
+      ]
+    },
+    "AuraActivate": {
+      "frames": 116,
+      "seconds": 1.15,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "left_finger_fit_frames": 56,
+      "left_finger_fit_range": [
+        -0.043,
+        0.4
+      ]
+    }
+  },
+  "socket_vs_pr32_blender": {
+    "Attack": {
+      "right_pos_m": 0.0,
+      "right_rot_deg": 0.0,
+      "left_pos_m": 0.0,
+      "left_rot_deg": 0.0
+    },
+    "AuraActivate": {
+      "right_pos_m": 0.0,
+      "right_rot_deg": 0.0,
+      "left_pos_m": 0.0,
+      "left_rot_deg": 0.0
+    }
+  },
+  "hand_sword_contact": {
+    "Idle": {
+      "hilt_min_clearance_m": {
+        "R": 0.0031,
+        "L": 9.0
+      },
+      "penetrating_vertices": 0,
+      "nearest_camera_m": 0.297
+    },
+    "Attack": {
+      "hilt_min_clearance_m": {
+        "R": 0.0031,
+        "L": 9.0
+      },
+      "penetrating_vertices": 0,
+      "nearest_camera_m": 0.288
+    },
+    "AuraActivate": {
+      "hilt_min_clearance_m": {
+        "R": 0.0031,
+        "L": 0.0028
+      },
+      "penetrating_vertices": 0,
+      "nearest_camera_m": 0.291
+    }
+  }
+}
