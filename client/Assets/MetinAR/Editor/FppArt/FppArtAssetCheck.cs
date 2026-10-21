@@ -211,8 +211,9 @@ namespace MetinAR.Editor.FppArt
                 Transform t = FppArtAssetBuilder.FindDeep(sword.transform, s);
                 if (t != null)
                 {
-                    float a = Quaternion.Angle(Quaternion.identity, Quaternion.Inverse(sword.transform.rotation) * t.rotation);
-                    c.Check(a < 0.5f, "sword socket " + s + " frame = RightGrip frame (rotation off by " + a.ToString("0.00") + " deg)");
+                    Quaternion local = Quaternion.Inverse(sword.transform.rotation) * t.rotation;
+                    float a = Quaternion.Angle(Quaternion.identity, local);
+                    c.Check(a < 0.5f, "sword socket " + s + " frame = RightGrip frame (rotation off by " + a.ToString("0.00") + " deg, local euler " + Fmt(local.eulerAngles) + ")");
                 }
             }
 
@@ -260,6 +261,7 @@ namespace MetinAR.Editor.FppArt
                     c.Check(clip.isLooping == (state == "Idle"), state + ": loop flag " + clip.isLooping);
 
                     float maxP = 0f, maxR = 0f, maxPL = 0f, maxRL = 0f, idleAmp = 0f, minClear = 9f;
+                    Quaternion worstDelta = Quaternion.identity;
                     int penetrations = 0, samples = 0, visGrip = 0, visTip = 0, visLeft = 0;
                     int n = Mathf.RoundToInt(clip.length * 100f);
                     for (int i = 0; i <= n; i++)
@@ -276,6 +278,7 @@ namespace MetinAR.Editor.FppArt
                             if (i == 0 || i == n)
                             {
                                 maxP = Mathf.Max(maxP, (p - RestPosition).magnitude);
+                                if (Quaternion.Angle(r, Quaternion.Euler(RestEuler)) > maxR) worstDelta = Quaternion.Inverse(Quaternion.Euler(RestEuler)) * r;
                                 maxR = Mathf.Max(maxR, Quaternion.Angle(r, Quaternion.Euler(RestEuler)));
                                 LeftHandPose("Idle", 0f, out Vector3 ep, out Quaternion er);
                                 maxPL = Mathf.Max(maxPL, (pl - ep).magnitude);
@@ -286,6 +289,7 @@ namespace MetinAR.Editor.FppArt
                         {
                             SwordPose(state, t, out Vector3 ep, out Quaternion er);
                             maxP = Mathf.Max(maxP, (p - ep).magnitude);
+                            if (Quaternion.Angle(r, er) > maxR) worstDelta = Quaternion.Inverse(er) * r;
                             maxR = Mathf.Max(maxR, Quaternion.Angle(r, er));
                             LeftHandPose(state, t, out Vector3 lp, out Quaternion lr);
                             maxPL = Mathf.Max(maxPL, (pl - lp).magnitude);
@@ -323,7 +327,7 @@ namespace MetinAR.Editor.FppArt
                     }
 
                     string what = state == "Idle" ? "start/end vs rest pose" : "vs PR #32 pose (" + (n + 1) + " samples)";
-                    c.Check(maxP <= MaxPositionError && maxR <= MaxRotationErrorDeg, state + ": B_Socket_Sword " + what + ": max " + (maxP * 1000f).ToString("0.00") + " mm / " + maxR.ToString("0.00") + " deg");
+                    c.Check(maxP <= MaxPositionError && maxR <= MaxRotationErrorDeg, state + ": B_Socket_Sword " + what + ": max " + (maxP * 1000f).ToString("0.00") + " mm / " + maxR.ToString("0.00") + " deg (worst local delta euler " + Fmt(worstDelta.eulerAngles) + ")");
                     c.Check(maxPL <= MaxPositionError && maxRL <= MaxRotationErrorDeg, state + ": B_Socket_GripL " + what + ": max " + (maxPL * 1000f).ToString("0.00") + " mm / " + maxRL.ToString("0.00") + " deg");
                     if (state == "Idle") c.Check(idleAmp <= 0.006f, "Idle: sway amplitude " + (idleAmp * 1000f).ToString("0.0") + " mm (<= 6 mm)");
                     c.Check(penetrations == 0, state + ": hand vertices inside sword proxies = " + penetrations + " over " + samples + " sampled frames (min grip clearance " + (minClear * 1000f).ToString("0.0") + " mm)");
