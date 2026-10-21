@@ -100,6 +100,11 @@ if ($dirtyBefore.Count -gt 0) { $notes.Add("Working tree had tracked modificatio
 
 $unity = $null
 $needUnity = @($selected | Where-Object { $unityGates -contains $_ }).Count -gt 0 -and -not $SkipUnity
+# ApkAudit never launches Unity but finds aapt/aapt2 in the Unity Android module, so resolve the path for it too.
+if (-not $needUnity -and $selected -contains 'ApkAudit') {
+    $unity = Find-MetinARUnity -Version $config.unityVersion -Override $UnityPath
+    if (-not $unity) { $notes.Add('Unity Android module not found; aapt/aapt2 must be on PATH or ANDROID_HOME for ApkAudit.') }
+}
 if ($needUnity) {
     $unity = Find-MetinARUnity -Version $config.unityVersion -Override $UnityPath
     if (-not $unity) { $notes.Add("Unity $($config.unityVersion) not found (set -UnityPath or METINAR_UNITY).") }
