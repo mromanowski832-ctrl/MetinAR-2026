@@ -136,7 +136,14 @@ namespace MetinAR.Editor
 
             private void Check(bool condition, string message)
             {
-                if (!condition && _currentFailure == null)
+                if (condition)
+                {
+                    return;
+                }
+
+                // Every failed check is logged (the report keeps the first), so one early failure cannot hide later ones.
+                Debug.Log("[ArSmoke] CHECK FAIL " + message);
+                if (_currentFailure == null)
                 {
                     _currentFailure = message;
                 }
@@ -476,6 +483,31 @@ namespace MetinAR.Editor
             /// XR Simulation only scans the environment while this camera moves, like a real phone.
             /// Found by type name to avoid a compile-time dependency on the simulation assembly.
             /// </summary>
+            /// <summary>
+            /// XR Simulation clamps its camera to the environment's camera movement bounds on every input update
+            /// (CameraFPSModeHandler.useMovementBounds); the #31 device-geometry walk (up to 4.82 m from the spider) leaves
+            /// them, so the test camera was silently clamped (first LuzMen run 21.10 18:28). Test-only: switch the clamp
+            /// off for the walk and restore it afterwards. Returns the previous value, or null if the field is not found.
+            /// </summary>
+            private static bool? SetSimulationCameraBounds(Transform simCam, bool use)
+            {
+                if (simCam == null) return null;
+                const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance
+                    | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+                foreach (MonoBehaviour b in simCam.GetComponents<MonoBehaviour>())
+                {
+                    if (b == null || b.GetType().Name != "SimulationCameraPoseProvider") continue;
+                    object handler = b.GetType().GetField("m_FPSModeHandler", flags)?.GetValue(b);
+                    System.Reflection.PropertyInfo prop = handler?.GetType().GetProperty("useMovementBounds", flags);
+                    if (prop == null || prop.PropertyType != typeof(bool)) return null;
+                    bool previous = (bool)prop.GetValue(handler);
+                    prop.SetValue(handler, use);
+                    return previous;
+                }
+
+                return null;
+            }
+
             private static Transform FindSimulationCamera()
             {
                 foreach (MonoBehaviour b in FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include))
@@ -800,6 +832,8 @@ namespace MetinAR.Editor
                 var savedFrameSource = _ar.FrameSourceOverride;
                 Vector3 savedSimPos = simCam.position;
                 Quaternion savedSimRot = simCam.rotation;
+                bool? savedBounds = SetSimulationCameraBounds(simCam, false);
+                Check(savedBounds.HasValue, "cannot lift the XR Simulation camera movement bounds (package internals changed)");
                 _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionTracking;
                 try
                 {
@@ -866,6 +900,7 @@ namespace MetinAR.Editor
                 {
                     fpp.CancelActions();
                     simCam.SetPositionAndRotation(savedSimPos, savedSimRot);
+                    if (savedBounds.HasValue) SetSimulationCameraBounds(simCam, savedBounds.Value);
                     _ar.FrameSourceOverride = savedFrameSource;
                 }
 
@@ -889,6 +924,8 @@ namespace MetinAR.Editor
                 var savedFrameSource = _ar.FrameSourceOverride;
                 Vector3 savedSimPos = simCam.position;
                 Quaternion savedSimRot = simCam.rotation;
+                bool? savedBounds = SetSimulationCameraBounds(simCam, false);
+                Check(savedBounds.HasValue, "cannot lift the XR Simulation camera movement bounds (package internals changed)");
                 var promptLogs = new List<string>();
                 Application.LogCallback onLog = (message, stack, type) =>
                 {
@@ -964,6 +1001,7 @@ namespace MetinAR.Editor
                     Application.logMessageReceived -= onLog;
                     fpp.CancelActions();
                     simCam.SetPositionAndRotation(savedSimPos, savedSimRot);
+                    if (savedBounds.HasValue) SetSimulationCameraBounds(simCam, savedBounds.Value);
                     _ar.FrameSourceOverride = savedFrameSource;
                 }
 
