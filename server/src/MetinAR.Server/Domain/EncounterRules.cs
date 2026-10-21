@@ -3,7 +3,8 @@ namespace MetinAR.Server.Domain;
 /// <summary>
 /// Technical prototype thresholds for server-side encounter authority (METINAR-012).
 /// These are anti-abuse / GPS-noise limits, NOT final game-balance values. Configure via the
-/// <c>EncounterRules</c> section.
+/// <c>EncounterRules</c> section. Owner decision D3/Q3 (#33, comment 6316048203): the limits stay configuration and
+/// are explicitly prototype values. Per D3/Q2 the TTL is the only way an open encounter ends in v1.
 /// </summary>
 public sealed class EncounterRules
 {

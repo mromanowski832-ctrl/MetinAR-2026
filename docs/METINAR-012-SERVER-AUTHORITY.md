@@ -17,10 +17,10 @@ This document explains what METINAR-012 adds and why.
 | Entity availability | flag + spawn window | flag + spawn window + optional deterministic schedule; `activeUntil` on the wire |
 | Schema | `0002_seed_synthetic_world` | `0003_encounter_authority_and_spawn_schedules` |
 
-**Contract note.** Making `clientPosition` and `nonce` required tightens `v1` requests. The versioning rule in
-METINAR-010 §5.1 says this needs `/api/v2`. It was done in place on purpose: no client consumes the API yet (Unity
-integration hasn't started) and the issue asks for these checks on the existing endpoints. Before the first real
-client ships, the reviewer may prefer to freeze `v1` as it is now. That is a process choice, not a code blocker.
+**Contract note (decided, D3/Q1).** Making `clientPosition` and `nonce` required tightens `v1` requests. The versioning
+rule in METINAR-010 §5.1 would normally require `/api/v2`. The owner decided ([#33, D3](https://github.com/mromanowski832-ctrl/MetinAR-2026/issues/33#issuecomment-6316048203)) to keep
+the change in place in `/api/v1` with no `/api/v2`, because `v1` has no consumers yet. The "after" contract in §8 is the
+`v1` baseline; the additive-only rule of METINAR-010 §5.1 applies to every change from here on.
 
 ## 2. Encounter proximity validation
 
@@ -67,7 +67,8 @@ starts, not the gameplay trigger.
 | `MaxFutureSkewSeconds` | 5 | tolerated client clock skew |
 | `EncounterTtlSeconds` | 600 | encounter session lifetime |
 
-**These are technical prototype limits, not game-balance values.** They are validated at startup (an invalid value stops
+**These are PROTOTYPE technical limits, not game-balance values** (owner decision D3/Q3, [#33](https://github.com/mromanowski832-ctrl/MetinAR-2026/issues/33#issuecomment-6316048203): they stay
+configuration and are explicitly marked as prototype; final values aren't set by this work). They are validated at startup (an invalid value stops
 the server) and can be overridden per environment, e.g. `EncounterRules__MaxStartDistanceMeters=60`.
 
 Example rejection:
@@ -108,6 +109,10 @@ Example rejection:
 - **No double completion.** An already completed session answers `200` with `firstCompletion: false` and the original
   `completedAt`, even after its TTL or a server restart. `firstCompletion: true` happens at most once per session; it
   remains the only allowed hook for future rewards (METINAR-010 §6).
+- **Mob window ending mid-fight (decided, D3/Q2).** In v1 an open encounter ends only by completion or TTL. When the
+  entity's spawn window or schedule phase ends after the start, the session isn't interrupted or expired: it can still
+  be completed until `expiresAt`, and it expires at `expiresAt` as usual. Only *new* starts check entity activity
+  (tests `Complete_AfterMobWindowEndsMidFight_StillSucceedsWithinTtl`, `OpenSession_AfterMobWindowEnds_ExpiresOnlyAtTtl`).
 - **Expiry is lazy.** There's no background job. A lapsed open session is marked `expired` the next time it's
   touched (complete or start). Its effective state is still "expired" from `expiresAt` on, because completion checks the
   deadline atomically.
@@ -199,7 +204,7 @@ flowchart LR
 From `server/`:
 - `dotnet build MetinAR.Server.sln -c Release`: warnings are errors.
 - `dotnet format MetinAR.Server.sln --verify-no-changes`.
-- `dotnet test MetinAR.Server.sln -c Release`: 100 tests (54 METINAR-010 + 46 new).
+- `dotnet test MetinAR.Server.sln -c Release`: 102 tests (54 METINAR-010 + 48 new; the 2 D3/Q2 tests were added after the owner decision).
   - METINAR-010 encounter/persistence tests changed only to send the now-required `clientPosition`/`nonce` and expect the new schema version.
   - New tests cover:
     - near starts allowed (including the accuracy-cap boundary);
@@ -217,6 +222,7 @@ From `server/`:
     - nearby activation/deactivation over a simulated day;
     - same results across restart;
     - encounter start honours the schedule;
+    - an open session survives the mob window ending and expires only at the TTL (D3/Q2);
     - upgrade from a METINAR-010 database.
   - Mutation checks during development: dropping the TTL guard, ignoring distance, logging a coordinate and ignoring
     the schedule each make tests fail (3, 6, 1 and 3 tests).
@@ -228,10 +234,11 @@ From `server/`:
 
 Not applicable: Unity compile, Play Mode, Android build, physical device (no client change).
 
-## 8. `v1` contract before/after (review aid for Q1)
+## 8. `v1` contract before/after (Q1 decided: in place, D3)
 
-This section only compares the two states for the reviewer. It makes **no** decision. Q1–Q3 (§9) stay open.
-"Before" is `main` at METINAR-010 (#21, `8332eca`). "After" is this branch.
+"Before" is `main` at METINAR-010 (#21, `8332eca`). "After" is this branch and, per the owner decision D3/Q1
+([#33](https://github.com/mromanowski832-ctrl/MetinAR-2026/issues/33#issuecomment-6316048203)), it **is** the `v1` contract. The full endpoint-by-endpoint reference is
+[METINAR-010 §5](METINAR-010-BACKEND.md#5-api-contract-v1).
 
 ### 8.1 Per endpoint
 
@@ -260,19 +267,24 @@ exists. The only callers are the server's own tests and `server/scripts/smoke-lo
 Data: METINAR-010 dev databases upgrade in place (migration `0003`, covered by
 `Upgrade_FromMetinar010Schema_KeepsRows_AndLegacyOpenSessionCannotBeCompleted`).
 
-### 8.3 Options for Q1 (owner/controller decision; not chosen here)
+### 8.3 Options that were considered for Q1 (owner chose A, D3)
 
 | Option | What it means | Consequences |
 |---|---|---|
-| A — accept in place (current PR) | `v1` = the "after" column; METINAR-010 §5.1 versioning rule starts to apply from the first real client | no extra code. Breaks only callers that don't exist yet. The doc history shows the tightening |
+| **A — accept in place (chosen)** | `v1` = the "after" column; METINAR-010 §5.1 versioning rule starts to apply from the first real client | no extra code. Breaks only callers that don't exist yet. The doc history shows the tightening |
 | B — `/api/v2` | keep a `v1` with the "before" request shape and add `v2` with the "after" shape | an unchecked `v1` start/complete path would bypass proximity, nonce and TTL, so `v1` would need to be disabled or also enforce the checks (then it isn't the "before" contract either). Duplicate routes and tests. Code change in this PR before merge |
 | C — other | e.g. freeze the version label until the first client integration issue | needs an explicit owner rule |
 
-## 9. Open owner questions (unchanged, not assumed)
+## 9. Owner decisions (D3, recorded in [#33](https://github.com/mromanowski832-ctrl/MetinAR-2026/issues/33#issuecomment-6316048203); plan in `docs/audit/AUDIT_2026-10-21.md` §E.5/§F.4)
 
-- **Q1** — `v1` tightened in place vs `/api/v2` (§8.3).
-- **Q2** — should an encounter end when the mob's scheduled active window ends mid-fight? Currently only the TTL applies.
-- **Q3** — confirm or replace the placeholder limits in §2 (40 m + ≤ 20 m allowance, 50 m max accuracy, 30 s fix age, 600 s TTL).
+| Q | Question | Decision | Where it shows |
+|---|---|---|---|
+| **Q1** | `v1` tightened in place vs `/api/v2` | **In place in `/api/v1`, no `/api/v2`** (v1 has no consumers) | §1 contract note, §8, METINAR-010 §5.1 |
+| **Q2** | End an encounter when the mob's active window ends mid-fight? | **No. In v1 an encounter ends only via TTL** (or completion); no interruption on despawn | §3, 2 tests in `SpawnScheduleTests` |
+| **Q3** | Placeholder limits | **Stay as configuration, explicitly marked as prototype values**; no value change | §2, `appsettings.json` comment, `EncounterRules` XML doc, `server/README.md` |
+
+Not decided by D3 and still open: final combat balance, rewards, player stat defaults (METINAR-010 §4), spawn safety
+rules (S10 #55) and identity (#39).
 
 ## 10. CI
 

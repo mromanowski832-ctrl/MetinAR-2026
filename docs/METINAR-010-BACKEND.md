@@ -168,6 +168,9 @@ The canonical machine-readable schema is the generated OpenAPI document at `/swa
 - Within `v1`, changes are additive only (new optional request fields, new response fields).
   Clients must ignore unknown **response** fields.
 - Removing/renaming a field, changing a type or meaning, or tightening validation requires `/api/v2`, served side by side with `v1` during migration.
+- **One recorded exception (owner decision D3/Q1, [#33](https://github.com/mromanowski832-ctrl/MetinAR-2026/issues/33#issuecomment-6316048203)):** METINAR-012 tightened `v1` in place
+  (required `clientPosition` with accuracy on start, required `nonce` on complete) because `v1` had no consumers. The
+  contract described in this section, as of METINAR-012, is the `v1` baseline; the rules above apply to every later change.
 - **Request** bodies are strict: unknown fields are rejected with `400 MALFORMED_REQUEST`. That is how the API refuses
   a client trying to set server-owned fields such as `level`.
 
@@ -269,7 +272,8 @@ Request:
 ```
 `clientPosition` is **required** (METINAR-012). `latitude`, `longitude` and `horizontalAccuracyMeters` (≥ 0) are required,
 and `capturedAt` (UTC) is optional. The fix is evidence only: the server compares it with its own entity position
-([METINAR-012 §2](METINAR-012-SERVER-AUTHORITY.md#2-encounter-proximity-validation)).
+([METINAR-012 §2](METINAR-012-SERVER-AUTHORITY.md#2-encounter-proximity-validation)). The thresholds come from the
+`EncounterRules` configuration and are **prototype values** (D3/Q3), not game balance.
 
 Validation order: body fields (`400`) → player exists (`404 PLAYER_NOT_FOUND`) → entity exists (`404 WORLD_ENTITY_NOT_FOUND`)
 → entity effectively active now, including its schedule (`409 WORLD_ENTITY_INACTIVE`) → fix accuracy
@@ -315,6 +319,10 @@ Responses:
   None of these modify a completed session.
 
 No reward, XP, loot or HP change is applied. The endpoint only records completion.
+
+Session lifetime (D3/Q2): an open session ends only by completion or by reaching `expiresAt` (`EncounterTtlSeconds`,
+prototype value). If the entity's spawn window or schedule phase ends after the start, the session is **not**
+interrupted; completion still works until `expiresAt`. Entity activity is checked only on `start`.
 
 ## 6. Idempotency rules
 
@@ -416,7 +424,7 @@ Required before any non-local deployment (separate, owner-approved issues):
 Commands (from `server/`) and results at PR time are in the PR description and the issue #17 review comment.
 - `dotnet build MetinAR.Server.sln -c Release` — `TreatWarningsAsErrors` + `latest-recommended` analyzers.
 - `dotnet format MetinAR.Server.sln --verify-no-changes`.
-- `dotnet test MetinAR.Server.sln -c Release` — 100 tests since METINAR-012 (see its §7). The METINAR-010 set: health, OpenAPI document + UI, 404/405 problem+json, nearby query (radius, ordering,
+- `dotnet test MetinAR.Server.sln -c Release` — 102 tests since METINAR-012 (see its §7). The METINAR-010 set: health, OpenAPI document + UI, 404/405 problem+json, nearby query (radius, ordering,
   spawn window, paging, limits), player upsert/validation/coarsening/server-owned fields, encounter start validation
   (unknown / inactive / despawned / unknown player / reuse), idempotent completion (sequential, 16 concurrent, after restart),
   wrong-player completion, migrations once-only, unique open-session constraint, geo math.

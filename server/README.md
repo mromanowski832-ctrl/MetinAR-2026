@@ -63,5 +63,8 @@ curl -X POST http://localhost:5080/api/v1/encounters/complete -H "Content-Type: 
      -d '{"encounterId":"<id from start>","playerId":"demo-player","nonce":"<nonce from start>"}'
 ```
 
-Encounter authority limits (distance, accuracy, fix age, TTL) live in the `EncounterRules` section of `appsettings.json`;
-see [`docs/METINAR-012-SERVER-AUTHORITY.md`](../docs/METINAR-012-SERVER-AUTHORITY.md).
+Encounter authority limits (distance, accuracy, fix age, TTL) live in the `EncounterRules` section of `appsettings.json`.
+**They are prototype values** (owner decision D3/Q3, [#33](https://github.com/mromanowski832-ctrl/MetinAR-2026/issues/33#issuecomment-6316048203)): technical anti-abuse / GPS-noise
+limits, not game balance, kept as configuration and overridable per environment (`EncounterRules__<Name>=<value>`).
+In v1 an encounter ends only by completion or TTL; a mob's active window ending mid-fight doesn't interrupt it (D3/Q2).
+See [`docs/METINAR-012-SERVER-AUTHORITY.md`](../docs/METINAR-012-SERVER-AUTHORITY.md).

@@ -136,4 +136,42 @@ public class SpawnScheduleTests
         HttpResponseMessage active = await client.PostJsonAsync("/api/v1/encounters/start", new { playerId = "hunter-1", worldEntityId = "seed-mob-0006", clientPosition = fix });
         Assert.Equal(HttpStatusCode.Created, active.StatusCode);
     }
+
+    /// <summary>
+    /// D3/Q2 (owner decision, #33 comment 6316048203): in v1 an encounter ends only via TTL. The mob's active
+    /// window ending mid-fight does not interrupt or expire an open session.
+    /// </summary>
+    [Fact]
+    public async Task Complete_AfterMobWindowEndsMidFight_StillSucceedsWithinTtl()
+    {
+        // seed-mob-0006 is active 00:10-00:15 UTC; TTL 600 s puts expiresAt at 00:20.
+        using var factory = new MetinArServerFactory(now: new DateTimeOffset(2026, 10, 20, 0, 10, 0, TimeSpan.Zero));
+        using HttpClient client = factory.CreateClient();
+        await client.WithPlayerAsync("hunter-1");
+        (string id, string nonce) = await client.StartAtAsync("hunter-1", "seed-mob-0006");
+
+        factory.Clock.Set(new DateTimeOffset(2026, 10, 20, 0, 16, 0, TimeSpan.Zero)); // window over, TTL not
+        JsonElement nearby = await (await client.GetAsync("/api/v1/world/nearby?lat=-0.02&lon=0&radiusMeters=200")).JsonAsync();
+        Assert.DoesNotContain(nearby.GetProperty("entities").EnumerateArray(), e => e.GetProperty("id").GetString() == "seed-mob-0006");
+
+        HttpResponseMessage done = await client.CompleteAsync(id, "hunter-1", nonce);
+        Assert.Equal(HttpStatusCode.OK, done.StatusCode);
+        JsonElement json = await done.JsonAsync();
+        Assert.True(json.GetProperty("firstCompletion").GetBoolean());
+        Assert.Equal("completed", json.GetProperty("encounter").GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task OpenSession_AfterMobWindowEnds_ExpiresOnlyAtTtl()
+    {
+        using var factory = new MetinArServerFactory(now: new DateTimeOffset(2026, 10, 20, 0, 10, 0, TimeSpan.Zero));
+        using HttpClient client = factory.CreateClient();
+        await client.WithPlayerAsync("hunter-1");
+        (string id, string nonce) = await client.StartAtAsync("hunter-1", "seed-mob-0006");
+
+        factory.Clock.Set(new DateTimeOffset(2026, 10, 20, 0, 20, 0, TimeSpan.Zero)); // expiresAt (exclusive)
+        HttpResponseMessage late = await client.CompleteAsync(id, "hunter-1", nonce);
+        Assert.Equal(HttpStatusCode.Gone, late.StatusCode);
+        Assert.Equal("ENCOUNTER_EXPIRED", (await late.JsonAsync()).GetProperty("code").GetString());
+    }
 }
