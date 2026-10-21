@@ -535,6 +535,62 @@ namespace AssetPipeline.Tests
         }
 
         [Fact]
+        public void ProjectMixerHasMasterWithSfxUiMusicChildren()
+        {
+            // METINAR-018: Audio/Mixers/MetinARMixer.mixer created by AudioMixerBuilder in Unity 6000.6.4f1 batch mode
+            // and re-verified in a separate Unity process (AudioImportVerifier). Here: static YAML check.
+            string path = Path.Combine(AudioRoot(), "Mixers", "MetinARMixer.mixer");
+            Assert.True(File.Exists(path), "mixer missing: " + path);
+            Assert.True(File.Exists(path + ".meta"), "mixer .meta missing");
+            string text = File.ReadAllText(path).Replace("\r\n", "\n");
+            var groups = new Dictionary<string, string>();   // name -> fileID
+            var children = new Dictionary<string, List<string>>();
+            foreach (string doc in text.Split(new[] { "\n--- " }, StringSplitOptions.None))
+            {
+                if (!doc.StartsWith("!u!243 &", StringComparison.Ordinal))
+                {
+                    continue; // 243 = AudioMixerGroupController
+                }
+
+                string id = doc.Substring(8, doc.IndexOf('\n') - 8).Trim();
+                string name = doc.Split('\n').Select(l => l.Trim()).First(l => l.StartsWith("m_Name:", StringComparison.Ordinal)).Substring(7).Trim();
+                groups[name] = id;
+                var ids = new List<string>();
+                bool inChildren = false;
+                foreach (string line in doc.Split('\n'))
+                {
+                    string l = line.Trim();
+                    if (l.StartsWith("m_Children:", StringComparison.Ordinal))
+                    {
+                        inChildren = true;
+                        continue;
+                    }
+
+                    if (inChildren && l.StartsWith("- {fileID: ", StringComparison.Ordinal))
+                    {
+                        ids.Add(l.Substring(11).TrimEnd('}').Trim());
+                    }
+                    else if (inChildren)
+                    {
+                        inChildren = false;
+                    }
+                }
+
+                children[name] = ids;
+            }
+
+            Assert.Contains("Master", groups.Keys);
+            Assert.Contains("m_MasterGroup: {fileID: " + groups["Master"] + "}", text);
+            foreach (string child in new[] { "SFX", "UI", "Music" })
+            {
+                Assert.True(groups.ContainsKey(child), "group " + child + " missing");
+                Assert.Contains(groups[child], children["Master"]);
+            }
+
+            Assert.Equal(4, groups.Count);
+        }
+
+        [Fact]
         public void MetaGuidsAreUniqueAcrossTheProject()
         {
             var seen = new Dictionary<string, string>();

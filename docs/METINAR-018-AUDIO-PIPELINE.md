@@ -14,7 +14,7 @@ Owner of this area: the "Dźwięk i muzyka" bot. Unity / A31 time only through r
 - Licence + budget gate in `tests/AssetPipeline.Tests/AudioPipelineTests.cs`, run in CI by the existing
   `asset-pipeline-tests` workflow (`dotnet test`).
 - 10 original SFX made by `tools/audio/generate_sfx.py` (procedural synthesis, Python 3 + numpy, fixed seeds).
-- Not done here (by scope): no wiring into combat logic, no AudioMixer asset, no music.
+- Not done here (by scope): no wiring into combat logic, no music. AudioMixer `Audio/Mixers/MetinARMixer.mixer` (Master/SFX/UI/Music) added later in this PR, see section 8.
 
 ## 2. Layout and naming
 
@@ -113,7 +113,7 @@ only together with the regenerated files).
 | UI Click | `HudButtonBar` / HUD button `onClick` | 2D, UI mixer group |
 
 Suggested runtime (stage 5, not decided): a small `AudioCue` ScriptableObject (clips + volume/pitch range + spatial blend)
-and an AudioMixer with groups Master / SFX / UI / Music, created in the Unity Editor (requires a #33 slot).
+routed to the groups of `Audio/Mixers/MetinARMixer.mixer` (Master / SFX / UI / Music).
 
 ## 8. Verification status
 
@@ -124,6 +124,11 @@ and an AudioMixer with groups Master / SFX / UI / Music, created in the Unity Ed
   clips: default/Android/iOS = ADPCM + Decompress On Load + preload, mono, clips 1 ch 44.1 kHz. A probe WAV without
   `.meta` got the profile from `AudioImportPostprocessor` (incl. `normalize: 0`) and was deleted again. The committed
   `.meta` files are in the layout Unity writes itself and were not rewritten by a re-import.
-- AudioMixer: not added. Unity has no public API to create an `.mixer` asset from a script; it needs one manual
-  Editor step (Create > Audio Mixer, groups Master/SFX/UI/Music) in a later slot.
+- AudioMixer `Audio/Mixers/MetinARMixer.mixer`: Master with child groups SFX, UI, Music. Created without manual clicks
+  by `AudioMixerBuilder.BuildBatch` in Unity 6000.6.4f1 batch mode (Unity has no public API for creating a `.mixer`,
+  so the builder calls the editor-internal `AudioMixerController` by reflection; it is idempotent and fails with exit 1
+  and a log line if a future Unity changes that API). Re-loaded in a separate Unity process with public API only
+  (`AudioMixer.FindMatchingGroups`, in `AudioImportVerifier`): groups Master, SFX, UI, Music present. A second builder
+  run left the file byte-identical. `AudioRepositoryTests` checks the YAML (4 groups, children of Master). No exposed
+  parameters, effects or snapshots beyond the default yet (stage 5).
 - Listening test on the A31 speaker: **UNVERIFIED**.
