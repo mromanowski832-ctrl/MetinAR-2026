@@ -39,7 +39,8 @@ def preview_material(name, color, metallic=0.0, rough=0.5):
 
 
 def socket_world(rig, name):
-    return rig.matrix_world @ rig.pose.bones[name].matrix
+    """Contract (grip) frame of a socket bone in Blender space (bone matrix without C.NODE_FIX)."""
+    return rig.matrix_world @ rig.pose.bones[name].matrix @ C.NODE_FIX_INV
 
 
 def attach_sword_world(sword, rig):
@@ -127,7 +128,7 @@ def sword_contacts(arms, rig, actions, step=1):
             dg = bpy.context.evaluated_depsgraph_get()
             ev = arms.evaluated_get(dg)
             me = ev.to_mesh()
-            inv = (rig.matrix_world @ rig.pose.bones["B_Socket_Sword"].matrix).inverted()
+            inv = socket_world(rig, "B_Socket_Sword").inverted()
             grip_l = C.left_grip_blend("Aura", (f - 1) / C.FPS) if state == "AuraActivate" else 0.0
             for side in (1, -1):
                 for i in sets[side]:
@@ -165,7 +166,7 @@ def socket_samples(rig, actions):
             bpy.context.scene.frame_set(f)
             t = (f - 1) / C.FPS
             for bone, fn, store in (("B_Socket_Sword", C.sword_pose, "R"), ("B_Socket_GripL", C.left_hand_pose, "L")):
-                m = rig.matrix_world @ rig.pose.bones[bone].matrix
+                m = socket_world(rig, bone)
                 pos, rot = fn(code_action, t)
                 e = C.to_blender_matrix(pos, rot)
                 d_pos = (m.translation - e.translation).length

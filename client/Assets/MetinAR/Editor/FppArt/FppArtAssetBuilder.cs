@@ -32,6 +32,10 @@ namespace MetinAR.Editor.FppArt
         public static readonly string[] States = { "Idle", "Attack", "AuraActivate" };
         public static readonly string[] SwordSockets = { "Socket_GripR", "Socket_GripL", "Socket_FxBladeBase", "Socket_FxBladeTip", "Socket_FxAuraBurst", "Socket_FxGuardGem" };
 
+        public const float ClipRotationError = 0.05f;
+        public const float ClipPositionError = 0.05f;
+        public const float ClipScaleError = 0.05f;
+
         public static string ClipPath(string state) => ArmsFolder + "/Animations/A_" + ArmsId + "_" + state + ".fbx";
 
         [MenuItem("MetinAR/FPP Art/Build Hands + Sword")]
@@ -88,6 +92,15 @@ namespace MetinAR.Editor.FppArt
                 bool dirty = false;
                 if (!mi.preserveHierarchy) { mi.preserveHierarchy = true; dirty = true; }
                 if (mi.animationType != ModelImporterAnimationType.Generic) { mi.animationType = ModelImporterAnimationType.Generic; dirty = true; }
+                if (path.Contains("/Animations/") && (mi.animationRotationError > ClipRotationError || mi.animationPositionError > ClipPositionError || mi.animationScaleError > ClipScaleError))
+                {
+                    // keep Optimal compression but with tight tolerances: the left socket is the end of a 4-bone chain,
+                    // default 0.5 deg errors moved it ~4 mm (measured); the contract check allows 2 mm / 1 deg
+                    mi.animationRotationError = ClipRotationError;
+                    mi.animationPositionError = ClipPositionError;
+                    mi.animationScaleError = ClipScaleError;
+                    dirty = true;
+                }
                 if (path.Contains("/Animations/"))
                 {
                     ModelImporterClipAnimation[] clips = mi.clipAnimations.Length > 0 ? mi.clipAnimations : mi.defaultClipAnimations;

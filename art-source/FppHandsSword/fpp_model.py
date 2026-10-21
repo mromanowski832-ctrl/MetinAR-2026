@@ -108,6 +108,7 @@ def build_sword():
         e.empty_display_type = "ARROWS"
         e.empty_display_size = 0.03
         e.location = _u2b(p)
+        e.rotation_euler = (math.radians(90.0), 0.0, 0.0)  # C.NODE_FIX: Unity sees an identity frame
         e.parent = obj
         bpy.context.scene.collection.objects.link(e)
         sockets.append(e)
@@ -413,11 +414,11 @@ def build_armature():
         th2.align_roll(C.to_blender_point(rot @ design_to_local((1, 0, 0), side)))
         th2.parent = th1
         th2.use_connect = True
-        # socket bones: exactly the code's RightGrip / LeftHand frames. The bone matrix must equal
-        # to_blender_matrix(frame) so that Unity (which conjugates node transforms by the axis swap) sees the
-        # frame itself: bone Y = Blender column 1 (= Unity frame +Z), bone Z = column 2 (= Unity frame +Y, hilt).
+        # socket bones: exactly the code's RightGrip / LeftHand frames once imported into Unity. The bone matrix is
+        # to_blender_node_matrix(frame) = to_blender_matrix(frame) @ NODE_FIX (see fpp_contract), verified in Unity
+        # by FppArtAssetCheck (socket vs PR #32 pose at every frame).
         sock = eb.new("B_Socket_Sword" if side > 0 else "B_Socket_GripL")
-        m = C.to_blender_matrix(pos, rot)
+        m = C.to_blender_node_matrix(pos, rot)
         sock.head = m.translation.copy()
         sock.tail = sock.head + Vector(m.col[1][:3]) * 0.05
         sock.align_roll(Vector(m.col[2][:3]))

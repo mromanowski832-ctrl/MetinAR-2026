@@ -158,7 +158,7 @@ def sword_part_hit(lu):
 def count_hits(arms, rig, verts):
     ev = arms.evaluated_get(bpy.context.evaluated_depsgraph_get())
     me = ev.to_mesh()
-    inv = (rig.matrix_world @ rig.pose.bones["B_Socket_Sword"].matrix).inverted() @ ev.matrix_world
+    inv = (rig.matrix_world @ rig.pose.bones["B_Socket_Sword"].matrix @ C.NODE_FIX_INV).inverted() @ ev.matrix_world
     n = 0
     for i in verts:
         if sword_part_hit(C.S @ (inv @ me.vertices[i].co)):

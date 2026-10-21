@@ -78,6 +78,13 @@ namespace MetinAR.Editor.AssetPipeline
             if (category == AssetCategory.Player)
             {
                 importer.preserveHierarchy = true;
+                if (kind == AssetKind.AnimationSource)
+                {
+                    // camera-attached arms: compression error is visible at the hands (end of a 4-bone chain)
+                    importer.animationRotationError = 0.05f;
+                    importer.animationPositionError = 0.05f;
+                    importer.animationScaleError = 0.05f;
+                }
             }
 
             // Animation: clips only from A_*.fbx files; mesh files carry no takes.

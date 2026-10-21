@@ -109,6 +109,19 @@ def to_blender_matrix(pos, quat):
     return out
 
 
+# Unity's FBX import maps a node's local axes as vectors through S and then flips the node's local Z to fix the
+# handedness, i.e. Unity frame = S * R_blender * diag(1,1,-1). Measured in Unity 6000.6.4f1 (FppArtAssetCheck: an
+# identity Blender empty/bone came in as Euler(90,0,0)). Nodes that must equal a contract frame in Unity (sockets)
+# therefore carry NODE_FIX = S * diag(1,1,-1) = +90 deg about Blender X on top of to_blender_matrix(frame).
+NODE_FIX = Matrix.Rotation(math.radians(90.0), 4, "X")
+NODE_FIX_INV = NODE_FIX.inverted()
+
+
+def to_blender_node_matrix(pos, quat):
+    """Blender matrix for a node (bone/empty) whose imported Unity transform must equal the Unity frame."""
+    return to_blender_matrix(pos, quat) @ NODE_FIX
+
+
 def frame_point(pos, quat, local):
     """Unity-space point of `local` (Unity coordinates in the frame)."""
     return Vector(pos) + quat @ Vector(local)
