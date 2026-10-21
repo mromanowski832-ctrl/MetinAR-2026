@@ -1,0 +1,11 @@
+itemId,namePl,category,slot,itemType,itemLevel,rarity,stack,baseStats,requiredClass,source,asset
+starter_sword,Miecz Rekruta,equipment,weapon,sword_1h,1,common,1,atk=6,warrior|slajter,shop|start,FPP sword #36
+starter_buckler,Lipowy Puklerz,equipment,off_hand,shield,1,common,1,def=3;block=8,warrior,shop|drop,icon + FPP mesh <=1.5k tris
+starter_jerkin,Kaftan Wędrowca,equipment,armor,armor_light,1,common,1,def=4;max_hp=10,any,shop|drop,icon
+starter_boots,Buty Traktowe,equipment,boots,boots,1,common,1,def=2;evasion=2,any,shop|drop,icon
+starter_gloves,Rękawice Rekruta,equipment,gloves,gloves,1,common,1,def=1;accuracy=2,any,shop|drop,FPP gloves #36
+amber_earring,Bursztynowy Kolczyk,equipment,earrings,earrings,3,common,1,res_poison=5,any,drop,icon
+potion_hp_s,Mała Mikstura Życia,consumable,quick,potion,1,common,50,heal=80,any,shop|drop,icon
+antidote,Antidotum,consumable,quick,cure,1,common,50,cleanse=poison,any,shop|drop,icon
+ore_shard,Odłamek Rudy,material,,material,1,common,99,,any,drop,icon
+spider_silk,Jedwab Pajęczy,material,,material,5,common,99,,any,drop (Trujący Pająk),icon

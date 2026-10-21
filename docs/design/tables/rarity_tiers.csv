@@ -1,0 +1,6 @@
+rarityId,namePl,colorHex,affixCount,baseStatMultiplier,dropWeightNormalMob,dropWeightElite,dropWeightGuardian,sellPriceMultiplier,notes
+common,Zwykły,#C8C8C8,0,1.00,70.0,45.0,20.0,1.0,sprzedawany też przez NPC
+uncommon,Niezwykły,#4FBF5A,1,1.06,22.0,33.0,35.0,1.6,
+rare,Rzadki,#3D8BFF,2,1.12,6.5,16.0,30.0,2.6,
+epic,Epicki,#A45CFF,3,1.20,1.3,5.0,12.0,4.5,
+legendary,Legendarny,#FF9A1F,3,1.30,0.2,1.0,3.0,8.0,+1 unikalny efekt z puli przedmiotu; wymaga serwera przed włączeniem
