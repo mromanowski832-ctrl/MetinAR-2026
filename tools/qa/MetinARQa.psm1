@@ -903,6 +903,39 @@ function ConvertFrom-MetinARAdbDevices {
     }
 }
 
+function Test-MetinARLogcatCapture {
+    <#
+      Decides whether an `adb logcat -d` dump can be used as crash evidence. Kind:
+        Ok              - adb exit 0, non-empty dump with at least one line of the app (pid in -Pids or the package name);
+        Lost            - adb reports the device gone (see Test-MetinARAdbOutputLost);
+        CollectionError - adb exited non-zero, the dump is empty / whitespace only, or it has no line of the app.
+      Anything but Ok must never be reported as "no crash" (PASS): the caller reports UNVERIFIED (or FAIL when the
+      partial dump still shows a crash).
+    #>
+    param(
+        [AllowNull()][AllowEmptyCollection()][string[]]$Lines = @(),
+        [AllowNull()][object]$ExitCode = 0,
+        [string]$Package,
+        [int[]]$Pids = @()
+    )
+    $all = @($Lines | Where-Object { $null -ne $_ })
+    if (Test-MetinARAdbOutputLost -Lines $all) { return [pscustomobject]@{ Kind = 'Lost'; Reason = 'adb reports the device is gone' } }
+    if ($null -eq $ExitCode -or "$ExitCode" -notmatch '^-?\d+$') { return [pscustomobject]@{ Kind = 'CollectionError'; Reason = 'adb logcat exit code unknown' } }
+    if ([int]"$ExitCode" -ne 0) { return [pscustomobject]@{ Kind = 'CollectionError'; Reason = ("adb logcat exited with code {0}" -f $ExitCode) } }
+    $content = @($all | Where-Object { "$_".Trim().Length -gt 0 })
+    if ($content.Count -eq 0) { return [pscustomobject]@{ Kind = 'CollectionError'; Reason = 'empty logcat dump' } }
+    $pkg = if ($Package) { [regex]::Escape($Package) } else { $null }
+    $app = @($content | Where-Object {
+        $l = "$_"; $hit = $false
+        if ($l -match '^\d\d-\d\d \S+\s+(\d+)\s' -and $Pids -contains [int]$Matches[1]) { $hit = $true }
+        elseif ($l -match '^[VDIWEFA]/[^(]*\(\s*(\d+)\)' -and $Pids -contains [int]$Matches[1]) { $hit = $true }
+        if (-not $hit -and $pkg -and $l -match ('(?<![\w.])' + $pkg + '(?![\w.])')) { $hit = $true }
+        $hit
+    })
+    if ($app.Count -eq 0) { return [pscustomobject]@{ Kind = 'CollectionError'; Reason = ("logcat dump ({0} lines) has no line of {1} (pids {2})" -f $content.Count, $Package, ($Pids -join ',')) } }
+    return [pscustomobject]@{ Kind = 'Ok'; Reason = ("{0} lines, {1} of the app" -f $content.Count, $app.Count) }
+}
+
 function Test-MetinARAdbOutputLost {
     <# True when adb output shows the connection to the device is gone (a command that silently returns nothing
        useful, e.g. an empty logcat dump, would otherwise look like a clean run). #>

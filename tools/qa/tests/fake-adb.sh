@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Simulated adb for exercising Invoke-MetinARDeviceSmoke.ps1 without a phone (CI / Linux only).
 # Output is synthetic; a run against this script is NOT physical-device evidence.
-# FAKE_ADB_MODE=ok|nodevice|crash|adblost|adbblip|metinarexc|unityexc   FAKE_ADB_PACKAGE (default com.metinar.game.qa)
+# FAKE_ADB_MODE=ok|nodevice|crash|adblost|adbblip|metinarexc|unityexc|logcatempty|logcaterr|logcatnoapp   FAKE_ADB_PACKAGE (default com.metinar.game.qa)
 # adblost: `adb devices` lists the phone for the first FAKE_ADB_LOST_AFTER calls (default 3), then never again.
 # adbblip: the phone is missing from `adb devices` exactly once (call number FAKE_ADB_LOST_AFTER + 1), then back.
 mode="${FAKE_ADB_MODE:-ok}"
@@ -23,6 +23,16 @@ case "$1" in
   install) echo "Performing Streamed Install"; echo "Success"; exit 0;;
   logcat)
     if [ "$2" = "-c" ]; then exit 0; fi
+    [ "$mode" = "logcatempty" ] && exit 0
+    if [ "$mode" = "logcaterr" ]; then
+      echo "10-20 04:30:18.123  4242  4242 I Unity   : [MetinARPerf] v=1 event=start mainThreadRecorder=1 device=FakePhone"
+      echo "logcat: Unexpected EOF!" >&2; exit 1
+    fi
+    if [ "$mode" = "logcatnoapp" ]; then
+      echo "10-20 04:30:18.500  1500  1600 I ActivityManager: Displayed com.other.app/.Main: +2s100ms"
+      echo "10-20 04:30:19.000   999   999 I chatty  : uid=1000 system_server expire 3 lines"
+      exit 0
+    fi
     echo "10-20 04:30:18.123  4242  4242 I Unity   : [MetinARPerf] v=1 event=start mainThreadRecorder=1 device=FakePhone"
     for i in 1 2 3; do
       echo "10-20 04:30:2$i.200  4242  4260 I Unity   : [MetinARPerf] v=1 scene=WorldMapPrototype windowS=5 frames=300 fpsAvg=60 frameAvgMs=16.67 frameP50Ms=16.6 frameP95Ms=18 frameMaxMs=40 frameSpikes=0 mainAvgMs=8 mainP95Ms=10 mainMaxMs=20 mainSpikes=0 totalUsedMB=250 gcReservedMB=30 systemUsedMB=400"

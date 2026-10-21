@@ -27,7 +27,8 @@
   Raw logcat is never written to disk; only the redacted copy (no serial, IP, MAC, e-mail, coordinates, IDs).
 
   Exit codes: 0 = no FAIL, 1 = at least one FAIL, 2 = no authorized device (nothing verified),
-              3 = adb connection lost during the run (partial; remaining steps UNVERIFIED).
+              3 = adb connection lost during the run (partial; remaining steps UNVERIFIED),
+              4 = logcat collection error (adb logcat exit != 0, empty dump or no line of the app): Crash UNVERIFIED.
 
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARDeviceSmoke.ps1 -ApkPath client\Builds\Android\MetinAR-ar-encounter-qa.apk
@@ -79,6 +80,7 @@ function Add-Result($r) {
 function Adb {
     $a = @(); if ($Serial) { $a += @('-s', $Serial) }
     $out = & $AdbPath @($a + $args) 2>&1 | ForEach-Object { "$_" }
+    $script:AdbExit = $LASTEXITCODE   # read by callers that need it (logcat dump); a failed command must not look clean
     return @($out)
 }
 function Write-Report {
@@ -271,10 +273,13 @@ if (-not $SkipBackgroundTest -and -not $dialog -and $appPid) {
 
 # --- Logcat (redacted) ---------------------------------------------------------------------
 Assert-AdbReady 'Crash'
-$raw = Adb logcat '-d' '-v' threadtime '-b' 'main,system,crash,events'
-# An empty or error-only dump after a dropped connection must not read as "no crash".
-if (Test-MetinARAdbOutputLost -Lines $raw) { Stop-AdbLost 'Crash' 'logcat dump failed' (Get-Date) }
+$script:AdbExit = $null
+$raw = @(Adb logcat '-d' '-v' threadtime '-b' 'main,system,crash,events')
+$logcatExit = $script:AdbExit
 $pids = @(); foreach ($p in @($appPid, $rePid)) { if ($p -and "$p".Trim() -match '^\d+$') { $pids += [int]"$p".Trim() } }
+# An empty, failed (exit != 0) or app-less dump must never read as "no crash".
+$capture = Test-MetinARLogcatCapture -Lines $raw -ExitCode $logcatExit -Package $Package -Pids $pids
+if ($capture.Kind -eq 'Lost') { Stop-AdbLost 'Crash' 'logcat dump failed' (Get-Date) }
 $problems = Find-MetinARLogcatProblems -Lines $raw -Package $Package -Pids $pids
 $appLines = @($raw | Where-Object {
     $l = $_; $mine = $false
@@ -285,7 +290,14 @@ $redacted = ConvertTo-MetinARRedactedText -Lines $appLines -Secrets $secrets
 Set-Content -Path (Join-Path $OutputDir 'logcat-redacted.txt') -Value $redacted -Encoding UTF8
 $raw = $null
 $ev = @() + @($problems.Crashes) + @($problems.Anrs) + @($problems.FatalLines) + @($problems.MetinARExceptions | ForEach-Object { "MetinAR exception: $_" }) + @($problems.UnityErrors | Select-Object -First 5)
-Add-Result (New-MetinARGateResult -Name 'Crash' -Status $problems.Status -Detail ("crash={0} anr={1} fatal={2} metinarExceptions={3} unityErrors={4} (redacted app log: {5} lines)" -f $problems.Crashes.Count, $problems.Anrs.Count, $problems.FatalLines.Count, $problems.MetinARExceptions.Count, $problems.UnityErrors.Count, $redacted.Count) -Evidence (ConvertTo-MetinARRedactedText -Lines $ev -Secrets $secrets))
+$crashStatus = $problems.Status; $crashPrefix = ''
+if ($capture.Kind -ne 'Ok') {
+    $script:logcatCollectionError = $true
+    if ($crashStatus -ne 'FAIL') { $crashStatus = 'UNVERIFIED' }
+    $crashPrefix = "logcat collection error: $($capture.Reason); "
+    $notes.Add("Logcat collection error ($($capture.Reason)): crash/ANR/exception state is UNVERIFIED, not PASS. Repeat the capture.")
+}
+Add-Result (New-MetinARGateResult -Name 'Crash' -Status $crashStatus -Detail ($crashPrefix + ("crash={0} anr={1} fatal={2} metinarExceptions={3} unityErrors={4} (redacted app log: {5} lines)" -f $problems.Crashes.Count, $problems.Anrs.Count, $problems.FatalLines.Count, $problems.MetinARExceptions.Count, $problems.UnityErrors.Count, $redacted.Count)) -Evidence (ConvertTo-MetinARRedactedText -Lines $ev -Secrets $secrets))
 
 # --- Memory / frames / perf budgets / thermal ----------------------------------------------
 $samples = Get-MetinARPerfSamples -Lines $redacted
@@ -338,4 +350,6 @@ Add-Result (New-MetinARGateResult -Name 'Thermal' -Status $st -Detail ("thermalS
 $notes.Add(("adb devices checked {0} times before steps; connection stayed up unless an adb gap is listed above." -f $script:adbChecks))
 $notes.Add('A short scripted run is a smoke check, not proof that GPS accuracy, AR tracking quality, hand tracking or long-session thermals are acceptable; those need the owner checklist in docs/METINAR-011-QA-GATES.md.')
 Write-Report
-if (@($results | Where-Object { $_.Status -eq 'FAIL' }).Count) { exit 1 } else { exit 0 }
+if (@($results | Where-Object { $_.Status -eq 'FAIL' }).Count) { exit 1 }
+if ($script:logcatCollectionError) { exit 4 }   # no usable logcat: the run is not a pass
+exit 0
