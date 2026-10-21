@@ -123,6 +123,9 @@ namespace MetinAR.ArEncounter
 
         public bool IsExiting { get; private set; }
 
+        /// <summary>METINAR-020: hit → damage → mob HP → death → EXP/talary (added at runtime in Awake).</summary>
+        public ArEncounterCombat Combat { get; private set; }
+
         public void Configure(
             ARSession session,
             XROrigin origin,
@@ -163,6 +166,13 @@ namespace MetinAR.ArEncounter
             }
 
             Debug.Log("[ArEncounter] request " + Request + (RequestFromWorldMap ? " (world map)" : " (direct open)"));
+            Combat = GetComponent<ArEncounterCombat>();
+            if (Combat == null)
+            {
+                Combat = gameObject.AddComponent<ArEncounterCombat>();
+            }
+
+            Combat.Initialize(this);
             if (_hud != null)
             {
                 _hud.Bind(this);

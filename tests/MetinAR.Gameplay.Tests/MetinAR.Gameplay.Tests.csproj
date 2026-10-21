@@ -21,6 +21,11 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/CharacterLoadout.cs" Link="Production/CharacterLoadout.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/ClassBalance.cs" Link="Production/ClassBalance.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/ClassId.cs" Link="Production/ClassId.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/Combat/EncounterCombatSession.cs" Link="Production/Combat/EncounterCombatSession.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/Combat/MobCombatProfile.cs" Link="Production/Combat/MobCombatProfile.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/Combat/MobRewardCalculator.cs" Link="Production/Combat/MobRewardCalculator.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/Combat/PlayerProgress.cs" Link="Production/Combat/PlayerProgress.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/Combat/StarterLoadout.cs" Link="Production/Combat/StarterLoadout.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/DamageResolver.cs" Link="Production/DamageResolver.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/DamageType.cs" Link="Production/DamageType.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/Data/BalanceTableImporter.cs" Link="Production/Data/BalanceTableImporter.cs" />
