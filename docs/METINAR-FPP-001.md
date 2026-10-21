@@ -147,6 +147,20 @@ Owner findings and what this change does (damage itself is S2a #47 / PR #67):
 | Spider now too small | `ArEncounterFraming.MobVisualScale` 0.75 → **0.9** (between the first build, 1.0 = filled the screen, and 0.75). Visual only; level/HP unchanged; nameplate clamp unchanged. |
 | Spider moves forward together with the phone | The mob is no longer held by a plane-attached anchor. It is put in session space (`XROrigin.TrackablesParent`, never under the camera), then a **free world `ARAnchor`** is requested with `ARAnchorManager.TryAddAnchorAsync(pose)` and the mob is re-parented to it (fallbacks: plane anchor, then session space). `[ArAnchor]` log every 2 s: anchor kind and tracking state, session state, camera and mob positions, ground distance — so the next device log shows whether the camera position is tracked while the mob stays at its spot. Root cause on the device is **UNVERIFIED** until that log is read. |
 
+### `[ArAnchor]` log for the A31 v0 test (open acceptance bug: spider moves with the phone)
+
+One line every 2 s and **immediately** on every session-tracking change (`event=session SessionTracking->SessionInitializing`
+and back), anchor tracking change or anchor-kind change (`pending -> world`). Fields: `kind`, `anchorState`, `session`,
+`cam` position, `camYaw` / `camPitch`, `mob` world position, `anchor` and `origin` positions, `parent`, and the
+`ArAnchorProbe` sample against the placement baseline: `yaw` (rotation since placement), `side` (sidestep, m),
+`closer` (+ closer / − farther, m), `d` / `d0` (ground distance now / at placement), `drift` (monster world drift, m),
+`camMove`, `verdict` = `STAYS` / `DRIFT` / `FOLLOWS_CAMERA`, plus `maxDrift` and `followsCam=n/total`.
+
+A31 script: place the spider, then (1) rotate in place ±90°, (2) sidestep 0.5 m left and right, (3) walk 1 m closer,
+(4) walk 1 m back, (5) cover the camera for ~3 s (tracking loss) and uncover it (recovery). Pass = every line
+`verdict=STAYS`, `followsCam=0/…`, `maxDrift` < 0.10 m, and `d` changing with `closer`. Editor smoke T09 asserts the
+probe saw no follow and drift < 0.05 m. Device result: **UNVERIFIED** until that log is read.
+
 Owner request "an attacked mob must become aggressive, run to the player and attack" is **not** in this PR (audit plan
 D1–D4, 2026-10-21): it is a separate `[READY]` issue, implemented after #67. Hands stay virtual on-screen hands with a
 sword; there is no tracking of the player's real hands through the AR camera.

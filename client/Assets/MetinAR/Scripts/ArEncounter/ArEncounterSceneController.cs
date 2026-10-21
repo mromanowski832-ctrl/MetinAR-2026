@@ -290,26 +290,90 @@ namespace MetinAR.ArEncounter
         }
 
         private float _nextAnchorLog;
+        private ArSessionStatus _anchorLogSession;
+        private TrackingState _anchorLogAnchorState = TrackingState.None;
+        private string _anchorLogKind;
+
+        /// <summary>v0 acceptance probe for "the spider moves together with the phone" (#31); baseline = placement.</summary>
+        public ArAnchorProbe AnchorProbe { get; } = new ArAnchorProbe();
 
         /// <summary>
-        /// #31 A31 retest: "the spider moves forward together with the phone". Logs camera, monster and anchor poses so
-        /// a device log shows whether the camera position is tracked and whether the monster stays at its world spot.
+        /// #31 A31 retest: "the spider moves forward together with the phone" (open v0 acceptance bug). Every
+        /// <see cref="AnchorDiagnosticsIntervalSeconds"/> and immediately on any session-tracking, anchor-tracking or
+        /// anchor-kind change, logs one <c>[ArAnchor]</c> line: anchor kind and state, session state, camera position and
+        /// yaw/pitch, monster world position, anchor and XR origin positions, plus the <see cref="ArAnchorProbe"/> sample
+        /// against the placement baseline (rotation, sidestep, closer/farther, monster drift and a STAYS / DRIFT /
+        /// FOLLOWS_CAMERA verdict). The A31 test reads these lines for rotate, sidestep, approach, retreat and
+        /// tracking loss/recovery.
         /// </summary>
         private void LogAnchorDiagnostics()
         {
-            if (AnchorDiagnosticsIntervalSeconds <= 0f || SpawnedMob == null || _arCamera == null || Time.unscaledTime < _nextAnchorLog)
+            if (AnchorDiagnosticsIntervalSeconds <= 0f || SpawnedMob == null || _arCamera == null)
             {
                 return;
             }
 
+            TrackingState anchorState = MobAnchor != null ? MobAnchor.trackingState : TrackingState.None;
+            string reason = null;
+            if (LastSessionStatus != _anchorLogSession)
+            {
+                reason = "session " + _anchorLogSession + "->" + LastSessionStatus;
+            }
+            else if (anchorState != _anchorLogAnchorState)
+            {
+                reason = "anchorState " + _anchorLogAnchorState + "->" + anchorState;
+            }
+            else if (MobAnchorKind != _anchorLogKind)
+            {
+                reason = "kind " + _anchorLogKind + "->" + MobAnchorKind;
+            }
+            else if (Time.unscaledTime < _nextAnchorLog)
+            {
+                return;
+            }
+
+            _anchorLogSession = LastSessionStatus;
+            _anchorLogAnchorState = anchorState;
+            _anchorLogKind = MobAnchorKind;
             _nextAnchorLog = Time.unscaledTime + AnchorDiagnosticsIntervalSeconds;
-            Vector3 cam = _arCamera.transform.position;
+
+            Transform camT = _arCamera.transform;
+            Vector3 cam = camT.position;
+            Vector3 euler = camT.rotation.eulerAngles;
             Vector3 mob = SpawnedMob.transform.position;
-            Debug.Log("[ArAnchor] kind=" + MobAnchorKind
-                      + " anchorState=" + (MobAnchor != null ? MobAnchor.trackingState.ToString() : "-")
+            if (!AnchorProbe.HasBaseline)
+            {
+                AnchorProbe.SetBaseline(cam.x, cam.z, euler.y, mob.x, mob.y, mob.z);
+            }
+
+            ArAnchorSample sample = AnchorProbe.Sample(cam.x, cam.z, euler.y, mob.x, mob.y, mob.z);
+            Debug.Log("[ArAnchor] " + (reason != null ? "event=" + reason + " " : "tick ")
+                      + "kind=" + MobAnchorKind
+                      + " anchorState=" + anchorState
                       + " session=" + LastSessionStatus
-                      + " cam=" + cam.ToString("F2") + " mob=" + mob.ToString("F2")
-                      + " d=" + ArEncounterFraming.HorizontalDistance(cam.x, cam.z, mob.x, mob.z).ToString("F2"));
+                      + " cam=" + cam.ToString("F2") + " camYaw=" + euler.y.ToString("F0") + " camPitch=" + ArAnchorProbe.WrapDegrees(euler.x).ToString("F0")
+                      + " mob=" + mob.ToString("F2")
+                      + " anchor=" + (MobAnchor != null ? MobAnchor.transform.position.ToString("F2") : "-")
+                      + " origin=" + (_origin != null ? _origin.transform.position.ToString("F2") : "-")
+                      + " parent=" + (SpawnedMob.transform.parent != null ? SpawnedMob.transform.parent.name : "-")
+                      + " " + sample
+                      + " maxDrift=" + AnchorProbe.MaxDriftMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                      + " followsCam=" + AnchorProbe.FollowsCameraSamples + "/" + AnchorProbe.Samples);
+        }
+
+        /// <summary>Restarts the anchor probe at the monster's current pose (placement, or once the world anchor is set).</summary>
+        private void ResetAnchorProbe()
+        {
+            if (SpawnedMob == null || _arCamera == null)
+            {
+                return;
+            }
+
+            Transform camT = _arCamera.transform;
+            Vector3 mob = SpawnedMob.transform.position;
+            AnchorProbe.SetBaseline(camT.position.x, camT.position.z, camT.rotation.eulerAngles.y, mob.x, mob.y, mob.z);
+            _anchorLogKind = null;
+            _nextAnchorLog = 0f;
         }
 
         private ARPlane _targetPlane;
@@ -557,6 +621,7 @@ namespace MetinAR.ArEncounter
                 _placementReticle.gameObject.SetActive(false);
             }
 
+            ResetAnchorProbe();
             Debug.Log("[ArEncounter] spawned " + Request.MobName + " at " + pose.position + " anchor=" + MobAnchorKind
                       + " scale=" + ArEncounterFraming.MobVisualScale);
             MobPlaced?.Invoke(SpawnedMob);

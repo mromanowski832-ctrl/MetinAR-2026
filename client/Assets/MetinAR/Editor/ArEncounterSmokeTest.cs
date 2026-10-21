@@ -640,6 +640,8 @@ namespace MetinAR.Editor
                 Check(_ar.State == ArEncounterState.Placed, "state " + _ar.State);
                 float drift = Vector3.Distance(_ar.SpawnedMob.transform.position, _realPlacedPosition);
                 Check(drift < 0.05f, "mob drifted " + drift + " m");
+                Check(_ar.AnchorProbe.HasBaseline && _ar.AnchorProbe.FollowsCameraSamples == 0 && _ar.AnchorProbe.MaxDriftMeters < 0.05,
+                      "[ArAnchor] probe: followsCam=" + _ar.AnchorProbe.FollowsCameraSamples + " maxDrift=" + _ar.AnchorProbe.MaxDriftMeters);
                 int visiblePlanes = 0;
                 foreach (ARPlane p in _ar.PlaneManager.trackables)
                 {

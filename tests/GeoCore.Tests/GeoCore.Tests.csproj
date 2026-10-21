@@ -35,6 +35,7 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/FppHitGeometry.cs" Link="Production/FppHitGeometry.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/FppViewFraming.cs" Link="Production/FppViewFraming.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArEncounterFraming.cs" Link="Production/ArEncounterFraming.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArAnchorProbe.cs" Link="Production/ArAnchorProbe.cs" />
   </ItemGroup>
 </Project>
 
