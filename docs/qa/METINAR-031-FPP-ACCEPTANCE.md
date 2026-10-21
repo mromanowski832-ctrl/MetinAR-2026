@@ -14,9 +14,9 @@ Device use is coordinated in #33 (`LOCAL SLOT ACQUIRED/RELEASED`). Do not put pa
 | ID | Check | Pass criterion |
 |---|---|---|
 | A1 | Unity compile on the exact head | 0 `error CS` (`Invoke-MetinARQa.ps1 -Gates UnityCompile`) |
-| A2 | Editor smokes (with graphics, **without** `-nographics`) | `ArEncounterSmokeTest` all PASS, including T10/T10b (attack/aura) and T15 (no unclassified exception). `WorldMapPrototypeSmokeTest` all PASS. Until #26 merges, a T15 failure whose only cause is the SearchDatabase startup signature is recorded as "known, #26" — never as PASS. |
+| A2 | Editor smokes (with graphics, **without** `-nographics`) | `ArEncounterSmokeTest` all PASS, including T10/T10b (attack/aura) and T15 (no unclassified exception). `WorldMapPrototypeSmokeTest` all PASS. Since #37 (`3b796a3`), `SmokeExceptionClassifier` ignores the SearchDatabase startup signature (`KnownEditorInfrastructure`, METINAR-014 §1) for T15 and logs it as `[ArSmoke] T15 ignored known editor-infrastructure exceptions`. Any other exception fails T15. This applies only to Editor batchmode. T09 is handled as in #66. |
 | A3 | `-nographics` artefact | `nativeTex can not be null` from ARCameraManager appears only under `-nographics` (XR Simulation without a GPU). It is logged separately and not counted as a product exception. Smokes are run with graphics. |
-| A4 | APK audit | `-Gates ApkAudit`: package `com.metinar.game`, debuggable, minSdk 31, arm64-v8a only, IL2CPP, **no ACCESS_BACKGROUND_LOCATION**, no permission outside the allow-list, SHA256 recorded |
+| A4 | APK audit | `-Gates ApkAudit`: package matches the APK's purpose (game `com.metinar.game`, QA `com.metinar.game.qa`, #73), 11/11 `Unity.XR.ARCore` registrations (DEVICE-ACCEPTANCE-LOOP-V0 P3), debuggable, minSdk 31, arm64-v8a only, IL2CPP, **no ACCESS_BACKGROUND_LOCATION**, no permission outside the allow-list, SHA256 recorded |
 | A5 | No missing scripts / scene order | `-Gates UnityQaChecks` PASS |
 
 ## B. Device — install and launch (A31)
@@ -24,7 +24,7 @@ Device use is coordinated in #33 (`LOCAL SLOT ACQUIRED/RELEASED`). Do not put pa
 |---|---|---|
 | B1 | Install the exact APK | `adb install -r` Success; `dumpsys package` versionName/lastUpdateTime match; APK SHA256 = handoff |
 | B2 | Cold start → AR scene | starts in < 15 s; camera permission prompt handled by the owner on the device; real camera background visible |
-| B3 | Logcat clean | `Invoke-MetinARDeviceSmoke.ps1`: no FATAL/ANR/native crash, no `Exception` from `MetinAR.*` during the test |
+| B3 | Logcat clean | `Invoke-MetinARDeviceSmoke.ps1`: no FATAL/ANR/native crash, no `Exception` from `MetinAR.*` during the test. The harness reports Unity exceptions only as WARN (`unityErrors=<n>`), so they are read by hand (L14) |
 
 ## C. Device — FPP combat behaviour (manual, owner on the device; record a screen video)
 | ID | Check | Pass criterion |
