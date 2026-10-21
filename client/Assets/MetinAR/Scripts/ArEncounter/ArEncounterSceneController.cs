@@ -18,9 +18,13 @@ namespace MetinAR.ArEncounter
     [DefaultExecutionOrder(-50)]
     public sealed class ArEncounterSceneController : MonoBehaviour
     {
+        // Centre first, then points above it (farther ground) and below it. Hits closer than
+        // ArEncounterFraming.MinPlacementDistanceMeters are skipped (#31 A31 retest: spider filled the screen).
         private static readonly Vector2[] ReticleViewportPoints =
         {
             new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.6f),
+            new Vector2(0.5f, 0.7f),
             new Vector2(0.5f, 0.4f),
             new Vector2(0.5f, 0.3f),
         };
@@ -117,6 +121,9 @@ namespace MetinAR.ArEncounter
         public string PlacementTargetPlaneId { get; private set; }
 
         public bool PlacementTargetFromReticle { get; private set; }
+
+        /// <summary>Ground was found but every candidate target is closer than the minimum placement distance.</summary>
+        public bool PlacementTargetTooClose { get; private set; }
 
         /// <summary>Latest session status fed to the state machine.</summary>
         public ArSessionStatus LastSessionStatus { get; private set; }
@@ -234,10 +241,14 @@ namespace MetinAR.ArEncounter
                 ? _notTrackingSeconds + Time.unscaledDeltaTime
                 : 0f;
 
-            HasPlacementTarget = _machine.State == ArEncounterState.ReadyToPlace
-                                 && _frame.HasTarget
-                                 && _frame.TargetPlaneId != null
-                                 && ContainsSuitable(_frame.TargetPlaneId);
+            bool candidate = _machine.State == ArEncounterState.ReadyToPlace
+                             && _frame.HasTarget
+                             && _frame.TargetPlaneId != null
+                             && ContainsSuitable(_frame.TargetPlaneId);
+            bool farEnough = candidate && IsFarEnough(_frame.TargetPose.position);
+            PlacementTargetTooClose = _machine.State == ArEncounterState.ReadyToPlace
+                                      && ((candidate && !farEnough) || (!_frame.HasTarget && _frame.TargetTooClose));
+            HasPlacementTarget = candidate && farEnough;
             if (HasPlacementTarget)
             {
                 PlacementTargetPose = _frame.TargetPose;
@@ -297,7 +308,20 @@ namespace MetinAR.ArEncounter
                 _notTrackingSeconds,
                 Request != null ? Request.MobName : string.Empty,
                 SpawnedMob != null ? SpawnedMob.transform : null,
-                _arCamera != null ? _arCamera.transform : null);
+                _arCamera != null ? _arCamera.transform : null,
+                PlacementTargetTooClose);
+        }
+
+        /// <summary>Placement target at least the minimum ground distance from the AR camera (true without a camera).</summary>
+        public bool IsFarEnough(Vector3 target)
+        {
+            if (_arCamera == null)
+            {
+                return true;
+            }
+
+            Vector3 c = _arCamera.transform.position;
+            return ArEncounterFraming.IsPlacementFarEnough(c.x, c.z, target.x, target.z);
         }
 
         /// <summary>Maps AR Foundation's session state to the project-owned mirror.</summary>
@@ -373,13 +397,25 @@ namespace MetinAR.ArEncounter
                             continue;
                         }
 
+                        if (!IsFarEnough(hit.pose.position))
+                        {
+                            frame.TargetTooClose = true;
+                            continue;
+                        }
+
                         SetTarget(frame, plane, hit.pose.position, true);
                         return;
                     }
                 }
             }
 
-            // Fallback: centre of the nearest suitable plane (still real detected ground).
+            // Fallback: centre of the nearest suitable plane (still real detected ground), if it is far enough.
+            if (!IsFarEnough(nearestSuitable.center))
+            {
+                frame.TargetTooClose = true;
+                return;
+            }
+
             SetTarget(frame, nearestSuitable, nearestSuitable.center, false);
         }
 
@@ -456,6 +492,8 @@ namespace MetinAR.ArEncounter
 
             GameObject go = Instantiate(_mobPrefab, pose.position, pose.rotation);
             go.name = _mobPrefab.name;
+            // Visual size only (#31 A31 retest); level/HP/aggro come from the request and are unchanged.
+            go.transform.localScale = _mobPrefab.transform.localScale * ArEncounterFraming.MobVisualScale;
             SpawnCount++;
             SpawnedMob = go.GetComponent<ArEncounterMob>();
             if (SpawnedMob == null)

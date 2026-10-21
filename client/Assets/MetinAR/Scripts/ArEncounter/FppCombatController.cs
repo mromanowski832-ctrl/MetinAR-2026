@@ -145,7 +145,7 @@ namespace MetinAR.ArEncounter
                 var root = new GameObject("FppHandsView");
                 root.transform.SetParent(_encounter.ArCamera.transform, false);
                 var procedural = root.AddComponent<FppHandsView>();
-                procedural.Build(body, energy, FppPoseContract.FramingV2Candidate);
+                procedural.Build(body, energy, FppPoseContract.RetestV3);
                 _view = procedural;
             }
             _view.Render(FppCombatAction.Idle, 0f, 0f, 0f);
@@ -185,11 +185,11 @@ namespace MetinAR.ArEncounter
         {
             if (mob == null || _encounter == null || _encounter.ArCamera == null
                 || float.IsNaN(attackTime) || float.IsInfinity(attackTime)) return false;
-            Pose pose = ViewAlive ? _view.Contract.SwordPose(FppCombatAction.Attack, attackTime)
-                : FppPoseContract.BakedClipsV1.SwordPose(FppCombatAction.Attack, attackTime);
+            FppPoseContract contract = ViewAlive ? _view.Contract : FppPoseContract.RetestV3;
+            Pose pose = contract.SwordPose(FppCombatAction.Attack, attackTime);
             Transform camera = _encounter.ArCamera.transform;
-            Vector3 a = mob.transform.InverseTransformPoint(camera.TransformPoint(pose.position + pose.rotation * FppPoseContract.BladeBase));
-            Vector3 b = mob.transform.InverseTransformPoint(camera.TransformPoint(pose.position + pose.rotation * FppPoseContract.BladeTip));
+            Vector3 a = mob.transform.InverseTransformPoint(camera.TransformPoint(pose.position + pose.rotation * contract.HitBladeBase));
+            Vector3 b = mob.transform.InverseTransformPoint(camera.TransformPoint(pose.position + pose.rotation * contract.HitBladeTip));
             // Covers the existing abdomen/cephalothorax plus a 2.5 cm prototype tolerance. Legs/label are excluded.
             return FppHitGeometry.IntersectsBox(Point(a), Point(b), new FppPoint(-0.285, 0.125, -0.605), new FppPoint(0.285, 0.595, 0.345));
         }

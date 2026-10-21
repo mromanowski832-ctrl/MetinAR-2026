@@ -201,7 +201,7 @@ namespace MetinAR.Editor
                     ("T10_FppActionsAndRemainingPlaceholders", T10_FppActionsAndRemainingPlaceholders),
                     ("T10b_FppArtClipsAttackAuraHitCancel", () => FppVariantChecks(FppViewVariant.Art)),
                     ("T10c_FppProceduralAttackAuraHitCancel", () => FppVariantChecks(FppViewVariant.Procedural)),
-                    ("T10d_FppProceduralV2RestVisibleInPortraitPreview", () => FppFramingPreview(FppViewVariant.Procedural)),
+                    ("T10d_FppProceduralV3RestVisibleInPortraitPreview", () => FppFramingPreview(FppViewVariant.Procedural)),
                     ("T10e_FppArtClipsRestVisibleInPortraitPreview", () => FppFramingPreview(FppViewVariant.Art)),
                     ("T11_ExitButtonReturnsToWorldMap", T11_ExitButtonReturnsToWorldMap),
                     ("T12_SyntheticFrames_ScanReadyPlacedSingleSpawn", T12_SyntheticFrames_ScanReadyPlacedSingleSpawn),
@@ -661,7 +661,7 @@ namespace MetinAR.Editor
             private void PlaceTargetOnBlade(FppPoseContract contract)
             {
                 Pose pose = contract.SwordPose(FppCombatAction.Attack, 0.30f);
-                Vector3 localMid = pose.position + pose.rotation * Vector3.Lerp(FppPoseContract.BladeBase, FppPoseContract.BladeTip, 0.5f);
+                Vector3 localMid = pose.position + pose.rotation * Vector3.Lerp(contract.HitBladeBase, contract.HitBladeTip, 0.5f);
                 Transform target = _ar.SpawnedMob.transform;
                 target.rotation = _ar.ArCamera.transform.rotation;
                 target.position = _ar.ArCamera.transform.TransformPoint(localMid) - target.TransformVector(new Vector3(0, 0.33f, -0.13f));
@@ -709,6 +709,14 @@ namespace MetinAR.Editor
                     foreach (FppHandsView v in FindObjectsByType<FppHandsView>(FindObjectsInactive.Exclude)) activeViews++;
                     Check(activeViews == 1, variant + ": active FPP views = " + activeViews + " (bones must never be driven twice)");
                     Check(view.RightGrip != null && view.LeftHand != null, variant + ": virtual hands missing");
+                    // #31 A31 retest framing: sword model scaled like the contract, spider visual scale, stats unchanged.
+                    if (view is FppHandsView procView)
+                        Check(procView.Sword != null && Mathf.Abs(procView.Sword.localScale.x - view.Contract.SwordScale) < 1e-4f,
+                            variant + ": sword model not scaled to " + view.Contract.SwordScale);
+                    Check(Mathf.Abs(_ar.SpawnedMob.transform.lossyScale.x - ArEncounterFraming.MobVisualScale) < 1e-3f,
+                        "spider visual scale " + _ar.SpawnedMob.transform.lossyScale.x);
+                    Check(_ar.SpawnedMob.Request != null && _ar.SpawnedMob.Request.Level == 5 && _ar.SpawnedMob.Request.MaxHp == 120,
+                        "spider gameplay stats changed");
                     Check(_ar.Hud.ActionButtons[0].interactable && _ar.Hud.ActionButtons[1].interactable, "combat buttons not enabled");
                     FppPoseContract contract = view.Contract;
                     Pose rest = contract.SwordPose(FppCombatAction.Idle, 0f);
@@ -719,6 +727,26 @@ namespace MetinAR.Editor
                     Check(combat.BladeIntersects(_ar.SpawnedMob, 0.30f), "near target should intersect blade");
                     _ar.SpawnedMob.transform.position += Vector3.right * 20f;
                     Check(!combat.BladeIntersects(_ar.SpawnedMob, 0.30f), "distant target incorrectly intersects blade");
+                    // Nameplate: constant max angular size up close, authored size far away, out of the top HUD band.
+                    Transform target = _ar.SpawnedMob.transform;
+                    Camera arCam = _ar.ArCamera;
+                    Transform camT = arCam.transform;
+                    target.rotation = Quaternion.LookRotation(Vector3.ProjectOnPlane(-camT.forward, Vector3.up).normalized, Vector3.up);
+                    target.position = camT.position + Vector3.ProjectOnPlane(camT.forward, Vector3.up).normalized * 0.9f + Vector3.down * 0.3f;
+                    _ar.SpawnedMob.ClampLabel();
+                    float near = Vector3.Distance(camT.position, _ar.SpawnedMob.LabelRoot.position);
+                    Check(_ar.SpawnedMob.LabelScaleFactor < 0.6f, "nameplate not shrunk up close: " + _ar.SpawnedMob.LabelScaleFactor + " at " + near + " m");
+                    Check(Mathf.Abs(_ar.SpawnedMob.LabelRoot.lossyScale.x - _ar.SpawnedMob.LabelScaleFactor) < 1e-3f, "nameplate world scale " + _ar.SpawnedMob.LabelRoot.lossyScale.x);
+                    Vector3 labelVp = arCam.WorldToViewportPoint(_ar.SpawnedMob.LabelRoot.position);
+                    Check(labelVp.z <= 0f || labelVp.y <= (float)ArEncounterFraming.NameplateMaxViewportY + 0.05f
+                          || _ar.SpawnedMob.LabelClampedBelowHud, "nameplate in the top HUD band: vp " + labelVp);
+                    target.position = camT.position + Vector3.ProjectOnPlane(camT.forward, Vector3.up).normalized * 12f + Vector3.down * 1.2f;
+                    _ar.SpawnedMob.ClampLabel();
+                    Check(Mathf.Abs(_ar.SpawnedMob.LabelScaleFactor - 1f) < 1e-3f, "far nameplate not at authored size: " + _ar.SpawnedMob.LabelScaleFactor);
+                    Debug.Log("[ArSmoke] T10b nameplate near=" + near + " m label vp=" + labelVp + " clamped=" + _ar.SpawnedMob.LabelClampedBelowHud);
+                    PlaceTargetOnBlade(contract);
+                    target.position += Vector3.right * 20f;
+
                     int before = combat.HitCount;
                     _ar.Hud.ActionButtons[0].onClick.Invoke();
                     Check(combat.Timeline.Action == FppCombatAction.Attack, "Attack button not bound");
@@ -755,7 +783,7 @@ namespace MetinAR.Editor
                     Check(combat.Timeline.Action == FppCombatAction.Aura, "Aura button not bound");
                     yield return WaitUntil(() => combat.Timeline.Elapsed >= 0.4f, 3f);
                     Check(combat.Timeline.Action == FppCombatAction.Aura, "Aura cancelled too early");
-                    Vector3 expectedLeft = CamLocal(cam, view.RightGrip.TransformPoint(FppPoseContract.LeftGripOffset));
+                    Vector3 expectedLeft = CamLocal(cam, view.RightGrip.TransformPoint(contract.LeftGrip));
                     float gripErr = (CamLocal(cam, view.LeftHand.position) - expectedLeft).magnitude;
                     Check(gripErr < 0.015f, variant + ": left hand did not grip hilt (" + (gripErr * 1000f).ToString("0.0") + " mm)");
                     yield return WaitUntil(() => combat.Timeline.Action == FppCombatAction.Idle, 3f);
@@ -837,8 +865,8 @@ namespace MetinAR.Editor
                         combat.SetPreviewPose(action, t, aura);
                         yield return Frames(3); // pose held >= 1 full frame so skinning of the rendered frame matches
                         bool grip = InView(probe, view.RightGrip.position);
-                        bool guard = InView(probe, view.RightGrip.TransformPoint(FppPoseContract.GuardCentre));
-                        bool tip = InView(probe, view.RightGrip.TransformPoint(FppPoseContract.BladeTip));
+                        bool guard = InView(probe, view.RightGrip.TransformPoint(view.Contract.GripGuardCentre));
+                        bool tip = InView(probe, view.RightGrip.TransformPoint(view.Contract.HitBladeTip));
                         bool left = InView(probe, view.LeftHand.position);
                         Pose e = view.Contract.SwordPose(action, t);
                         float err = (CamLocal(arCam.transform, view.RightGrip.position) - e.position).magnitude;
@@ -954,7 +982,7 @@ namespace MetinAR.Editor
 
                 Transform cam = _ar.ArCamera.transform;
                 Vector3 fwd = Vector3.ProjectOnPlane(cam.forward, Vector3.up).normalized;
-                _syntheticTarget = cam.position + fwd * 1.5f + Vector3.down * 1.2f;
+                _syntheticTarget = cam.position + fwd * 0.8f + Vector3.down * 1.2f; // too close first (#31 A31 retest)
                 yield return Frames(3);
                 Check(_ar.State == ArEncounterState.Scanning, "phase0 state " + _ar.State);
                 Check(!_ar.Hud.IsPlaceButtonInteractable, "phase0 place interactable");
@@ -966,9 +994,19 @@ namespace MetinAR.Editor
                 yield return Frames(3);
                 Check(_ar.State == ArEncounterState.Scanning, "phase1 small plane state " + _ar.State);
 
-                _syntheticPhase = 2; // suitable floor
+                _syntheticPhase = 2; // suitable floor, but the target is closer than the minimum placement distance
                 yield return Frames(3);
-                Check(_ar.State == ArEncounterState.ReadyToPlace && _ar.HasPlacementTarget, "phase2 state " + _ar.State);
+                Check(_ar.State == ArEncounterState.ReadyToPlace && !_ar.HasPlacementTarget && _ar.PlacementTargetTooClose,
+                    "too-close target accepted: state " + _ar.State + " target " + _ar.HasPlacementTarget);
+                Check(!_ar.Hud.IsPlaceButtonInteractable && _ar.Hud.StatusLabel == ArEncounterHud.PlacementTooCloseNotice,
+                    "too-close hint missing: " + _ar.Hud.StatusLabel);
+                _ar.Hud.PlaceButton.onClick.Invoke();
+                yield return Frames(1);
+                Check(MobCount() == 0, "spawned on a too-close target");
+
+                _syntheticTarget = cam.position + fwd * 1.8f + Vector3.down * 1.2f; // far enough
+                yield return Frames(3);
+                Check(_ar.State == ArEncounterState.ReadyToPlace && _ar.HasPlacementTarget && !_ar.PlacementTargetTooClose, "phase2 state " + _ar.State);
                 Check(_ar.Hud.IsPlaceButtonInteractable, "phase2 place not interactable");
                 Check(_ar.PlacementReticle.gameObject.activeSelf && Vector3.Distance(_ar.PlacementReticle.position, _syntheticTarget) < 0.01f, "reticle not at target");
                 Check(MobCount() == 0, "spawned before confirm");

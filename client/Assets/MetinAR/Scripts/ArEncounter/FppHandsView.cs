@@ -10,21 +10,24 @@ namespace MetinAR.ArEncounter
     /// </summary>
     public sealed class FppHandsView : MonoBehaviour, IFppHandsView
     {
+        /// <summary>Unscaled sword-model blade points (RightGrip frame at scale 1); the hit segment is Contract.HitBladeBase/Tip.</summary>
         public static readonly Vector3 BladeBase = FppPoseContract.BladeBase;
         public static readonly Vector3 BladeTip = FppPoseContract.BladeTip;
 
         private readonly List<Mesh> _meshes = new List<Mesh>();
         private readonly List<Material> _materials = new List<Material>();
-        private Transform _rightGrip, _leftHand, _rightArm, _leftArm;
+        private Transform _rightGrip, _leftHand, _rightArm, _leftArm, _sword;
         private FppAuraFx _aura;
         public Transform RightGrip => _rightGrip;
         public Transform LeftHand => _leftHand;
-        public FppPoseContract Contract { get; private set; } = FppPoseContract.FramingV2Candidate;
+        /// <summary>Sword model root under the grip, uniformly scaled by Contract.SwordScale (#31 A31 retest).</summary>
+        public Transform Sword => _sword;
+        public FppPoseContract Contract { get; private set; } = FppPoseContract.RetestV3;
         public bool AuraRibbonsVisible => _aura != null && _aura.RibbonsVisible;
 
         public void Build(Material bodySource, Material energySource, FppPoseContract contract)
         {
-            Contract = contract ?? FppPoseContract.FramingV2Candidate;
+            Contract = contract ?? FppPoseContract.RetestV3;
             Material glove = MaterialCopy(bodySource, new Color(0.22f, 0.12f, 0.075f), "FppLeather");
             Material steel = MaterialCopy(bodySource, new Color(0.7f, 0.77f, 0.82f), "FppSteel");
             Material gold = MaterialCopy(bodySource, new Color(0.78f, 0.52f, 0.14f), "FppGold");
@@ -32,29 +35,32 @@ namespace MetinAR.ArEncounter
 
             _rightGrip = Child("RightGrip", transform);
             _leftHand = Child("LeftHand", transform);
+            _sword = Child("Sword", _rightGrip);
+            _sword.localScale = Vector3.one * Contract.SwordScale;
             DrawMesh("RightGlove", _rightGrip, HandMesh(1f), glove);
             DrawMesh("LeftGlove", _leftHand, HandMesh(-1f), glove);
             var hilt = new Shape();
             hilt.Box(new Vector3(0, -0.035f, 0), new Vector3(0.035f, 0.29f, 0.035f));
-            DrawMesh("SwordGrip", _rightGrip, hilt.Finish(), glove);
+            DrawMesh("SwordGrip", _sword, hilt.Finish(), glove);
             var guard = new Shape();
             guard.Box(new Vector3(0, 0.12f, 0), new Vector3(0.25f, 0.035f, 0.05f));
             guard.Box(new Vector3(0, -0.19f, 0), new Vector3(0.055f, 0.05f, 0.055f));
-            DrawMesh("SwordGuardPommel", _rightGrip, guard.Finish(), gold);
+            DrawMesh("SwordGuardPommel", _sword, guard.Finish(), gold);
             var blade = new Shape();
             blade.Box(new Vector3(0, 0.485f, 0), new Vector3(0.065f, 0.70f, 0.018f));
             blade.Triangle(new Vector3(-0.0325f, 0.835f, -0.009f), new Vector3(0, 0.94f, 0), new Vector3(0.0325f, 0.835f, -0.009f));
             blade.Triangle(new Vector3(0.0325f, 0.835f, 0.009f), new Vector3(0, 0.94f, 0), new Vector3(-0.0325f, 0.835f, 0.009f));
             blade.Triangle(new Vector3(-0.0325f, 0.835f, 0.009f), new Vector3(0, 0.94f, 0), new Vector3(-0.0325f, 0.835f, -0.009f));
             blade.Triangle(new Vector3(0.0325f, 0.835f, -0.009f), new Vector3(0, 0.94f, 0), new Vector3(0.0325f, 0.835f, 0.009f));
-            DrawMesh("SwordBlade", _rightGrip, blade.Finish(), steel);
+            DrawMesh("SwordBlade", _sword, blade.Finish(), steel);
 
             var arm = new Shape();
             arm.Box(Vector3.zero, Vector3.one);
             Mesh armMesh = arm.Finish();
             _rightArm = DrawMesh("RightForearm", transform, armMesh, glove);
             _leftArm = DrawMesh("LeftForearm", transform, armMesh, glove);
-            _aura = new FppAuraFx(_rightGrip, energy);
+            // Under the scaled sword root: the Aura ribbons follow the visible (scaled) blade.
+            _aura = new FppAuraFx(_sword, energy);
         }
 
         public void Render(FppCombatAction action, float elapsed, float auraRemaining, float visualTime)

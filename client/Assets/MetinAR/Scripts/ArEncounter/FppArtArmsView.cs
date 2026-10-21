@@ -22,8 +22,8 @@ namespace MetinAR.ArEncounter
         private float _idleLength = 2f;
         private Material _auraMaterial;
 
-        /// <summary>The #36 clips (ce22c8b) are baked from the 52a1375 contract; changes need #34 regeneration.</summary>
-        public FppPoseContract Contract => FppPoseContract.BakedClipsV1;
+        /// <summary>Contract the #36 clips were baked from (config BakedContractId; cd3d02c = v1-52a1375). Changes need #34 regeneration.</summary>
+        public FppPoseContract Contract { get; private set; } = FppPoseContract.BakedClipsV1;
         public Transform RightGrip { get; private set; }
         public Transform LeftHand { get; private set; }
         public Animator Animator { get; private set; }
@@ -47,6 +47,7 @@ namespace MetinAR.ArEncounter
 
         private bool Bind(FppArtPreviewConfig config, Material energy)
         {
+            Contract = FppPoseContract.FromId(config.BakedContractId);
             RightGrip = FindDeep(transform, SwordSocketBone);
             LeftHand = FindDeep(transform, LeftGripSocketBone);
             Animator = GetComponentInChildren<Animator>(true);
@@ -75,7 +76,11 @@ namespace MetinAR.ArEncounter
             var auraColor = new Color(0.12f, 0.95f, 1f);
             if (_auraMaterial.HasProperty("_BaseColor")) _auraMaterial.SetColor("_BaseColor", auraColor);
             if (_auraMaterial.HasProperty("_Color")) _auraMaterial.SetColor("_Color", auraColor);
-            _auraFx = new FppAuraFx(RightGrip, _auraMaterial);
+            // Aura ribbons in unscaled sword-model space under a root scaled like the baked sword model.
+            var auraRoot = new GameObject("FppAuraRoot").transform;
+            auraRoot.SetParent(RightGrip, false);
+            auraRoot.localScale = Vector3.one * Contract.SwordScale;
+            _auraFx = new FppAuraFx(auraRoot, _auraMaterial);
             Render(FppCombatAction.Idle, 0f, 0f, 0f);
             return true;
         }

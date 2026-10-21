@@ -83,3 +83,57 @@ A long stall cancels the action instead of applying an unseen delayed hit.
 There is no final combat balance, HP damage, multiplayer validation, audio, haptics, resource cost or copied Metin2 content.
 Physical Android/iOS quality and performance remain UNVERIFIED.
 
+
+## A31 crash on entering AR (52a1375 dev APK) — build artifact, not FPP code
+
+Symptom: tapping AR closed the game (native SIGTRAP in `Loading.Preload`, `CachedReader::OutOfBoundsError`,
+"different serialization layout" errors and `sharedassets1.assets is corrupted`).
+
+Root cause: the APK contained `assets/bin/Data/sharedassets1.assets` from the new build **and** stale
+`sharedassets1.assets.split0..14` from an older build (dated 2026-10-20, containing the #8 sword/hand-tracking
+assets). They came from the Gradle export folder in a `Library` copied from another checkout; the new build did not
+overwrite or delete them. The Android player prefers split chunks, so it read the old AR-scene data against the new
+`level1`/`globalgamemanagers` and crashed. The AR scene YAML and the FPP components (added at runtime via
+`AddComponent`, no serialized fields) were not the cause; no runtime MetinAR script has serialized fields under
+`#if UNITY_EDITOR`.
+
+Fix: `MetinARAndroidDevBuild` deletes `Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/src/main/assets/bin/Data`
+before building and, after the build, fails (exit 1) if the APK contains a serialized file both whole and split or
+with non-contiguous chunks (`AndroidPlayerDataValidator`, tested in `tests/MetinAR.QA.Tests`).
+
+## A31 retest fixes (APK 2ec7a47, owner retest 2026-10-21)
+
+Findings 1, 3 and 4 of the retest (2 = real hands via #36 on `integration/fpp-art-preview`; 5 = HP damage is #47).
+Projection checks use the ESTIMATED A31 portrait camera (69.4° vertical, 540×1200 ≈ 34.6° horizontal) and a
+60–75° band; the physical FOV is still UNVERIFIED. Engine-free rules: `FppViewFraming`, `ArEncounterFraming`
+(tests: `tests/GeoCore.Tests/FppFramingTests.cs`).
+
+1. **Sword too big / too close.** The full-size sword (blade 0.94 m, guard 0.25 m) at ~0.5 m from a 35° wide portrait
+   frame cannot stay out of the centre: the old Aura hold put the blade on the centre line with the guard across
+   ~75 % of the width. Changes:
+   - sword model (hilt, guard, pommel, blade, Aura ribbons) drawn at `SwordScale = 0.75` around the grip; hands stay
+     life-size. The hit sweep samples the same scaled blade (`BladeBase/BladeTip` = 0.0975/0.705 m), so visible and
+     tracked blades still match; the blade's reach is 25 % shorter.
+   - rest `(0.09, -0.17, 0.46)` / Euler `(15, -30, -22)`: fist at NDC ≈ (0.63, -0.53), guard x 0.16..1.12 (≈ 48 % of the
+     width, below the centre line), blade 100 % in frame up the right side, never closer than 0.70 NDC to the centre.
+     The −30° yaw turns the guard towards the target (edge forward), which is what shrinks its on-screen width.
+   - Aura hold `(0.10, -0.14, 0.50)` / `(10, -30, -18)`: also lower-right, blade ≥ 0.73 NDC from the centre.
+   - #34 proposal `(0.06, -0.15, 0.44)` / `(15, 0, -14)` was not taken as is: at full scale its guard spans
+     x −0.22..1.46 (84 % of the width, across the centre). Windup/end of the swing, timings, cancel and one-hit rule
+     are unchanged; the swing still crosses the centre for its 0.24 s active window, which is intended.
+   - left hand rest `(-0.08, -0.23, 0.42)` / `(0, 0, 12)` (was `(-0.19, -0.25, 0.43)`, off-screen): lower-left of the
+     frame, NDC ≈ (-0.61, -0.79), so both hands are visible at rest; on the hilt during Aura at `LeftGripOffset = -0.09`
+     (scaled hilt).
+3. **Spider too close.** Placement targets closer than 1.5 m along the ground are skipped (reticle points 0.5/0.6/0.7/
+   0.4/0.3 of the screen height, then the plane-centre fallback). If only closer ground is found, the place button
+   stays disabled and the status says „Za blisko. Odsuń się albo wyceluj dalej w podłoże (min. 1,5 m).”. The spawned
+   spider is drawn at visual scale 0.75 (leg span ≈ 0.93 m), so at 1.5 m it fits the estimated portrait width.
+   Level 5, HP 120 and the 12 m aggro are not touched (they come from the request). Melee still needs the player
+   to walk up to it; up close it will again fill most of the screen.
+4. **Nameplate huge up close.** `ArEncounterMob.ClampLabel` keeps the nameplate at ≤ 9° angular width (HP bar about a
+   quarter, name about a third of the estimated portrait width) when near and at its authored size when far, and
+   lowers it out of the top HUD band (viewport y > 0.80) without pushing it onto the spider's body.
+
+Editor checks: `ArEncounterSmokeTest` T10b (sword scale, rest pose, spider scale/stats, nameplate scale and HUD band)
+and T12 (too-close synthetic target rejected with the hint, far target placed). The FPP hit tests run on the scaled
+blade.
