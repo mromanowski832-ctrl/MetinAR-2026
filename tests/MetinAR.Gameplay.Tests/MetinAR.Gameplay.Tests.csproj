@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- Production sources must also compile under Unity 6 (C# 9); tests use the same language level. -->
+    <LangVersion>9.0</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <!-- METINAR-019: tests compile the production MetinAR.Gameplay source directly (engine-free assembly). -->
+  <ItemGroup>
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/BalanceConfig.cs" Link="Production/BalanceConfig.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/BalanceRules.cs" Link="Production/BalanceRules.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/CharacterLoadout.cs" Link="Production/CharacterLoadout.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/ClassBalance.cs" Link="Production/ClassBalance.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/ClassId.cs" Link="Production/ClassId.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/DamageResolver.cs" Link="Production/DamageResolver.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/DamageType.cs" Link="Production/DamageType.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/Data/BalanceTableImporter.cs" Link="Production/Data/BalanceTableImporter.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/Data/ClassSkillCatalog.cs" Link="Production/Data/ClassSkillCatalog.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/Data/CsvTable.cs" Link="Production/Data/CsvTable.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/Data/MiniJson.cs" Link="Production/Data/MiniJson.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/DerivedStats.cs" Link="Production/DerivedStats.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/ExpCurve.cs" Link="Production/ExpCurve.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/GameplayMath.cs" Link="Production/GameplayMath.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/GameplayRandom.cs" Link="Production/GameplayRandom.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/MobLevelStats.cs" Link="Production/MobLevelStats.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/PrimaryStats.cs" Link="Production/PrimaryStats.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/SkillRankRules.cs" Link="Production/SkillRankRules.cs" />
+  </ItemGroup>
+</Project>
