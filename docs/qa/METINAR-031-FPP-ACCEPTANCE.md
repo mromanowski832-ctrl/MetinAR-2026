@@ -4,6 +4,9 @@ Owner: QA (#26). This is a test checklist, not an implementation. Each item is c
 APK SHA256**. A missing proof means **UNVERIFIED**. Green CI or Editor smokes never close device items (D*). Results are
 reported on PR #32 / #31 in the format `ID | PASS/FAIL/UNVERIFIED | evidence (log line, video/screenshot ref, measurement)`.
 
+The device run sheet for the combat loop v0 (#47 S2b) and the device items below is
+[DEVICE-ACCEPTANCE-LOOP-V0.md](DEVICE-ACCEPTANCE-LOOP-V0.md) (evidence format, exact SHA + APK SHA256, UNVERIFIED rule).
+
 Device: Samsung Galaxy A31 (Android 12, API 31), development APK built by `MetinAR.Editor.MetinARAndroidDevBuild.BuildArEncounterDevelopmentApk`.
 Device use is coordinated in #33 (`LOCAL SLOT ACQUIRED/RELEASED`). Do not put pairing codes, IP addresses, serial numbers or GPS coordinates in GitHub.
 

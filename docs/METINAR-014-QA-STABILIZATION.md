@@ -83,6 +83,7 @@ The hook is inert when the variable is unset. After the gate runs, the AR result
 - `ArSmokeInjection` is scheduled before `AndroidBuild` in a multi-gate run (the Android build switches the Library target).
 - An Android build failure caused by a full disk (`No space left on device`) is reported in the gate evidence.
 - The #31 device acceptance checklist is in [qa/METINAR-031-FPP-ACCEPTANCE.md](qa/METINAR-031-FPP-ACCEPTANCE.md).
+- The device run sheet for the combat loop v0 (#47 S2b) and #31 (visibility, near/far hit, button spam, tracking loss, pause/resume, exit/return, HP to 0, reward, fps, PSS, logcat) is in [qa/DEVICE-ACCEPTANCE-LOOP-V0.md](qa/DEVICE-ACCEPTANCE-LOOP-V0.md).
 
 ## 5. APK player-data validation (#31 crash follow-up)
 
