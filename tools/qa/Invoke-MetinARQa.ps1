@@ -211,13 +211,16 @@ try {
             'ArSmokeInjection' {
                 $cfg = @($config.smokeTests | Where-Object { $_.name -eq 'ArSmoke' })[0]
                 $xmlPath = Join-Path $repo $cfg.results
-                $ev = @(); $allOk = $true; $secs = 0.0
+                $ev = @(); $allOk = $true; $secs = 0.0; $skipped = $false
                 foreach ($mode in @('metinar', 'unknown', 'searchdb')) {
                     if (Test-Path $xmlPath) { Remove-Item $xmlPath -Force }
                     $env:METINAR_SMOKE_INJECT = $mode
                     try { $u = Invoke-UnityGate ("ArSmokeInjection-" + $mode) $cfg.method @() ([int]$cfg.timeoutMinutes) }
                     finally { Remove-Item Env:\METINAR_SMOKE_INJECT -ErrorAction SilentlyContinue }
-                    if ($u -isnot [pscustomobject] -or -not $u.PSObject.Properties['Run']) { $ev += "$($mode): $($u.Status) $($u.Detail)"; $allOk = $false; continue }
+                    if ($u -isnot [pscustomobject] -or -not $u.PSObject.Properties['Run']) {
+                        if ($u.Status -eq 'SKIP') { $skipped = $true } else { $allOk = $false }
+                        $ev += "$($mode): $($u.Status) $($u.Detail)"; continue
+                    }
                     $secs += $u.Run.Seconds
                     $j = Get-MetinARJUnitSummary -Path $xmlPath
                     if ($j) { Copy-Item $xmlPath (Join-Path $OutputDir ("inject-" + $mode + "-" + (Split-Path $xmlPath -Leaf))) -Force }
@@ -226,6 +229,7 @@ try {
                     $ev += "$($mode): $(if ($v.Ok) { 'OK' } else { 'WRONG' }) - $($v.Detail) (exit=$($u.Run.ExitCode), log: $(Rel $u.Log))"
                 }
                 if (Test-Path $xmlPath) { Remove-Item $xmlPath -Force }   # never leave an injected result where ArSmoke looks
+                if ($skipped -and $allOk) { Add-Result (New-MetinARGateResult -Name 'ArSmokeInjection' -Status 'SKIP' -Detail 'skipped (-SkipUnity)'); break }
                 Add-Result (New-MetinARGateResult -Name 'ArSmokeInjection' -Status $(if ($allOk) { 'PASS' } else { 'FAIL' }) -Detail $(if ($allOk) { 'injected MetinAR + unknown exceptions fail T15; known Search signature does not' } else { 'exception gate did not behave as expected' }) -Evidence $ev -Seconds $secs)
             }
             'AndroidBuild' {
