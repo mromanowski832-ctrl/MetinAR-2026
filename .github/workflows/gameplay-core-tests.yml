@@ -1,0 +1,27 @@
+name: gameplay-core-tests
+
+# METINAR-019 (#46): pure C# MetinAR.Gameplay (BalanceConfig, ExpCurve, DamageResolver, derived stats, table import).
+# Tests compile the production sources from client/Assets/MetinAR/Scripts/Gameplay and check them against
+# docs/design/tables and the 1–99 fixtures from PR #61. No Unity licence, no secrets.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Test gameplay core (METINAR-019)
+        run: dotnet test tests/MetinAR.Gameplay.Tests/MetinAR.Gameplay.Tests.csproj --configuration Release --logger "console;verbosity=normal"
