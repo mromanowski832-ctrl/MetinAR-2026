@@ -13,7 +13,7 @@ Owner of this area: the "Dźwięk i muzyka" bot. Unity / A31 time only through r
   first import only (like the METINAR-009 postprocessor). Existing `.meta` files are not rewritten.
 - Licence + budget gate in `tests/AssetPipeline.Tests/AudioPipelineTests.cs`, run in CI by the existing
   `asset-pipeline-tests` workflow (`dotnet test`).
-- 10 original SFX made by `tools/audio/generate_sfx.py` (procedural synthesis, Python 3 + numpy, fixed seeds).
+- 13 original SFX (10 starter combat/UI + 3 Aura) made by `tools/audio/generate_sfx.py` (procedural synthesis, Python 3 + numpy, fixed seeds).
 - Not done here (by scope): no wiring into combat logic, no music. AudioMixer `Audio/Mixers/MetinARMixer.mixer` (Master/SFX/UI/Music) added later in this PR, see section 8.
 
 ## 2. Layout and naming
@@ -91,13 +91,34 @@ Runtime voice count (`AudioManager` real voices 32) is unchanged. Not measured o
 | `SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Death_01.wav` | 1.20 s | 105 884 B | ~26.7 KB | spider death |
 | `SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Step_01..03.wav` | 0.12 s each | 10 628 B each | ~3.2 KB each | leg taps (3 variants) |
 | `SFX/UI/SFX_UI_Click_01.wav` | 0.06 s | 5 336 B | ~2.1 KB | UI button |
+| `SFX/Combat/SFX_Combat_AuraStart_01.wav` | 1.20 s | 105 884 B | ~26.7 KB | Aura cast: rising energy, burst at 0.65 s (= `AuraBurstSeconds`), settles by 1.15 s |
+| `SFX/Combat/SFX_Combat_AuraLoop_01.wav` | 2.00 s (88 200 samples) | 176 444 B | ~45.2 KB | Aura active on the blade, played with `AudioSource.loop` |
+| `SFX/Combat/SFX_Combat_AuraStop_01.wav` | 0.60 s | 52 964 B | ~13.4 KB | Aura expiry: pitch drop + crackling discharge |
 
-Total sources 338 246 B; ADPCM estimate (ffmpeg `adpcm_ima_wav`) ~90 KB. Peaks normalised: hits/blocks −1 dBFS,
+Total sources 673 538 B (budget 2 MiB); ADPCM estimate (ffmpeg `adpcm_ima_wav`) ~175 KB. Aura loop peak −12 dBFS
+(RMS ≈ −21 dBFS, a dense 6 s bed), Aura start −1 dBFS, Aura stop −4 dBFS. Peaks normalised: hits/blocks −1 dBFS,
 mob −2 dBFS, swing −3 dBFS, steps and UI click −6 dBFS (quieter by design). Unity `normalize` is off so these levels hold.
 
 Regenerate: `python3 tools/audio/generate_sfx.py`. Check bytes: `python3 tools/audio/generate_sfx.py --check`
 (bit-identical with numpy 2.5.4; other numpy versions may differ in the last bits — then update the SHA-256 in LICENSES.md
 only together with the regenerated files).
+
+### 6.1 Aura loop rules (METINAR-FPP-001 / #31)
+
+Context from `FppCombatTimeline` (PR #32): cast 1.15 s, burst at 0.65 s, Aura then active 6 s (prototype values,
+final duration undecided). The Aura is therefore Start (one-shot) → Loop (while `AuraActive`) → Stop (one-shot).
+
+- A loop clip is an SFX whose event ends in `Loop` (`SFX_Combat_AuraLoop_01.wav`). It stays in the **SFX profile**
+  (ADPCM, Decompress On Load, mono, preload): 2 s mono is ~172 KiB PCM in RAM, played without per-frame decoding on
+  the A31; no separate looped profile is needed while loops stay ≤ 2 s. Looping is an `AudioSource.loop` setting.
+- Seamless by construction: every partial and modulation has an integer number of cycles in exactly 88 200 samples,
+  the noise layer is synthesised periodically in the frequency domain, and there are no fades.
+  `generate_sfx.py --check` renders two periods and checks they repeat (`aura loop periodic: YES`).
+- Gate (`AudioPipelineRules.CheckLoopSeam`, run for every loop clip): seam step |x[0] − x[N−1]| and the second differences
+  across the seam must not exceed the largest inside the clip, and the first/last 50 ms RMS must agree within 3 dB.
+  Unit tests cover a seamless integer-cycle sine and failing half-cycle cut, kink and faded loops.
+- Risk (not verified in Unity/A31 here): ADPCM quantisation could add a tiny step at the seam after import. Vorbis /
+  MP3 are not used for this loop (encoder padding is the usual cause of loop gaps). To be checked by ear on the A31.
 
 ## 7. Hooks for stage 5 (not wired in this issue)
 
@@ -111,6 +132,9 @@ only together with the regenerated files).
 | Spider Death | `A_VenomousSpider_Death` start / mob defeated state | 3D, no overlap with Hit |
 | Spider Step 01..03 | Animation Events on foot contacts of Walk/Run clips | random variant, pitch ±5 %, rate-limit (8 legs!) |
 | UI Click | `HudButtonBar` / HUD button `onClick` | 2D, UI mixer group |
+| Aura Start | `FppCombatController.RequestAura()` returning `true` (PR #32) | 2D on the player's sword, SFX group |
+| Aura Loop | start when `Timeline.AuraActive` becomes true (burst at 0.65 s), `AudioSource.loop = true`, stop when it becomes false | short cross-fade (~50 ms) from Start tail; owned by the Developer (#31) |
+| Aura Stop | `AuraActive` true → false (expiry or `CancelActions`) | stop the loop first, then play Stop |
 
 Suggested runtime (stage 5, not decided): a small `AudioCue` ScriptableObject (clips + volume/pitch range + spatial blend)
 routed to the groups of `Audio/Mixers/MetinARMixer.mixer` (Master / SFX / UI / Music).

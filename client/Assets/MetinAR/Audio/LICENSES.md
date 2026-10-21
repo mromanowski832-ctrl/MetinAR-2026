@@ -45,6 +45,9 @@ All fields are required; empty or `-` fails the test. A `|` inside a cell is not
 
 | File | Origin | Author | License | Source | SHA-256 |
 |---|---|---|---|---|---|
+| `SFX/Combat/SFX_Combat_AuraLoop_01.wav` | original | MetinAR project (Grok Bot — Dźwięk i muzyka, for the owner Michał Romanowski) | MetinAR-Owned | procedural synthesis, `tools/audio/generate_sfx.py` aura_loop(), seed 1811 | `0babcc79b81216c8e0ac7db913595a25cdddd6aa478ea13bd636c0702df268e7` |
+| `SFX/Combat/SFX_Combat_AuraStart_01.wav` | original | MetinAR project (Grok Bot — Dźwięk i muzyka, for the owner Michał Romanowski) | MetinAR-Owned | procedural synthesis, `tools/audio/generate_sfx.py` aura_start(), seeds 1811, 1812 | `ede507271e05ad1b0c766c71583ecd8ceef396761852f04638cfb1cd6b720978` |
+| `SFX/Combat/SFX_Combat_AuraStop_01.wav` | original | MetinAR project (Grok Bot — Dźwięk i muzyka, for the owner Michał Romanowski) | MetinAR-Owned | procedural synthesis, `tools/audio/generate_sfx.py` aura_stop(), seed 1813 | `d1b6b04d9f783345acf24f26d04ffcb748ebfec6835d23b96b7e9f1c9436a614` |
 | `SFX/Combat/SFX_Combat_ShieldBlock_01.wav` | original | MetinAR project (Grok Bot — Dźwięk i muzyka, for the owner Michał Romanowski) | MetinAR-Owned | procedural synthesis, `tools/audio/generate_sfx.py` shield_block(), seed 1803 | `cde91634837be8e33828e24dfc10bf8efb70abdaddb496a17eb354f58cab4f3e` |
 | `SFX/Combat/SFX_Combat_SwordHit_01.wav` | original | MetinAR project (Grok Bot — Dźwięk i muzyka, for the owner Michał Romanowski) | MetinAR-Owned | procedural synthesis, `tools/audio/generate_sfx.py` sword_hit(), seed 1802 | `814ca6b61cdddc14ea329784ff6788e022e0dceef32637504d599ea1118bb793` |
 | `SFX/Combat/SFX_Combat_SwordSwing_01.wav` | original | MetinAR project (Grok Bot — Dźwięk i muzyka, for the owner Michał Romanowski) | MetinAR-Owned | procedural synthesis, `tools/audio/generate_sfx.py` sword_swing(), seed 1801 | `1978df6dfb8aafb8778e628840d23808aa39868e87cfd06b732c11482b0c123d` |

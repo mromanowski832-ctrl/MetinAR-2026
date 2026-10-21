@@ -408,6 +408,97 @@ namespace AssetPipeline.Tests
             Assert.Contains(AudioLicenseLedger.Parse(Ledger("a.wav", "cc0", "CC-BY-4.0", "x https://example.org/a")).Validate(), i => i.Message.Contains("CC0-1.0"));
         }
 
+        // ---- Loop seam (METINAR-018 Aura loop)
+
+        private static short[] Sine(double hz, int frames, int rate = 44100, double amp = 12000, double phase = 0)
+        {
+            var x = new short[frames];
+            for (int i = 0; i < frames; i++)
+            {
+                x[i] = (short)Math.Round(amp * Math.Sin(2 * Math.PI * hz * i / rate + phase));
+            }
+
+            return x;
+        }
+
+        private static byte[] WavFrom(short[] x, int rate = 44100)
+        {
+            byte[] b = Wav(1, rate, 16, x.Length);
+            for (int i = 0; i < x.Length; i++)
+            {
+                b[44 + 2 * i] = (byte)x[i];
+                b[45 + 2 * i] = (byte)(x[i] >> 8);
+            }
+
+            return b;
+        }
+
+        [Theory]
+        [InlineData("Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_AuraLoop_01.wav", true)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_HissLoop_01.wav", true)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_AuraStart_01.wav", false)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_Loop_01.wav", false)]
+        [InlineData("Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_Looping_01.wav", false)]
+        public void DetectsLoopClipsByEventName(string path, bool loop)
+        {
+            Assert.Equal(loop, AudioPipelineRules.IsLoopClip(path));
+        }
+
+        [Fact]
+        public void IntegerCycleSineLoopIsSeamless()
+        {
+            // 220 Hz over exactly 1 s = 220 whole cycles.
+            Assert.Empty(AudioPipelineRules.CheckLoopSeam(Sine(220, 44100), 44100));
+        }
+
+        [Fact]
+        public void HalfCycleCutLoopClicksAtTheSeam()
+        {
+            // 220.5 cycles: the waveform jumps back at the seam.
+            List<string> p = AudioPipelineRules.CheckLoopSeam(Sine(220.5, 44100), 44100);
+            Assert.Contains(p, m => m.Contains("seam step") || m.Contains("kink"));
+        }
+
+        [Fact]
+        public void KinkAtTheSeamIsDetected()
+        {
+            // Cut at a peak: value continuous, slope flips sign -> second-difference spike.
+            short[] x = Sine(100, 44100 / 100 * 50 + 44100 / 400, phase: 0);
+            Assert.Contains(AudioPipelineRules.CheckLoopSeam(x, 44100), m => m.Contains("kink") || m.Contains("seam step"));
+        }
+
+        [Fact]
+        public void FadedLoopIsRejected()
+        {
+            short[] x = Sine(220, 44100);
+            for (int i = 0; i < 4410; i++)
+            {
+                x[x.Length - 1 - i] = (short)(x[x.Length - 1 - i] * i / 4410.0);
+            }
+
+            Assert.Contains(AudioPipelineRules.CheckLoopSeam(x, 44100), m => m.Contains("RMS") || m.Contains("silence"));
+        }
+
+        [Fact]
+        public void ReadPcm16ReturnsTheSamples()
+        {
+            short[] x = Sine(440, 1000);
+            Assert.Equal(x, AudioFormatInfo.ReadPcm16(WavFrom(x)));
+            Assert.Empty(AudioFormatInfo.ReadPcm16(Encoding.ASCII.GetBytes("nope")));
+        }
+
+        [Fact]
+        public void ValidateAssetRunsTheSeamCheckOnLoopClips()
+        {
+            byte[] bad = WavFrom(Sine(220.5, 22050 * 2 / 2));
+            string path = "Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_AuraLoop_01.wav";
+            var ledger = AudioLicenseLedger.Parse(Ledger("SFX/Combat/SFX_Combat_AuraLoop_01.wav", sha: AudioPipelineRules.Sha256Hex(bad)));
+            Assert.Contains(AudioPipelineRules.ValidateAsset(path, bad, Meta(0, 2), ledger), i => i.Message.StartsWith("loop:"));
+            byte[] good = WavFrom(Sine(220, 44100));
+            ledger = AudioLicenseLedger.Parse(Ledger("SFX/Combat/SFX_Combat_AuraLoop_01.wav", sha: AudioPipelineRules.Sha256Hex(good)));
+            Assert.Empty(AudioPipelineRules.ValidateAsset(path, good, Meta(0, 2), ledger));
+        }
+
         [Fact]
         public void ValidateAssetRequiresLedgerEntryMatchingShaAndMeta()
         {
@@ -514,6 +605,9 @@ namespace AssetPipeline.Tests
                 "SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Death_01.wav",
                 "SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Step_01.wav",
                 "SFX/UI/SFX_UI_Click_01.wav",
+                "SFX/Combat/SFX_Combat_AuraStart_01.wav",
+                "SFX/Combat/SFX_Combat_AuraLoop_01.wav",
+                "SFX/Combat/SFX_Combat_AuraStop_01.wav",
             };
             var existing = new HashSet<string>(AudioFiles().Select(AudioPipelineRules.LedgerPath));
             Assert.All(required, r => Assert.Contains(r, existing));
@@ -588,6 +682,20 @@ namespace AssetPipeline.Tests
             }
 
             Assert.Equal(4, groups.Count);
+        }
+
+        [Fact]
+        public void AuraLoopIsSeamlessAndFitsTheLoopRules()
+        {
+            string f = Path.Combine(AudioRoot(), "SFX", "Combat", "SFX_Combat_AuraLoop_01.wav");
+            byte[] data = File.ReadAllBytes(f);
+            AudioFormatInfo info = AudioFormatInfo.ParseWav(data);
+            Assert.True(AudioPipelineRules.IsLoopClip(f));
+            Assert.Equal(1, info.Channels);
+            Assert.Equal(88200, info.Frames); // exactly 2.000 s: every partial has an integer number of cycles
+            List<string> seam = AudioPipelineRules.CheckLoopSeam(AudioFormatInfo.ReadPcm16(data), info.SampleRate);
+            Assert.True(seam.Count == 0, string.Join("\n", seam));
+            Assert.Equal(AudioCategory.CombatSfx, AudioPipelineRules.ClassifyPath(f)); // SFX profile (ADPCM, Decompress On Load)
         }
 
         [Fact]

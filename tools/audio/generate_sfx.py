@@ -229,6 +229,82 @@ def ui_click():
     return fade_out(normalize(x, -6.0), 0.005)
 
 
+# ---------------------------------------------------------------- Aura (METINAR-FPP-001 / #31)
+# Prototype timing in FppCombatTimeline (PR #32): cast 1.15 s, burst at 0.65 s, Aura active 6 s on the blade.
+# Start = cast (two-hand grip, energy gathering, burst at 0.65 s); Loop = sustained blade hum while active
+# (played looped by an AudioSource); Stop = discharge when the Aura expires.
+AURA_LOOP_SECONDS = 2.0      # 88 200 samples; every partial / modulation is periodic in exactly this length
+AURA_BASE_HZ = 110.0         # multiple of 1 / AURA_LOOP_SECONDS -> integer cycles per loop
+
+
+def periodic_noise(r, n, lo, hi):
+    """Band-limited noise that is exactly periodic over n samples (built in the frequency domain)."""
+    spec = np.zeros(n // 2 + 1, dtype=np.complex128)
+    freqs = np.fft.rfftfreq(n, 1.0 / SR)
+    band = (freqs >= lo) & (freqs <= hi)
+    spec[band] = r.standard_normal(band.sum()) + 1j * r.standard_normal(band.sum())
+    x = np.fft.irfft(spec, n)
+    return x / np.max(np.abs(x))
+
+
+def aura_layers(t, r, n, periods=1):
+    """Steady Aura timbre: low hum, gold-ish harmonics with slow shimmer, airy blue noise band.
+    `periods` tiles the (one-period) noise so the same timbre can be rendered over several loop lengths."""
+    loop = AURA_LOOP_SECONDS
+    hum = tone(t, AURA_BASE_HZ) + 0.45 * tone(t, AURA_BASE_HZ * 2) + 0.2 * tone(t, AURA_BASE_HZ * 3)
+    # shimmer partials: frequencies are multiples of 0.5 Hz, slow AM at 1/loop and 2/loop Hz -> periodic
+    shimmer = (0.30 * tone(t, 1320.0) * (0.6 + 0.4 * np.sin(2 * np.pi * (1 / loop) * t)) +
+               0.22 * tone(t, 1981.5) * (0.6 + 0.4 * np.sin(2 * np.pi * (2 / loop) * t + 1.3)) +
+               0.15 * tone(t, 2643.0) * (0.6 + 0.4 * np.sin(2 * np.pi * (3 / loop) * t + 2.1)))
+    air = np.tile(periodic_noise(r, n, 3000, 9000), periods)[:len(t)] * (0.7 + 0.3 * np.sin(2 * np.pi * (4 / loop) * t))
+    pulse = 0.85 + 0.15 * np.sin(2 * np.pi * (6 / loop) * t)   # 3 Hz "breathing", periodic in the loop
+    return (0.55 * hum + shimmer + 0.12 * air) * pulse
+
+
+def aura_loop():
+    """Seamless loop: all components periodic in AURA_LOOP_SECONDS, no fades -> sample-continuous seam."""
+    n = int(round(AURA_LOOP_SECONDS * SR))
+    t = np.arange(n) / SR
+    r = rng(1811)
+    x = aura_layers(t, r, n)
+    # sustained bed under combat for ~6 s: dense signal, so a lower peak than one-shot SFX (RMS ~ -21 dBFS)
+    return normalize(x, -12.0)
+
+
+def aura_start():
+    """Cast: rising energy for 0.65 s into a bright burst, settling towards the loop timbre by 1.15 s."""
+    dur = 1.2
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(1812)
+    burst_t = 0.65
+    rise = np.clip(t / burst_t, 0, 1) ** 2
+    riser_f = 300 + 1500 * np.clip(t / burst_t, 0, 1) ** 1.5
+    riser = (tone(t, riser_f) + 0.5 * tone(t, riser_f * 1.5)) * rise * (t < burst_t + 0.05)
+    swell = bandpass(r.standard_normal(n), 1500, 8000) * rise * (t < burst_t + 0.02)
+    b = np.maximum(t - burst_t, 0)
+    burst_env = (t >= burst_t) * np.exp(-b / 0.12)
+    burst = (bandpass(r.standard_normal(n), 600, 9000) + 0.8 * tone(t, 880) + 0.5 * tone(t, 1320) + 0.6 * tone(t, 65 + 40 * np.exp(-b / 0.05))) * burst_env
+    bed = aura_layers(t, rng(1811), n) * np.clip((t - burst_t) / 0.3, 0, 1) * 0.5
+    x = 0.45 * riser + 0.35 * swell + 1.0 * burst + bed
+    return fade_out(normalize(x, -1.0), 0.04)
+
+
+def aura_stop():
+    """Expiry: the hum drops in pitch and fades with a soft crackling discharge."""
+    dur = 0.6
+    t = t_axis(dur)
+    n = len(t)
+    r = rng(1813)
+    drop = np.exp(-t / 0.25)
+    hum = (tone(t, AURA_BASE_HZ * (1 - 0.35 * (1 - drop))) + 0.4 * tone(t, 1320 * (1 - 0.4 * (1 - drop)))) * drop
+    crackle = chitter(r, n, 40, dur_click=0.003, f_lo=3000, f_hi=8000) * np.exp(-t / 0.2)
+    air = bandpass(r.standard_normal(n), 3000, 9000) * np.exp(-t / 0.15) * 0.3
+    x = 0.8 * hum + 0.5 * crackle + air
+    x[: int(0.005 * SR)] *= np.linspace(0, 1, int(0.005 * SR))
+    return fade_out(normalize(x, -4.0), 0.05)
+
+
 SOUNDS = [
     ("Combat/SFX_Combat_SwordSwing_01.wav", sword_swing),
     ("Combat/SFX_Combat_SwordHit_01.wav", sword_hit),
@@ -240,6 +316,9 @@ SOUNDS = [
     ("Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Step_02.wav", lambda: spider_step(1808)),
     ("Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Step_03.wav", lambda: spider_step(1809)),
     ("UI/SFX_UI_Click_01.wav", ui_click),
+    ("Combat/SFX_Combat_AuraStart_01.wav", aura_start),
+    ("Combat/SFX_Combat_AuraLoop_01.wav", aura_loop),
+    ("Combat/SFX_Combat_AuraStop_01.wav", aura_stop),
 ]
 
 
@@ -264,6 +343,15 @@ def generate(out_dir):
     return result
 
 
+def check_aura_periodic():
+    """The Aura timbre rendered over two loop lengths must repeat exactly (to float precision) and its first period
+    must equal the committed loop render: the seam is then the same as any other sample transition."""
+    n = int(round(AURA_LOOP_SECONDS * SR))
+    one = aura_layers(np.arange(n) / SR, rng(1811), n)
+    two = aura_layers(np.arange(2 * n) / SR, rng(1811), n, periods=2)
+    return bool(np.allclose(two[:n], one, atol=1e-9) and np.allclose(two[:n], two[n:], atol=1e-6))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=DEFAULT_OUT)
@@ -278,7 +366,9 @@ def main():
                 print(("OK   " if ok else "DIFF ") + rel)
                 bad += 0 if ok else 1
             print("reproducible: %s (%d/%d)" % ("YES" if bad == 0 else "NO", len(SOUNDS) - bad, len(SOUNDS)))
-            return 1 if bad else 0
+            periodic = check_aura_periodic()
+            print("aura loop periodic: %s" % ("YES" if periodic else "NO"))
+            return 1 if bad or not periodic else 0
     for rel, size, sha in generate(a.out):
         print("%-60s %7d B  sha256=%s" % (rel, size, sha))
     return 0

@@ -215,6 +215,89 @@ namespace MetinAR.Editor.Audio
             }
         }
 
+        /// <summary>
+        /// Loop clips: SFX whose event name ends in "Loop" (e.g. SFX_Combat_AuraLoop_01.wav). They are played with
+        /// AudioSource.loop and must be sample-continuous across the seam (last sample -> first sample).
+        /// They keep the SFX profile (ADPCM, Decompress On Load): at most 2 s mono = ~172 KiB PCM in RAM.
+        /// </summary>
+        public static bool IsLoopClip(string path)
+        {
+            string p = NormalizePath(path);
+            string file = p.Substring(p.LastIndexOf('/') + 1);
+            Match m = SfxCombatUiRegex.Match(file);
+            string ev = m.Success ? m.Groups[2].Value : null;
+            if (ev == null)
+            {
+                Match mob = SfxMobRegex.Match(file);
+                ev = mob.Success ? mob.Groups[2].Value : null;
+            }
+
+            return ev != null && ev.EndsWith("Loop", StringComparison.Ordinal) && ev.Length > 4;
+        }
+
+        /// <summary>
+        /// Seam check for a mono 16-bit loop. A click shows up as a step or a kink at the seam far outside what the
+        /// clip itself contains. Rules: |x[0] - x[N-1]| must not exceed the largest step inside the clip, the second
+        /// differences across the seam must not exceed the largest inside the clip, and the RMS of the first and last
+        /// 50 ms must agree within 3 dB (no fade-in/out that would pump on every repeat).
+        /// </summary>
+        public static List<string> CheckLoopSeam(short[] x, int sampleRate)
+        {
+            var problems = new List<string>();
+            int n = x == null ? 0 : x.Length;
+            if (n < 4 || sampleRate <= 0)
+            {
+                problems.Add("loop too short");
+                return problems;
+            }
+
+            double maxStep = 0, maxCurve = 0;
+            for (int i = 1; i < n; i++)
+            {
+                maxStep = Math.Max(maxStep, Math.Abs((double)x[i] - x[i - 1]));
+                if (i < n - 1)
+                {
+                    maxCurve = Math.Max(maxCurve, Math.Abs((double)x[i + 1] - 2.0 * x[i] + x[i - 1]));
+                }
+            }
+
+            double seamStep = Math.Abs((double)x[0] - x[n - 1]);
+            double seamCurveA = Math.Abs((double)x[1] - 2.0 * x[0] + x[n - 1]);
+            double seamCurveB = Math.Abs((double)x[0] - 2.0 * x[n - 1] + x[n - 2]);
+            if (seamStep > maxStep)
+            {
+                problems.Add(string.Format(CultureInfo.InvariantCulture, "loop seam step {0} > largest step inside the clip {1} (click)", seamStep, maxStep));
+            }
+
+            if (Math.Max(seamCurveA, seamCurveB) > maxCurve)
+            {
+                problems.Add(string.Format(CultureInfo.InvariantCulture, "loop seam kink {0} > largest second difference inside the clip {1}", Math.Max(seamCurveA, seamCurveB), maxCurve));
+            }
+
+            int w = Math.Min(n / 4, sampleRate / 20);
+            double head = 0, tail = 0;
+            for (int i = 0; i < w; i++)
+            {
+                head += (double)x[i] * x[i];
+                tail += (double)x[n - 1 - i] * x[n - 1 - i];
+            }
+
+            if (head <= 0 || tail <= 0)
+            {
+                problems.Add("loop starts or ends in silence (fade) - would pump on every repeat");
+            }
+            else
+            {
+                double db = 10.0 * Math.Log10(head / tail);
+                if (Math.Abs(db) > 3.0)
+                {
+                    problems.Add(string.Format(CultureInfo.InvariantCulture, "loop head/tail RMS differ by {0:0.0} dB (> 3 dB)", db));
+                }
+            }
+
+            return problems;
+        }
+
         /// <summary>Budget for all SFX source files together (lossless WAV in the repo, before Unity compression).</summary>
         public const long TotalSfxSourceBytesBudget = 2L * 1024 * 1024;
 
@@ -263,6 +346,14 @@ namespace MetinAR.Editor.Audio
                     foreach (string problem in budget.Check(info, data.LongLength))
                     {
                         issues.Add(AudioIssue.Error(p, "budget: " + problem));
+                    }
+
+                    if (IsLoopClip(p) && info.Format == "wav" && info.Channels == 1 && info.BitsPerSample == 16)
+                    {
+                        foreach (string problem in CheckLoopSeam(AudioFormatInfo.ReadPcm16(data), info.SampleRate))
+                        {
+                            issues.Add(AudioIssue.Error(p, "loop: " + problem));
+                        }
                     }
                 }
             }
@@ -600,6 +691,44 @@ namespace MetinAR.Editor.Audio
             }
 
             return new AudioFormatInfo { Format = "wav", Channels = channels, SampleRate = rate, BitsPerSample = bits, Frames = dataBytes / blockAlign };
+        }
+
+        /// <summary>Samples of a 16-bit PCM WAV (interleaved if multi-channel); empty array if the file is not one.</summary>
+        public static short[] ReadPcm16(byte[] d)
+        {
+            AudioFormatInfo info = ParseWav(d);
+            if (info.Error != null || info.BitsPerSample != 16)
+            {
+                return new short[0];
+            }
+
+            int pos = 12;
+            while (pos + 8 <= d.Length)
+            {
+                uint size = U32(d, pos + 4);
+                int body = pos + 8;
+                if (Tag(d, pos, "data"))
+                {
+                    int count = (int)(Math.Min(size, (long)d.Length - body) / 2);
+                    var x = new short[count];
+                    for (int i = 0; i < count; i++)
+                    {
+                        x[i] = (short)U16(d, body + 2 * i);
+                    }
+
+                    return x;
+                }
+
+                long next = (long)body + size + (size & 1);
+                if (next > int.MaxValue)
+                {
+                    break;
+                }
+
+                pos = (int)next;
+            }
+
+            return new short[0];
         }
 
         /// <summary>Reads channels/rate from the Vorbis identification header and the length from the last page's granule position.</summary>
