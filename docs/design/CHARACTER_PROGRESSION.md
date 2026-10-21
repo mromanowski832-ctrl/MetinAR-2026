@@ -1,6 +1,6 @@
 # METINAR-017 — Postać: statystyki, poziomy, EXP
 
-> **Status: PROPOZYCJA do akceptacji właściciela (#40). Bez implementacji.**
+> **Status: ZAAKCEPTOWANE przez właściciela 2026-10-21 (#40; maks. poziom 99, pozostałe propozycje domyślne). Bez implementacji.**
 > Każda liczba i formuła w tym pliku to **proponowana wartość startowa do balansowania**, a nie finalny balans.
 > Wszystkie nazwy, formuły i tabele są własne projektu MetinAR. Indeks: [README.md](README.md).
 
@@ -60,7 +60,7 @@ Bazowy zamach to 0,72 s z prototypu FPP (#31). Modyfikator szybkości ataku jest
 
 ## 2. Poziomy i krzywa EXP
 
-- **Maks. poziom: 60** (propozycja; opcje w [OPEN_QUESTIONS_PLAN.md](OPEN_QUESTIONS_PLAN.md), Q1).
+- **Maks. poziom: 99** (decyzja właściciela 2026-10-21, wcześniej proponowane 60; [OPEN_QUESTIONS_PLAN.md](OPEN_QUESTIONS_PLAN.md), Q1).
 - Formuła: `ExpToNext(L) = round10( MobExp(L) × K(L) )`, gdzie `MobExp(m) = round(20 + 10 × m^1.15)`,
   `K(L) = 4 + 1.2 × L` to liczba „ekwiwalentów zabicia moba na tym samym poziomie”, licząc wszystkie źródła EXP.
 - Pełna tabela: [tables/exp_curve.csv](tables/exp_curve.csv) (generator: [tables/generate_tables.py](tables/generate_tables.py)).
@@ -72,11 +72,27 @@ Bazowy zamach to 0,72 s z prototypu FPP (#31). Modyfikator szybkości ataku jest
 | 10 | 2 580 | 8 720 | 16 |
 | 20 | 9 320 | 61 230 | 28 |
 | 30 | 20 800 | 202 180 | 40 |
-| 59 | 82 880 | 1 567 050 | 74,8 |
-| 60 | — | 1 649 930 | — |
+| 40 | 37 230 | 479 840 | 52 |
+| 60 | 85 800 | 1 649 930 | 76 |
+| 80 | 156 400 | 3 998 640 | 100 |
+| 98 | 239 430 | 7 491 640 | 121,6 |
+| 99 | — | 7 731 070 | — |
 
-Razem ok. **2 360 ekwiwalentów zabicia** do poziomu 60. Przy założeniu ~25 ekwiwalentów na godzinę aktywnej gry
-(walki + zadania + spacer) daje to **~95 h gry**. Poziomy 1–10 w ok. 3–4 h. Tempo do akceptacji (Q1, Q2).
+Razem ok. **6 210 ekwiwalentów zabicia** i **7 731 070 EXP** do poziomu 99. Przy założeniu ~25 ekwiwalentów na godzinę
+aktywnej gry (walki + zadania + spacer) daje to **~250 h gry** (ok. 8 miesięcy przy ~1 h dziennie).
+Formuła jest ta sama co przy limicie 60, więc tempo poziomów 1–60 się nie zmienia:
+
+| Odcinek | Ekwiwalenty zabić | Czas gry (≈) |
+|---|---|---|
+| 1 → 10 | 90 | 3–4 h |
+| 1 → 30 | 640 | ~25 h |
+| 1 → 60 | 2 360 | ~95 h |
+| 60 → 80 | 1 750 | ~70 h |
+| 80 → 99 | 2 100 | ~85 h |
+| **1 → 99** | **6 210** | **~250 h** |
+
+Poziomy 60–99 to długa końcówka gry (~155 h): rangi mistrzowskie umiejętności ([CLASSES_SKILLS.md](CLASSES_SKILLS.md) §2),
+przedmioty iL 60–99 i hartowanie +6…+10. Tempo Q2 (poz. 10 w ~3–4 h) zaakceptowane bez zmian.
 
 ### 2.1 Wskaźnik EXP w HUD (4 × 25%)
 

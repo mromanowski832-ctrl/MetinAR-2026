@@ -4,13 +4,17 @@
 Odtwarza pliki CSV w tym katalogu z formuł opisanych w docs/design/*.md.
 Uruchomienie: python3 docs/design/tables/generate_tables.py
 Bez zależności zewnętrznych. Każda liczba to proponowana wartość startowa do balansowania.
+
+Maks. poziom 99 (decyzja właściciela 2026-10-21, wcześniej 60). Formuły bez zmian, więc poziomy 1–60 mają
+identyczne wartości jak przy limicie 60; poziomy 60–99 to długa końcówka gry (patrz CHARACTER_PROGRESSION.md §2).
 """
 import csv
 import math
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MAX_LEVEL = 60
+MAX_LEVEL = 99  # decyzja właściciela 2026-10-21 (wcześniej 60)
+KILL_EQUIVALENTS_PER_HOUR = 25  # założenie tempa: walki + zadania + spacer (CHARACTER_PROGRESSION.md §2)
 
 
 def round_to(x, step):
@@ -88,6 +92,14 @@ def main():
           ["level", "expToNext", "cumulativeExpAtLevelStart", "sameLevelKillEquivalents", "sameLevelMobExp", "expPerHudOrb"],
           rows)
 
+    # Podsumowanie tempa (tylko wydruk, do dokumentacji): ekwiwalenty zabić i godziny do progów poziomów.
+    ke = 0.0
+    for lvl in range(1, MAX_LEVEL):
+        ke += kill_equivalents(lvl)
+        if lvl + 1 in (10, 20, 30, 40, 50, 60, 70, 80, 90, 99):
+            print("poz. %d: suma EXP %d, %.0f ekw. zabić, ~%.1f h" % (
+                lvl + 1, sum(exp_to_next(x) for x in range(1, lvl + 1)), ke, ke / KILL_EQUIVALENTS_PER_HOUR))
+
     rows = []
     for m in range(1, MAX_LEVEL + 1):
         rows.append([m, mob_hp(m), mob_atk(m), mob_def(m), mob_exp(m), mob_gold_avg(m),
@@ -97,7 +109,7 @@ def main():
 
     # Przykładowa postać wojownika, który wkłada 2/3 wolnych punktów w Moc (sanity check TTK).
     rows = []
-    for lvl in (1, 5, 10, 20, 30, 40, 50, 60):
+    for lvl in (1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99):
         free = 2 * (lvl - 1)
         might = 6 + (lvl - 1) + round(free * 2 / 3)
         vigor = 5 + (lvl - 1) + (free - round(free * 2 / 3))

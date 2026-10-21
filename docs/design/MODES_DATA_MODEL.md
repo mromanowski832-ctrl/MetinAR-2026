@@ -1,6 +1,6 @@
 # METINAR-017 — Tryby gry (AR/FPP i mapa GPS) oraz model danych
 
-> **Status: PROPOZYCJA do akceptacji właściciela (#40). Bez implementacji.** Indeks: [README.md](README.md).
+> **Status: ZAAKCEPTOWANE przez właściciela 2026-10-21 (#40; maks. poziom 99, pozostałe propozycje domyślne). Bez implementacji.** Indeks: [README.md](README.md).
 
 ## 1. Co dzieje się w którym trybie
 

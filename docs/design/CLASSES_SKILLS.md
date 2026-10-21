@@ -1,6 +1,6 @@
 # METINAR-017 — Klasy, ścieżki i umiejętności
 
-> **Status: PROPOZYCJA do akceptacji właściciela (#40). Bez implementacji.**
+> **Status: ZAAKCEPTOWANE przez właściciela 2026-10-21 (#40; maks. poziom 99, pozostałe propozycje domyślne). Bez implementacji.**
 > Wszystkie koszty, czasy odnowienia i współczynniki to **proponowane wartości startowe do balansowania**.
 > Klasy ustalił właściciel: **wojownik, szaman, ninja, Slajter** (Slajter zastępuje „surę”, rola bez zmian).
 > Nazwy ścieżek i umiejętności, opisy i liczby są **własne**. Nie są tłumaczeniem ani przeróbką nazw z Metin2.
@@ -23,12 +23,14 @@ Razem 14 na klasę, 56 w grze.
 
 - **Wybór ścieżki:** poziom 10, u NPC-trenera (w prototypie: Wędrowny Handlarz). Zmiana ścieżki: zadanie + opłata
   (Q11). Po zmianie punkty umiejętności ścieżki wracają do puli.
-- **Punkty umiejętności:** 1 punkt za każdy awans od poziomu 2 (59 punktów do poziomu 60). Ranga 1–10.
-  Maksymalnie można rozwinąć ok. 6 z 8 dostępnych umiejętności, więc gracz wybiera styl.
+- **Punkty umiejętności:** 1 punkt za każdy awans od poziomu 2 (98 punktów do poziomu 99). Ranga 1–10 dostępna
+  od odblokowania; **rangi mistrzowskie 11–15** wymagają poziomu postaci 60 / 68 / 76 / 84 / 92 (ranga 11 / 12 / 13 / 14 / 15).
+  8 dostępnych umiejętności × 15 rang = 120 punktów, więc na poziomie 99 da się w pełni rozwinąć ok. 6–7 z 8 i gracz
+  dalej wybiera styl. Poziomy odblokowania umiejętności (1, 5, 10, 12, 15, 20, 26, 34) i wybór ścieżki (10) bez zmian.
 - **Skalowanie z rangą** (dla każdej umiejętności):
-  - współczynnik obrażeń/leczenia: `coef × (1 + 0,08 × (rank − 1))` (ranga 10 = ×1,72),
+  - współczynnik obrażeń/leczenia: `coef × (1 + 0,08 × (rank − 1))` (ranga 10 = ×1,72, ranga 15 = ×2,12),
   - koszt MP: `mpCost × (1 + 0,06 × (rank − 1))`,
-  - odnowienie: `cooldown × (1 − 0,02 × (rank − 1))`,
+  - odnowienie: `cooldown × (1 − 0,02 × (rank − 1))` (ranga 15 = ×0,72),
   - czas trwania efektów: `+3%` na rangę.
 - **Opłata treningowa** za każdą rangę (ujście talarów): `round5(8 × unlockLevel × rank^1.4)`.
 - **Obrażenia umiejętności:** `Atk` lub `Mag` × współczynnik, dalej jak w formule obrażeń ([COMBAT_PHYSICS.md](COMBAT_PHYSICS.md) §1).

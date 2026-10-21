@@ -1,33 +1,34 @@
 # METINAR-017 — Pytania do właściciela i plan etapów
 
-> **Status: PROPOZYCJA (#40).** Pytania wymagają decyzji właściciela, zanim cokolwiek trafi do kodu jako finalne.
+> **Status: ROZSTRZYGNIĘTE (#40).** Wszystkie 20 pytań ma decyzję właściciela z 2026-10-21: Q1 = **99** (osobna decyzja
+> właściciela), Q2–Q20 = propozycje domyślne (akceptacja właściciela 2026-10-21 09:51 czasu polskiego).
 > Plan etapów to propozycja przyszłych issue — **nie zostały utworzone**; utworzy je kierownik produkcji po akceptacji (#41).
 > Indeks: [README.md](README.md).
 
-## 1. Otwarte pytania (z opcjami; pogrubione = propozycja)
+## 1. Pytania i decyzje (pogrubione = wybrana opcja)
 
-| # | Pytanie | Opcje |
-|---|---|---|
-| Q1 | Maksymalny poziom | **60 (~95 h)** / 80 / 99 |
-| Q2 | Tempo awansu | **poz. 10 w ~3–4 h** / szybciej / wolniej |
-| Q3 | Rozdawanie statystyk | **auto +1 w 2 statystykach klasy + 2 wolne punkty** / wszystko ręcznie / wszystko automatycznie |
-| Q4 | Kara za śmierć | brak / **−2% EXP poziomu, bez spadku poziomu** / utrata części talarów |
-| Q5 | Wytrzymałość przedmiotów | **brak** / jest, z naprawą u kowala |
-| Q6 | Porażka hartowania | **bez niszczenia: do +5 tylko materiały, od +6 spadek o 1 poziom** / zawsze tylko materiały / niszczenie (odradzamy) |
-| Q7 | Nazwa waluty | **talary** / złoto / srebrniki / inna |
-| Q8 | Handel między graczami | **brak w v1** / wymiana bezpośrednia później / rynek później (wymaga serwera) |
-| Q9 | PvP | **brak** / pojedynki za zgodą później |
-| Q10 | EXP za spacer | **tak, limit 8 km/dobę, tylko z otwartą aplikacją** / bez EXP za dystans / krokomierz jako dodatkowy sygnał (nowe uprawnienie `ACTIVITY_RECOGNITION`) |
-| Q11 | Wybór i zmiana ścieżki | **poz. 10, zmiana za zadanie + talary** / wybór na stałe / darmowa zmiana |
-| Q12 | Poziomy mobów | **dopasowane do gracza (−2…+1), strażnicy stali** / stałe poziomy stref (sąsiedztwo dla niskich, dalej wyższe) |
-| Q13 | Bronie klas | **szaman: różdżka + totem; Slajter: miecz 1H + fokus mroku; ninja: sztylety / łuk** / inne (każda nowa broń = nowe animacje FPP) |
-| Q14 | Przycisk AURA | **zostaje jako gest obu rąk dla wybranego wzmocnienia klasy** / zmienić etykietę (np. „MOC”) |
-| Q15 | Gra w grupie | **solo w v1, uzdrowiciel leczy siebie** / wspólne spotkania później (wymaga serwera) |
-| Q16 | Kolejność klas w implementacji | **wojownik → Slajter → ninja → szaman** (wg kosztu nowych animacji FPP) / inna |
-| Q17 | Rozmiar ekwipunku | **24 na start, do 56** / 16 jak w prototypie / 40 |
-| Q18 | Gniazda i kamienie w przedmiotach | **nie w v1** / tak |
-| Q19 | Dodatkowe sloty | **rękawice + pierścień (razem 10 slotów)** / tylko lista z polecenia (8) / jeszcze pas |
-| Q20 | Liczba rzadkości | **5** / 4 / 6 |
+| # | Pytanie | Opcje | Decyzja |
+|---|---|---|---|
+| Q1 | Maksymalny poziom | 60 (~95 h) / 80 / **99 (~250 h)** | **ROZSTRZYGNIĘTE: 99** — decyzja właściciela 2026-10-21 |
+| Q2 | Tempo awansu | **poz. 10 w ~3–4 h** / szybciej / wolniej | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q3 | Rozdawanie statystyk | **auto +1 w 2 statystykach klasy + 2 wolne punkty** / wszystko ręcznie / wszystko automatycznie | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q4 | Kara za śmierć | brak / **−2% EXP poziomu, bez spadku poziomu** / utrata części talarów | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q5 | Wytrzymałość przedmiotów | **brak** / jest, z naprawą u kowala | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q6 | Porażka hartowania | **bez niszczenia: do +5 tylko materiały, od +6 spadek o 1 poziom** / zawsze tylko materiały / niszczenie (odradzamy) | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q7 | Nazwa waluty | **talary** / złoto / srebrniki / inna | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q8 | Handel między graczami | **brak w v1** / wymiana bezpośrednia później / rynek później (wymaga serwera) | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q9 | PvP | **brak** / pojedynki za zgodą później | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q10 | EXP za spacer | **tak, limit 8 km/dobę, tylko z otwartą aplikacją** / bez EXP za dystans / krokomierz jako dodatkowy sygnał (nowe uprawnienie `ACTIVITY_RECOGNITION`) | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q11 | Wybór i zmiana ścieżki | **poz. 10, zmiana za zadanie + talary** / wybór na stałe / darmowa zmiana | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q12 | Poziomy mobów | **dopasowane do gracza (−2…+1), strażnicy stali** / stałe poziomy stref (sąsiedztwo dla niskich, dalej wyższe) | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q13 | Bronie klas | **szaman: różdżka + totem; Slajter: miecz 1H + fokus mroku; ninja: sztylety / łuk** / inne (każda nowa broń = nowe animacje FPP) | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q14 | Przycisk AURA | **zostaje jako gest obu rąk dla wybranego wzmocnienia klasy** / zmienić etykietę (np. „MOC”) | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q15 | Gra w grupie | **solo w v1, uzdrowiciel leczy siebie** / wspólne spotkania później (wymaga serwera) | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q16 | Kolejność klas w implementacji | **wojownik → Slajter → ninja → szaman** (wg kosztu nowych animacji FPP) / inna | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q17 | Rozmiar ekwipunku | **24 na start, do 56** / 16 jak w prototypie / 40 | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q18 | Gniazda i kamienie w przedmiotach | **nie w v1** / tak | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q19 | Dodatkowe sloty | **rękawice + pierścień (razem 10 slotów)** / tylko lista z polecenia (8) / jeszcze pas | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
+| Q20 | Liczba rzadkości | **5** / 4 / 6 | ROZSTRZYGNIĘTE: propozycja (akceptacja właściciela 2026-10-21 09:51) |
 
 Uwagi do decyzji, które nie są pytaniami:
 - **Audio CC-BY-4.0 dozwolone z atrybucją autora** (decyzja właściciela 2026-10-21) → ekran Napisy, [MODES_DATA_MODEL.md](MODES_DATA_MODEL.md) §5.
@@ -40,7 +41,7 @@ Każdy etap: osobny branch i PR, testy czystego C#, kompilacja Unity i testy na 
 
 | Etap | Tytuł roboczy | Zakres | Zależności |
 |---|---|---|---|
-| S1 | Gameplay core: dane i formuły | czysty C# `MetinAR.Gameplay`: `BalanceConfig`, `ExpCurve`, `DamageResolver`, statystyki pochodne; import tabel JSON; testy jednostkowe w CI | akceptacja specu |
+| S1 | Gameplay core: dane i formuły | czysty C# `MetinAR.Gameplay`: `BalanceConfig`, `ExpCurve` (poziomy 1–99), `DamageResolver`, statystyki pochodne; import tabel JSON; testy jednostkowe w CI | akceptacja specu |
 | S2 | Obrażenia w AR (wojownik, pająk) | `HitDetected` z FPP → `DamageResolver` → HP moba → śmierć → EXP i talary lokalnie; HUD 4 × 25% z ułamkiem | S1, #31 |
 | S3 | AI moba w AR + HP gracza | stany `Telegraph/Attack/Recover`, trafienia w gracza, BLOK, trucizna pająka, reakcje i liczby obrażeń, zdarzenia SFX (#42/#43) | S2 |
 | S4 | Ekwipunek i zestaw startowy | inwentarz 24, sloty, zakładanie, tabela łupu pająka, ikony startowe (modele 3D/grafik) | S2 |
