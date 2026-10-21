@@ -174,7 +174,7 @@ namespace MetinAR.Editor.Audio
                 problems.Add("clip loadType=" + clip.loadType);
             }
 
-            AudioBudget budget = AudioPipelineRules.GetBudget(category);
+            AudioBudget budget = AudioPipelineRules.GetBudgetForPath(path);
             if (budget != null && clip.length > budget.MaxSeconds)
             {
                 problems.Add("clip length " + clip.length + " s > " + budget.MaxSeconds);

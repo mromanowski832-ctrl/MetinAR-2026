@@ -23,6 +23,10 @@ Owner of this area: the "Dźwięk i muzyka" bot. Unity / A31 time only through r
 | `SFX/Combat/` | player weapon / shield sounds | `SFX_Combat_<Event>_<NN>.wav` |
 | `SFX/Mobs/<MobId>/` | per-mob sounds, `<MobId>` = METINAR-009 asset id | `SFX_Mob_<MobId>_<Event>_<NN>.wav` |
 | `SFX/UI/` | interface | `SFX_UI_<Event>_<NN>.wav` |
+| `SFX/Item/` | equipment and consumables (METINAR-033, #60) | `SFX_Item_<Event>_<NN>.wav` |
+| `SFX/Loot/` | loot pickup (METINAR-033, #60) | `SFX_Loot_<Event>_<NN>.wav` |
+| `SFX/Status/` | status effects, e.g. poison tick (METINAR-033, #60) | `SFX_Status_<Event>_<NN>.wav` |
+| `SFX/Stinger/` | short progression stingers, e.g. level up (METINAR-033, #60) | `SFX_Stinger_<Event>_<NN>.wav` |
 | `Music/` | music (future) | `MUS_<Name>[_<NN>].ogg` |
 | `Ambience/` | loops/beds (future) | `AMB_<Name>_<NN>.ogg` |
 
@@ -32,7 +36,7 @@ Owner of this area: the "Dźwięk i muzyka" bot. Unity / A31 time only through r
 
 | Category | Source | Load Type | Compression | Mono | Preload | Load in background |
 |---|---|---|---|---|---|---|
-| SFX (Combat, Mobs, UI) | 16-bit PCM WAV, ≤ 48 kHz | Decompress On Load | ADPCM | yes | yes | no |
+| SFX (Combat, Mobs, UI, Item, Loot, Status, Stinger) | 16-bit PCM WAV, ≤ 48 kHz | Decompress On Load | ADPCM | yes | yes | no |
 | Music | Ogg Vorbis | Streaming | Vorbis q 0.50 | no | no | yes |
 | Ambience | Ogg Vorbis | Compressed In Memory | Vorbis q 0.40 | no | no | yes |
 
@@ -49,8 +53,14 @@ source is accepted for music (source quality ≥ q 6 recommended).
 
 | Category | Max duration | Max source file | Sample rate | Channels | Bits |
 |---|---|---|---|---|---|
-| Combat / Mob SFX | 2.0 s | 256 KiB | 8–48 kHz | mono | 16 |
-| UI SFX | 0.5 s | 64 KiB | 8–48 kHz | mono | 16 |
+| Combat / Mob SFX (one-shot) | 1.5 s (spec #44; was 2.0 s before the Loop category) | 256 KiB, ≤ 40 KB ADPCM est. | 8–48 kHz | mono | 16 |
+| UI SFX | 0.5 s | 64 KiB, ≤ 40 KB ADPCM est. | 8–48 kHz | mono | 16 |
+| Item / Loot / Status / Stinger SFX (one-shot) | 1.5 s | 160 KiB, ≤ 40 KB ADPCM est. | 8–48 kHz | mono | 16 |
+| **Loop** — any SFX named `*Loop` (owner decision #60) | 2.5 s | 256 KiB, ≤ 64 KB ADPCM est. | 8–48 kHz | mono | 16 |
+
+The budget of a file comes from `AudioPipelineRules.GetBudgetForPath`: `*Loop` SFX get the Loop category, every other
+file the one-shot budget of its folder. No per-file exceptions. "ADPCM est." = `EstimateAdpcmBytes` (4 bits per sample +
+4 bytes per 1024-frame block), the spec's "≤ 40 KB" for one SFX in the build.
 | Music | 240 s | 6 MiB | 8–48 kHz | ≤ 2 | Vorbis |
 | Ambience | 60 s | 2 MiB | 8–48 kHz | ≤ 2 | Vorbis |
 | All SFX sources together | — | 2 MiB | | | |
@@ -118,7 +128,8 @@ final duration undecided). The Aura is therefore Start (one-shot) → Loop (whil
 
 - A loop clip is an SFX whose event ends in `Loop` (`SFX_Combat_AuraLoop_01.wav`). It stays in the **SFX profile**
   (ADPCM, Decompress On Load, mono, preload): 2 s mono is ~172 KiB PCM in RAM, played without per-frame decoding on
-  the A31; no separate looped profile is needed while loops stay ≤ 2 s. Looping is an `AudioSource.loop` setting.
+  the A31; no separate import profile is needed. Looping is an `AudioSource.loop` setting. Budget: category **Loop**
+  (≤ 2.5 s, ≤ 64 KB ADPCM estimate, owner decision #60); the Aura loop is 1.99982 s, ~44 KB.
 - Seamless by construction: every partial and modulation has an integer number of cycles in exactly 88 192 samples
   (1378 ADPCM blocks, 1.99982 s): the partials are re-tuned to whole cycles per loop (`loop_hz`: 110.010 Hz = 220
   cycles, shimmer 1320.12 / 1981.68 / 2643.24 Hz = 2640 / 3963 / 5286 cycles), not cut from a longer render,

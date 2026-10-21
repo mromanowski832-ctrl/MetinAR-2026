@@ -20,6 +20,14 @@ namespace MetinAR.Editor.Audio
         public const string CombatSfxFolder = SfxFolder + "/Combat";
         public const string MobSfxFolder = SfxFolder + "/Mobs";
         public const string UiSfxFolder = SfxFolder + "/UI";
+
+        /// <summary>METINAR-033 (#60): equipment and consumables, loot pickup, status effects (e.g. poison tick).</summary>
+        public const string ItemSfxFolder = SfxFolder + "/Item";
+        public const string LootSfxFolder = SfxFolder + "/Loot";
+        public const string StatusSfxFolder = SfxFolder + "/Status";
+
+        /// <summary>Short musical stingers for progression events (level up), owner decision in #60.</summary>
+        public const string StingerSfxFolder = SfxFolder + "/Stinger";
         public const string MusicFolder = Root + "/Music";
         public const string AmbienceFolder = Root + "/Ambience";
         public const string LicenseLedgerFileName = "LICENSES.md";
@@ -52,7 +60,7 @@ namespace MetinAR.Editor.Audio
         public static readonly string[] ForbiddenSourceWords = { "metin2", "metin 2", "gameforge", "ymir" };
 
         private const string IdPattern = "[A-Z][A-Za-z0-9]*";
-        private static readonly Regex SfxCombatUiRegex = new Regex("^SFX_(Combat|UI)_(" + IdPattern + ")_(\\d{2})\\.wav$");
+        private static readonly Regex SfxCombatUiRegex = new Regex("^SFX_(Combat|UI|Item|Loot|Status|Stinger)_(" + IdPattern + ")_(\\d{2})\\.wav$");
         private static readonly Regex SfxMobRegex = new Regex("^SFX_Mob_(" + IdPattern + ")_(" + IdPattern + ")_(\\d{2})\\.wav$");
         private static readonly Regex MusicRegex = new Regex("^MUS_(" + IdPattern + ")(?:_(\\d{2}))?\\.ogg$");
         private static readonly Regex AmbienceRegex = new Regex("^AMB_(" + IdPattern + ")_(\\d{2})\\.ogg$");
@@ -109,6 +117,26 @@ namespace MetinAR.Editor.Audio
                 return AudioCategory.UiSfx;
             }
 
+            if (folder == ItemSfxFolder)
+            {
+                return AudioCategory.ItemSfx;
+            }
+
+            if (folder == LootSfxFolder)
+            {
+                return AudioCategory.LootSfx;
+            }
+
+            if (folder == StatusSfxFolder)
+            {
+                return AudioCategory.StatusSfx;
+            }
+
+            if (folder == StingerSfxFolder)
+            {
+                return AudioCategory.StingerSfx;
+            }
+
             if (folder.StartsWith(MobSfxFolder + "/", StringComparison.Ordinal) && folder.IndexOf('/', MobSfxFolder.Length + 1) < 0)
             {
                 return AudioCategory.MobSfx;
@@ -129,7 +157,9 @@ namespace MetinAR.Editor.Audio
 
         public static bool IsSfx(AudioCategory c)
         {
-            return c == AudioCategory.CombatSfx || c == AudioCategory.MobSfx || c == AudioCategory.UiSfx;
+            return c == AudioCategory.CombatSfx || c == AudioCategory.MobSfx || c == AudioCategory.UiSfx ||
+                   c == AudioCategory.ItemSfx || c == AudioCategory.LootSfx || c == AudioCategory.StatusSfx ||
+                   c == AudioCategory.StingerSfx;
         }
 
         /// <summary>Returns null when the file name follows the convention for its folder, else the reason.</summary>
@@ -142,9 +172,13 @@ namespace MetinAR.Editor.Audio
             {
                 case AudioCategory.CombatSfx:
                 case AudioCategory.UiSfx:
+                case AudioCategory.ItemSfx:
+                case AudioCategory.LootSfx:
+                case AudioCategory.StatusSfx:
+                case AudioCategory.StingerSfx:
                 {
                     Match m = SfxCombatUiRegex.Match(file);
-                    string expected = c == AudioCategory.CombatSfx ? "Combat" : "UI";
+                    string expected = GroupPrefix(c);
                     if (!m.Success || m.Groups[1].Value != expected)
                     {
                         return "expected SFX_" + expected + "_<Event>_<NN>.wav";
@@ -171,7 +205,22 @@ namespace MetinAR.Editor.Audio
                 case AudioCategory.Ambience:
                     return AmbienceRegex.IsMatch(file) ? null : "expected AMB_<Name>_<NN>.ogg";
                 default:
-                    return "audio file outside the pipeline folders (SFX/Combat, SFX/Mobs/<MobId>, SFX/UI, Music, Ambience)";
+                    return "audio file outside the pipeline folders (SFX/Combat, SFX/Mobs/<MobId>, SFX/UI, SFX/Item, SFX/Loot, SFX/Status, SFX/Stinger, Music, Ambience)";
+            }
+        }
+
+        /// <summary>Name prefix that must match the folder: SFX/&lt;Group&gt;/SFX_&lt;Group&gt;_&lt;Event&gt;_&lt;NN&gt;.wav.</summary>
+        private static string GroupPrefix(AudioCategory c)
+        {
+            switch (c)
+            {
+                case AudioCategory.CombatSfx: return "Combat";
+                case AudioCategory.UiSfx: return "UI";
+                case AudioCategory.ItemSfx: return "Item";
+                case AudioCategory.LootSfx: return "Loot";
+                case AudioCategory.StatusSfx: return "Status";
+                case AudioCategory.StingerSfx: return "Stinger";
+                default: return null;
             }
         }
 
@@ -187,6 +236,10 @@ namespace MetinAR.Editor.Audio
                 case AudioCategory.CombatSfx:
                 case AudioCategory.MobSfx:
                 case AudioCategory.UiSfx:
+                case AudioCategory.ItemSfx:
+                case AudioCategory.LootSfx:
+                case AudioCategory.StatusSfx:
+                case AudioCategory.StingerSfx:
                     return new AudioImportProfile(AudioLoadTypeValue.DecompressOnLoad, AudioCompressionValue.Adpcm, 1f, true, false, true);
                 case AudioCategory.Music:
                     return new AudioImportProfile(AudioLoadTypeValue.Streaming, AudioCompressionValue.Vorbis, 0.5f, false, true, false);
@@ -197,15 +250,27 @@ namespace MetinAR.Editor.Audio
             }
         }
 
+        /// <summary>
+        /// Budget per category for ONE-SHOT clips. Every one-shot SFX also has the spec cap of 40 KB compressed
+        /// (ADPCM estimate, ITEMS_COMBAT_SPEC #44). Loop clips (*Loop) use <see cref="LoopBudget"/> instead:
+        /// call <see cref="GetBudgetForPath"/> for a concrete file.
+        /// </summary>
         public static AudioBudget GetBudget(AudioCategory category)
         {
             switch (category)
             {
                 case AudioCategory.CombatSfx:
                 case AudioCategory.MobSfx:
-                    return new AudioBudget(".wav", 2.0, 256 * 1024, 48000, true, 16);
+                    // was 2.0 s in METINAR-018 to fit the Aura loop; loops now have their own LoopBudget (#60)
+                    return new AudioBudget(".wav", 1.5, 256 * 1024, 48000, true, 16, SpecSfxCompressedBytesLimit);
                 case AudioCategory.UiSfx:
-                    return new AudioBudget(".wav", 0.5, 64 * 1024, 48000, true, 16);
+                    return new AudioBudget(".wav", 0.5, 64 * 1024, 48000, true, 16, SpecSfxCompressedBytesLimit);
+                case AudioCategory.ItemSfx:
+                case AudioCategory.LootSfx:
+                case AudioCategory.StatusSfx:
+                case AudioCategory.StingerSfx:
+                    // Spec ITEMS_COMBAT_SPEC (#44): SFX mono, <= 1.5 s. 1.5 s mono 16-bit 48 kHz = 144 044 B.
+                    return new AudioBudget(".wav", 1.5, 160 * 1024, 48000, true, 16, SpecSfxCompressedBytesLimit);
                 case AudioCategory.Music:
                     return new AudioBudget(".ogg", 240.0, 6 * 1024 * 1024, 48000, false, 0);
                 case AudioCategory.Ambience:
@@ -213,6 +278,24 @@ namespace MetinAR.Editor.Audio
                 default:
                     return null;
             }
+        }
+
+        /// <summary>
+        /// Budget category Loop (owner decision in #60): SFX clips named *Loop, played with AudioSource.loop, in any SFX
+        /// folder. At most 2.5 s and 64 KB compressed (ADPCM estimate); source WAV at most 256 KiB, mono, 16-bit.
+        /// </summary>
+        public static readonly AudioBudget LoopBudget = new AudioBudget(".wav", 2.5, 256 * 1024, 48000, true, 16, LoopCompressedBytesLimit);
+
+        /// <summary>Budget for one file: Loop for SFX loop clips, otherwise the one-shot budget of its folder category.</summary>
+        public static AudioBudget GetBudgetForPath(string path)
+        {
+            AudioCategory c = ClassifyPath(path);
+            if (IsSfx(c) && IsLoopClip(path))
+            {
+                return LoopBudget;
+            }
+
+            return GetBudget(c);
         }
 
         /// <summary>
@@ -322,6 +405,32 @@ namespace MetinAR.Editor.Audio
         /// <summary>Budget for all SFX source files together (lossless WAV in the repo, before Unity compression).</summary>
         public const long TotalSfxSourceBytesBudget = 2L * 1024 * 1024;
 
+        /// <summary>
+        /// Spec limit for one SFX in the build (docs/design/ITEMS_COMBAT_SPEC.md, #44): mono, at most 1.5 s and 40 KB
+        /// compressed. The 40 KB cap is part of every one-shot SFX budget (checked with <see cref="EstimateAdpcmBytes"/>);
+        /// loop clips have their own budget category <see cref="LoopBudget"/>.
+        /// </summary>
+        public const double SpecSfxMaxSeconds = 1.5;
+        public const long SpecSfxCompressedBytesLimit = 40000;
+
+        /// <summary>Budget category Loop (#60): compressed (ADPCM estimate) cap for *Loop clips.</summary>
+        public const long LoopCompressedBytesLimit = 64000;
+
+        /// <summary>
+        /// Estimated size of a clip after Unity ADPCM import (IMA ADPCM: 4 bits per sample plus a 4-byte header per channel
+        /// and 1024-frame block). An estimate for budgets, not a measurement of a Unity build.
+        /// </summary>
+        public static long EstimateAdpcmBytes(long frames, int channels)
+        {
+            if (frames <= 0 || channels <= 0)
+            {
+                return 0;
+            }
+
+            long blocks = (frames + 1023) / 1024;
+            return (frames * channels + 1) / 2 + 4L * channels * blocks;
+        }
+
         public static string Sha256Hex(byte[] data)
         {
             using (var sha = System.Security.Cryptography.SHA256.Create())
@@ -349,7 +458,7 @@ namespace MetinAR.Editor.Audio
                 issues.Add(AudioIssue.Error(p, "name/folder: " + nameProblem));
             }
 
-            AudioBudget budget = GetBudget(category);
+            AudioBudget budget = GetBudgetForPath(p);
             if (budget != null)
             {
                 if (!p.EndsWith(budget.Extension, StringComparison.OrdinalIgnoreCase))
@@ -429,6 +538,10 @@ namespace MetinAR.Editor.Audio
         CombatSfx,
         MobSfx,
         UiSfx,
+        ItemSfx,
+        LootSfx,
+        StatusSfx,
+        StingerSfx,
         Music,
         Ambience,
     }
@@ -552,8 +665,9 @@ namespace MetinAR.Editor.Audio
 
     public sealed class AudioBudget
     {
-        public AudioBudget(string extension, double maxSeconds, long maxBytes, int maxSampleRate, bool requireMono, int requiredBits)
+        public AudioBudget(string extension, double maxSeconds, long maxBytes, int maxSampleRate, bool requireMono, int requiredBits, long maxCompressedBytes = 0)
         {
+            MaxCompressedBytes = maxCompressedBytes;
             Extension = extension;
             MaxSeconds = maxSeconds;
             MaxBytes = maxBytes;
@@ -571,6 +685,9 @@ namespace MetinAR.Editor.Audio
         /// <summary>0 = not checked (compressed formats).</summary>
         public int RequiredBits { get; }
 
+        /// <summary>Cap on the ADPCM size estimate after import (<see cref="AudioPipelineRules.EstimateAdpcmBytes"/>); 0 = not checked.</summary>
+        public long MaxCompressedBytes { get; }
+
         public List<string> Check(AudioFormatInfo info, long fileBytes)
         {
             var problems = new List<string>();
@@ -587,6 +704,12 @@ namespace MetinAR.Editor.Audio
             if (fileBytes > MaxBytes)
             {
                 problems.Add("size " + fileBytes + " B > " + MaxBytes + " B");
+            }
+
+            long compressed = AudioPipelineRules.EstimateAdpcmBytes(info.Frames, info.Channels);
+            if (MaxCompressedBytes > 0 && compressed > MaxCompressedBytes)
+            {
+                problems.Add("ADPCM estimate " + compressed + " B > " + MaxCompressedBytes + " B");
             }
 
             if (info.SampleRate > MaxSampleRate || info.SampleRate < 8000)
