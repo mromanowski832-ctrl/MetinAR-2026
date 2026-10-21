@@ -8,8 +8,6 @@ using UnityEditor;
 using UnityEditor.Animations;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.Animations;
-using UnityEngine.Playables;
 using UnityEngine.Rendering;
 
 namespace MetinAR.Editor.WanderingMerchant
@@ -70,7 +68,7 @@ namespace MetinAR.Editor.WanderingMerchant
             Check("C02 humanoid avatar valid", avatar != null && avatar.isValid && avatar.isHuman, avatar == null ? "no avatar" : "valid=" + avatar.isValid + " human=" + avatar.isHuman);
             HumanBone[] human = avatar != null ? avatar.humanDescription.human : new HumanBone[0];
             Info("avatar mapping (" + human.Length + "): " + string.Join(", ", human.Select(h => h.humanName + "=" + h.boneName)));
-            string[] requiredHuman = { "Hips", "Spine", "Chest", "Neck", "Head", "LeftUpperArm", "LeftLowerArm", "LeftHand", "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "RightUpperLeg", "RightLowerLeg", "RightFoot" };
+            string[] requiredHuman = { "Hips", "Spine", "Chest", "Neck", "Jaw", "Head", "LeftUpperArm", "LeftLowerArm", "LeftHand", "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "RightUpperLeg", "RightLowerLeg", "RightFoot" };
             var mapped = new HashSet<string>(human.Select(h => h.humanName));
             string[] missingHuman = requiredHuman.Where(h => !mapped.Contains(HumanTrait.BoneName[(int)Enum.Parse(typeof(HumanBodyBones), h)])).ToArray();
             Check("C03 avatar maps every required humanoid bone", missingHuman.Length == 0, missingHuman.Length == 0 ? human.Length + " bones mapped" : "missing " + string.Join(",", missingHuman));
@@ -85,10 +83,19 @@ namespace MetinAR.Editor.WanderingMerchant
             // ---------------- clips
             foreach (var kv in Expected)
             {
+                string cp = WanderingMerchantAssetBuilder.ClipPath(kv.Key);
+                var dimp = (ModelImporter)AssetImporter.GetAtPath(cp);
+                Info("clip file " + kv.Key + ": sub-assets [" + string.Join(", ", AssetDatabase.LoadAllAssetsAtPath(cp).Select(o => o.GetType().Name + ":" + o.name)) + "] type=" + dimp.animationType + " avatarSetup=" + dimp.avatarSetup
+                     + " source=" + (dimp.sourceAvatar != null ? dimp.sourceAvatar.name : "-") + " clips=" + dimp.clipAnimations.Length + " takes=" + (dimp.importedTakeInfos != null ? dimp.importedTakeInfos.Length : -1)
+                     + " (import messages: see the clip .meta animationImportErrors/Warnings)");
+            }
+
+            foreach (var kv in Expected)
+            {
                 AnimationClip clip = WanderingMerchantAssetBuilder.LoadClip(kv.Key);
                 var ci = (ModelImporter)AssetImporter.GetAtPath(WanderingMerchantAssetBuilder.ClipPath(kv.Key));
                 bool ok = clip != null && clip.name == "A_WanderingMerchant_" + kv.Key && Mathf.Abs(clip.length - kv.Value.len) < 0.05f && clip.isLooping == kv.Value.loop
-                          && clip.isHumanMotion && ci.animationType == ModelImporterAnimationType.Human && ci.avatarSetup == ModelImporterAvatarSetup.CopyFromOther
+                          && clip.isHumanMotion && ci.animationType == ModelImporterAnimationType.Human && ci.avatarSetup == ModelImporterAvatarSetup.CopyFromOther && ci.sourceAvatar == avatar
                           && ci.animationCompression == ModelImporterAnimationCompression.Optimal;
                 Check("C07 clip " + kv.Key + ": name, " + kv.Value.len + " s, loop=" + kv.Value.loop + ", humanoid, Copy From Other Avatar, Optimal", ok,
                     clip == null ? "missing" : clip.name + " len=" + clip.length.ToString("0.000") + " loop=" + clip.isLooping + " human=" + clip.isHumanMotion + " avatarSetup=" + ci.avatarSetup);
@@ -163,24 +170,22 @@ namespace MetinAR.Editor.WanderingMerchant
             Check("C19 asset pipeline validator (current NPC rules) on WanderingMerchant: 0 errors", issues.All(i => i.Severity != IssueSeverity.Error), files + " files, " + issues.Count + " issues (" + issues.Count(i => i.Severity == IssueSeverity.Error) + " errors)");
 
             Screenshots(inst, anim);
+            if (AnimationMode.InAnimationMode()) AnimationMode.StopAnimationMode();
         }
 
+        // Edit-mode sampling the same way the Animation window does (AnimationMode), so humanoid
+        // muscle curves are retargeted through the Animator's avatar onto the bone transforms.
         private static void Sample(Animator animator, AnimationClip clip, float time)
         {
-            PlayableGraph graph = PlayableGraph.Create("METINAR-016 sample");
+            if (!AnimationMode.InAnimationMode()) AnimationMode.StartAnimationMode();
+            AnimationMode.BeginSampling();
             try
             {
-                graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
-                var output = AnimationPlayableOutput.Create(graph, "out", animator);
-                var playable = AnimationClipPlayable.Create(graph, clip);
-                playable.SetApplyFootIK(false);
-                output.SetSourcePlayable(playable);
-                playable.SetTime(time);
-                graph.Evaluate();
+                AnimationMode.SampleAnimationClip(animator.gameObject, clip, time);
             }
             finally
             {
-                graph.Destroy();
+                AnimationMode.EndSampling();
             }
         }
 

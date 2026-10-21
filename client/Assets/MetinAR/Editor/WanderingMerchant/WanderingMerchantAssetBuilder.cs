@@ -38,6 +38,9 @@ namespace MetinAR.Editor.WanderingMerchant
         public static readonly Vector3 LabelAnchor = new Vector3(0f, 2.10f, 0f);
         public static readonly Vector3 InteractAnchor = new Vector3(0f, 1.10f, 0.60f);
 
+        /// <summary>Optional humanoid bones that this rig has and that must be mapped (bone name == HumanBodyBones name).</summary>
+        public static readonly string[] OptionalHumanBones = { "Chest", "Jaw", "LeftToes", "RightToes", "LeftShoulder", "RightShoulder" };
+
         public static string ClipPath(string state) => Folder + "/Animations/A_" + Id + "_" + state + ".fbx";
 
         [MenuItem("MetinAR/NPC/Build Wandering Merchant")]
@@ -87,10 +90,33 @@ namespace MetinAR.Editor.WanderingMerchant
         {
             var mi = (ModelImporter)AssetImporter.GetAtPath(ModelPath);
             if (mi == null) throw new FileNotFoundException("Missing model " + ModelPath);
-            if (mi.animationType != ModelImporterAnimationType.Human || mi.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel)
+            if (mi.animationType != ModelImporterAnimationType.Human || mi.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel || !mi.preserveHierarchy)
             {
                 mi.animationType = ModelImporterAnimationType.Human;
                 mi.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                mi.preserveHierarchy = true;
+                mi.SaveAndReimport();
+            }
+
+            // Unity's auto-mapper leaves the optional Chest (and sometimes Jaw) unmapped when Spine already sits below
+            // it; map them explicitly by name so chest breathing/twist and jaw (Talk) are part of the muscle clips.
+            HumanDescription hd = mi.humanDescription;
+            var human = hd.human.ToList();
+            bool changed = false;
+            foreach (string bone in OptionalHumanBones)
+            {
+                string humanName = HumanTrait.BoneName[(int)System.Enum.Parse(typeof(HumanBodyBones), bone)];
+                if (human.Any(h => h.humanName == humanName)) continue;
+                var hb = new HumanBone { humanName = humanName, boneName = bone };
+                hb.limit.useDefaultValues = true;
+                human.Add(hb);
+                changed = true;
+            }
+
+            if (changed)
+            {
+                hd.human = human.ToArray();
+                mi.humanDescription = hd;
                 mi.SaveAndReimport();
             }
 
@@ -111,11 +137,16 @@ namespace MetinAR.Editor.WanderingMerchant
                 var ci = (ModelImporter)AssetImporter.GetAtPath(ClipPath(state));
                 if (ci == null) throw new FileNotFoundException("Missing clip " + ClipPath(state));
                 ci.animationType = ModelImporterAnimationType.Human;
+                // The clip FBX holds only the armature: without Preserve Hierarchy Unity collapses its single root node
+                // ("Armature") and Copy From Other Avatar fails with "Parent for 'Root' differs" (same FBX behaviour as
+                // METINAR-013). Set per asset here; the shared import postprocessor is not changed.
+                ci.preserveHierarchy = true;
                 ci.avatarSetup = ModelImporterAvatarSetup.CopyFromOther;
                 ci.sourceAvatar = avatar;
                 ci.importAnimation = true;
                 ci.animationCompression = ModelImporterAnimationCompression.Optimal;
-                ModelImporterClipAnimation[] clips = ci.defaultClipAnimations;
+                ci.SaveAndReimport(); // re-read the takes with the copied avatar before editing the clip settings
+                ModelImporterClipAnimation[] clips = ci.clipAnimations.Length == 1 ? ci.clipAnimations : ci.defaultClipAnimations;
                 if (clips == null || clips.Length != 1) throw new System.InvalidOperationException(ClipPath(state) + " must hold exactly one take.");
                 ModelImporterClipAnimation c = clips[0];
                 c.name = "A_" + Id + "_" + state;
@@ -134,8 +165,8 @@ namespace MetinAR.Editor.WanderingMerchant
 
         public static AnimationClip LoadClip(string state)
         {
-            return AssetDatabase.LoadAllAssetsAtPath(ClipPath(state)).OfType<AnimationClip>()
-                .FirstOrDefault(c => !c.name.StartsWith("__preview__"));
+            AnimationClip[] all = AssetDatabase.LoadAllAssetsAtPath(ClipPath(state)).OfType<AnimationClip>().ToArray();
+            return all.FirstOrDefault(c => c.name == "A_" + Id + "_" + state) ?? all.FirstOrDefault(c => !c.name.StartsWith("__preview__"));
         }
 
         private static Texture2D Tex(string role)
