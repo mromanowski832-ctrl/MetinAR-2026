@@ -224,4 +224,61 @@ From `server/`:
   nonce-based completion, schema version and a no-coordinates-in-log check across a restart.
 - `dotnet list MetinAR.Server.sln package --vulnerable --include-transitive`.
 
+- GitHub Actions `server-tests` (§10) runs the same build and test project on every push/PR touching `server/`.
+
 Not applicable: Unity compile, Play Mode, Android build, physical device (no client change).
+
+## 8. `v1` contract before/after (review aid for Q1)
+
+This section only compares the two states for the reviewer. It makes **no** decision. Q1–Q3 (§9) stay open.
+"Before" is `main` at METINAR-010 (#21, `8332eca`). "After" is this branch.
+
+### 8.1 Per endpoint
+
+| Endpoint | Part | Before (METINAR-010) | After (METINAR-012) | Compatibility |
+|---|---|---|---|---|
+| `GET /health` | response | `schemaVersion: "0002_seed_synthetic_world"` | `schemaVersion: "0003_encounter_authority_and_spawn_schedules"` | value change, same shape |
+| `GET/PUT /api/v1/player/{id}` | request/response | — | unchanged | unchanged |
+| `GET /api/v1/world/nearby` | query | `lat, lon, radiusMeters?, limit?, offset?` | unchanged | unchanged |
+| | response entity | `id, type, templateId, latitude, longitude, level, aggressive, active, spawnedAt, despawnAt, distanceMeters` | + `activeUntil` (UTC or `null`) | additive |
+| | semantics | active = flag + spawn window | + deterministic schedule phase; scheduled entities can drop out of results between calls | behavioural (data-driven) |
+| `POST /api/v1/encounters/start` | request | `playerId, worldEntityId, clientPosition?{latitude, longitude}` | `playerId, worldEntityId, clientPosition{latitude, longitude, horizontalAccuracyMeters, capturedAt?}` (**required**) | **breaking**: an old body without `clientPosition` gets `400 VALIDATION_FAILED`; an old `clientPosition` without accuracy gets `400` |
+| | response | `{encounter{id, playerId, worldEntityId, startedAt, completedAt, status}, created}` | `{encounter{…, expiresAt, completedAt, expiredAt, status}, created, nonce}` | additive |
+| | new errors | — | `422 ENCOUNTER_TOO_FAR`, `422 GPS_ACCURACY_INSUFFICIENT`, `422 GPS_FIX_STALE` | new rejection paths |
+| | reuse semantics | repeat start returns the open session | same, plus a new `nonce` (the old one stops working); a lapsed session isn't reused | behavioural |
+| `POST /api/v1/encounters/complete` | request | `encounterId, playerId` | `encounterId, playerId, nonce` (**required**) | **breaking**: an old body gets `400 VALIDATION_FAILED` |
+| | response | `{encounter, firstCompletion}` | same shape; `encounter` gains `expiresAt`, `expiredAt`; `status` may be `expired` | additive (new enum value) |
+| | new errors | — | `403 ENCOUNTER_NONCE_MISMATCH`, `410 ENCOUNTER_EXPIRED` | new rejection paths |
+
+Unchanged: error envelope (problem+json + `code` + `traceId`), timestamp format, radius/paging limits, idempotency of
+`firstCompletion`, localhost-only binding, no auth.
+
+### 8.2 Who is affected today
+
+No consumer of the API exists in the repository: the Unity client doesn't call the server, and no deployed instance
+exists. The only callers are the server's own tests and `server/scripts/smoke-local.sh`, both updated in this PR.
+Data: METINAR-010 dev databases upgrade in place (migration `0003`, covered by
+`Upgrade_FromMetinar010Schema_KeepsRows_AndLegacyOpenSessionCannotBeCompleted`).
+
+### 8.3 Options for Q1 (owner/controller decision; not chosen here)
+
+| Option | What it means | Consequences |
+|---|---|---|
+| A — accept in place (current PR) | `v1` = the "after" column; METINAR-010 §5.1 versioning rule starts to apply from the first real client | no extra code. Breaks only callers that don't exist yet. The doc history shows the tightening |
+| B — `/api/v2` | keep a `v1` with the "before" request shape and add `v2` with the "after" shape | an unchecked `v1` start/complete path would bypass proximity, nonce and TTL, so `v1` would need to be disabled or also enforce the checks (then it isn't the "before" contract either). Duplicate routes and tests. Code change in this PR before merge |
+| C — other | e.g. freeze the version label until the first client integration issue | needs an explicit owner rule |
+
+## 9. Open owner questions (unchanged, not assumed)
+
+- **Q1** — `v1` tightened in place vs `/api/v2` (§8.3).
+- **Q2** — should an encounter end when the mob's scheduled active window ends mid-fight? Currently only the TTL applies.
+- **Q3** — confirm or replace the placeholder limits in §2 (40 m + ≤ 20 m allowance, 50 m max accuracy, 30 s fix age, 600 s TTL).
+
+## 10. CI
+
+`.github/workflows/server-tests.yml` was added under the narrow scope approved by the controller in #33 / PR #27.
+It runs on push and pull_request for `server/**` and the workflow file, with `permissions: contents: read`, .NET 8.0.x,
+`dotnet restore` → `dotnet build -c Release` (warnings are errors) → `dotnet test server/tests/MetinAR.Server.Tests -c Release`
+(non-zero exit on any failing test fails the job), and uploads the TRX result as an artifact.
+It uses no secrets, deployment, production database, write permission or paid service. The smoke script and
+`dotnet format` are not part of this job (out of the approved compile/test scope); they remain local gates.

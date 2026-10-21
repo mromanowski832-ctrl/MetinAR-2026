@@ -426,8 +426,8 @@ Commands (from `server/`) and results at PR time are in the PR description and t
 - `dotnet list MetinAR.Server.sln package --vulnerable --include-transitive` — no known vulnerable packages.
 
 Not part of this issue: Unity compile, Play Mode, Android build and physical-device checks (no client change).
-The repository's GitHub Actions workflow (`geo-core-tests`) does not run the server tests yet; adding a server job
-is a small follow-up outside `server/` and `docs/`.
+Since METINAR-012 the GitHub Actions workflow `server-tests` builds and runs the server tests on every push/PR that
+touches `server/` (see [METINAR-012 §10](METINAR-012-SERVER-AUTHORITY.md#10-ci)).
 
 ## 12. Known limitations / out of scope
 
