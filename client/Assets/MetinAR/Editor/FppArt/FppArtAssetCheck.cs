@@ -449,7 +449,11 @@ namespace MetinAR.Editor.FppArt
                 {
                     FppArtAssetBuilder.LoadClip(state).SampleAnimation(model, t);
                     smr.BakeMesh(mesh, true);
+                    mesh.RecalculateBounds();
                     proxy.transform.SetPositionAndRotation(smr.transform.position, smr.transform.rotation);
+                    // warm-up render: the first render after BakeMesh showed the previous proxy mesh (V3 run 1: Idle
+                    // portrait/grip shots had no hands although the side shot of the same pose had them)
+                    Shot(portrait, 540, 1200, null);
                     string tag = state + "_" + Mathf.RoundToInt(t * 100f).ToString("000");
                     written += Shot(portrait, 540, 1200, "unity_fpp_portrait_" + tag) ? 1 : 0;
                     written += Shot(landscape, 1200, 540, "unity_fpp_landscape_" + tag) ? 1 : 0;
@@ -485,7 +489,7 @@ namespace MetinAR.Editor.FppArt
                 var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
                 tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
                 tex.Apply();
-                File.WriteAllBytes(OutDir + "/" + name + ".png", tex.EncodeToPNG());
+                if (name != null) File.WriteAllBytes(OutDir + "/" + name + ".png", tex.EncodeToPNG());
                 UnityEngine.Object.DestroyImmediate(tex);
                 return true;
             }

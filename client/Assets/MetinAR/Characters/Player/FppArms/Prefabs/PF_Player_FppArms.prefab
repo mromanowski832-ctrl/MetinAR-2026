@@ -45,6 +45,18 @@ PrefabInstance:
       value: PF_Weapon_FppSword
       objectReference: {fileID: 0}
     - target: {fileID: 7509946990876612642, guid: 3f2c866b9de3bab4398eb49f1397e97b, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.75
+      objectReference: {fileID: 0}
+    - target: {fileID: 7509946990876612642, guid: 3f2c866b9de3bab4398eb49f1397e97b, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.75
+      objectReference: {fileID: 0}
+    - target: {fileID: 7509946990876612642, guid: 3f2c866b9de3bab4398eb49f1397e97b, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.75
+      objectReference: {fileID: 0}
+    - target: {fileID: 7509946990876612642, guid: 3f2c866b9de3bab4398eb49f1397e97b, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
