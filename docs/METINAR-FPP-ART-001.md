@@ -135,6 +135,24 @@ rest pose has the grip, guard, blade and left hand in the lower part of the fram
 **V3 regeneration:** results of the V3 clips are in section 7.0 (added with the Unity run). The tables below 7.0
 are the V1 run (`a5d7e27`/`cd3d02c`) and are kept as history.
 
+### 7.0b V3 + Attack left-hand dodge + grip fit — tested SHA `034851e` (final)
+
+New clean clone `C:\Users\mroma\MetinAR-FPPART-V3C` from GitHub with a fresh Library, Unity 6000.6.4f1, batch mode, editor only,
+15:41–16:07 Europe/Warsaw (before #33 RULE 16:08). The commit after it only adds this section and the reports/screenshots.
+
+| Gate (`034851e`) | Result | Evidence |
+|---|---|---|
+| Blender build (box) | sockets vs contract 0 mm / 0°; IK wrist gap 0 mm; **0 penetrating hand vertices in every clip**; grip clearance R 3.8 / L 2.1 mm; hilt-to-left-socket min **74.8 mm at 0.42 s** | `blender_build_report.json` |
+| `dotnet test tests/AssetPipeline.Tests` (box) | PASS 181/181 (incl. dodge values and an engine-free ≥ 50 mm test over the whole Attack) | — |
+| Unity compile | exit 0, 0 `error CS` in all step logs | `unity-batch-summary.txt` |
+| `FppArtAssetBuilder.BuildBatch` ×2 | exit 0 both times; `git status` clean after each build and at the end | ″ |
+| `FppArtAssetCheck.RunBatch` | **PASS: errors = 0**. Attack: min hilt-to-`B_Socket_GripL` **74.7 mm at 0.42 s** (≥ 50 mm check); 0 hand vertices in the sword proxies (Idle/Attack/Aura); B_Socket_Sword ≤ 0.52 mm / 0.00°, B_Socket_GripL ≤ 0.56 mm / 0.00°; sword nested at 0.75; 4 sockets in the RightGrip frame 0.00 mm off; grip clearance 3.8 mm (R), 2.5 mm (Aura); 28 screenshots | `unity-asset-check.txt` |
+| `AssetPipelineValidator.RunBatch` | PASS: files=26 errors=0 warnings=0 | `unity-asset-validation.txt` |
+| `MetinARQaChecks.Run` | PASS: scenes=2 prefabs=4 missingScripts=0 failures=0 | log |
+| `AssetPipelineSelfTest.Run` | PASS 14/14 | `unity-batch-summary.txt` (note) |
+| Visibility (est. A31 portrait) | Idle grip 201/201, tip 66/201, left 201/201; Attack grip 55/73, tip 24/73, left 39/73 (the left hand leaves the frame during the dodge); Aura grip/left 116/116 | `unity-asset-check.txt` |
+| APK / A31 / FPS | **NOT RUN, UNVERIFIED** | — |
+
 ### 7.0 V3 (contract `v3-a31-retest`) — first run, before the left-hand dodge (history)
 
 These are the results of `22d2b1a`, before the dodge. The final run is in 7.0b.

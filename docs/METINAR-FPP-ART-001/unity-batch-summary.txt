@@ -1,12 +1,11 @@
-START compile,build,status,build,status,check,validate,qa,selftest,status 2026-10-21T15:14:45.9842418+02:00 head=22d2b1a198fa21b96facfdca60fcd858a0a196b1
-compile#1 exit=0 secs=552 freeBefore=62,74GB freeAfter=61,22GB
-build#2 exit=0 secs=23 freeBefore=61,22GB freeAfter=61,22GB
+START compile,build,status,build,status,check,validate,qa,selftest,status 2026-10-21T16:04:24.6794724+02:00 head=034851eff87a36abcd163cbf9d8a5dce1094043f
+compile#1 exit=0 secs=18 freeBefore=58,32GB freeAfter=58,31GB
+build#2 exit=0 secs=23 freeBefore=58,31GB freeAfter=58,29GB
 status#3 lines=0
-build#4 exit=0 secs=22 freeBefore=61,22GB freeAfter=61,22GB
+build#4 exit=0 secs=24 freeBefore=58,29GB freeAfter=58,23GB
 status#5 lines=0
-check#6 exit=1 secs=28 freeBefore=61,22GB freeAfter=61,21GB
-validate#7 exit=0 secs=20 freeBefore=61,21GB freeAfter=61,21GB
-qa#8 exit=0 secs=19 freeBefore=61,21GB freeAfter=61,21GB
-selftest#9 exit=0 secs=19 freeBefore=61,21GB freeAfter=61,21GB
-status#10 lines=0
-DONE 2026-10-21T15:26:12.4534715+02:00
+check#6 exit=0 secs=34 freeBefore=58,23GB freeAfter=58,18GB
+validate#7 exit=0 secs=23 freeBefore=58,18GB freeAfter=58,16GB
+qa#8 exit=0 secs=28 freeBefore=58,16GB freeAfter=58,14GB
+runner stopped 16:07:01 per #33 RULE 16:08 (parallel permission withdrawn); qa Unity PID 16952 left to finish on its own; selftest NOT started
+NOTE (added from the logs): selftest#9 had already been started by the runner at 16:06:57, before the stop; it finished on its own at 16:07:25: "[METINAR-009] Asset pipeline self-test: tests=14 failures=0". git status after it: 0 lines (checked read-only at 16:08). 0 error CS in all logs.
