@@ -71,6 +71,10 @@ namespace MetinAR.ArEncounter
             output.SetSourcePlayable(_mixer);
             _graph.Play();
             _auraMaterial = new Material(energy) { name = "FppArtAura" };
+            // Same blue Aura colour as the procedural variant (the source spider-eye material is red).
+            var auraColor = new Color(0.12f, 0.95f, 1f);
+            if (_auraMaterial.HasProperty("_BaseColor")) _auraMaterial.SetColor("_BaseColor", auraColor);
+            if (_auraMaterial.HasProperty("_Color")) _auraMaterial.SetColor("_Color", auraColor);
             _auraFx = new FppAuraFx(RightGrip, _auraMaterial);
             Render(FppCombatAction.Idle, 0f, 0f, 0f);
             return true;
