@@ -29,23 +29,23 @@ PR is only the METINAR-033 work. Pipeline, ledger and gates: [METINAR-018-AUDIO-
 
 | File (under `Audio/SFX`) | Event | Length | WAV (16-bit mono 44.1 kHz) | ADPCM est. | Peak |
 |---|---|---|---|---|---|
-| `Item/SFX_Item_EquipMetal_01.wav` | equip metal item (sword, buckler) | 0.45 s | 39 734 B | ~10.0 KB | −3 dBFS |
-| `Item/SFX_Item_UnequipMetal_01.wav` | unequip metal item | 0.40 s | 35 324 B | ~8.9 KB | −5 dBFS |
-| `Item/SFX_Item_EquipLeather_01.wav` | equip leather / cloth item (jerkin, boots, gloves) | 0.40 s | 35 324 B | ~8.9 KB | −4 dBFS |
-| `Item/SFX_Item_UnequipLeather_01.wav` | unequip leather / cloth item | 0.35 s | 30 914 B | ~7.8 KB | −5 dBFS |
-| `Item/SFX_Item_Potion_01.wav` | drink health / mana potion | 0.90 s | 79 424 B | ~20.0 KB | −3 dBFS |
-| `Item/SFX_Item_Antidote_01.wav` | drink antidote (poison removed) | 0.90 s | 79 424 B | ~20.0 KB | −3 dBFS |
-| `Loot/SFX_Loot_Common_01.wav` | pick up an item | 0.35 s | 30 914 B | ~7.8 KB | −4 dBFS |
-| `UI/SFX_UI_CoinPickup_01.wav` | pick up talers | 0.40 s | 35 324 B | ~8.9 KB | −3 dBFS |
-| `Stinger/SFX_Stinger_LevelUp_01.wav` | level up | 1.40 s | 123 524 B | ~31.1 KB | −6 dBFS |
-| `UI/SFX_UI_ShopOpen_01.wav` | open the merchant shop | 0.50 s | 44 144 B | ~11.1 KB | −6 dBFS |
-| `UI/SFX_UI_Buy_01.wav` | purchase confirmed | 0.45 s | 39 734 B | ~10.0 KB | −3 dBFS |
-| `UI/SFX_UI_Sell_01.wav` | sale confirmed | 0.45 s | 39 734 B | ~10.0 KB | −3 dBFS |
-| `UI/SFX_UI_Denied_01.wav` | refusal (not enough talers, bag full) | 0.35 s | 30 914 B | ~7.8 KB | −14 dBFS (dense tone) |
-| `Status/SFX_Status_PoisonTick_01.wav` | one poison DoT tick (spider) | 0.25 s | 22 094 B | ~5.6 KB | −8 dBFS |
+| `Item/SFX_Item_EquipMetal_01.wav` | equip metal item (sword, buckler) | 0.450 s (19 840 samples) | 39 724 B | ~10.0 KB | −3 dBFS |
+| `Item/SFX_Item_UnequipMetal_01.wav` | unequip metal item | 0.399 s (17 600 samples) | 35 244 B | ~8.9 KB | −5 dBFS |
+| `Item/SFX_Item_EquipLeather_01.wav` | equip leather / cloth item (jerkin, boots, gloves) | 0.399 s (17 600 samples) | 35 244 B | ~8.9 KB | −4 dBFS |
+| `Item/SFX_Item_UnequipLeather_01.wav` | unequip leather / cloth item | 0.350 s (15 424 samples) | 30 892 B | ~7.8 KB | −5 dBFS |
+| `Item/SFX_Item_Potion_01.wav` | drink health / mana potion | 0.900 s (39 680 samples) | 79 404 B | ~20.0 KB | −3 dBFS |
+| `Item/SFX_Item_Antidote_01.wav` | drink antidote (poison removed) | 0.900 s (39 680 samples) | 79 404 B | ~20.0 KB | −3 dBFS |
+| `Loot/SFX_Loot_Common_01.wav` | pick up an item | 0.350 s (15 424 samples) | 30 892 B | ~7.8 KB | −4 dBFS |
+| `UI/SFX_UI_CoinPickup_01.wav` | pick up talers | 0.399 s (17 600 samples) | 35 244 B | ~8.9 KB | −3 dBFS |
+| `Stinger/SFX_Stinger_LevelUp_01.wav` | level up | 1.399 s (61 696 samples) | 123 436 B | ~31.1 KB | −6 dBFS |
+| `UI/SFX_UI_ShopOpen_01.wav` | open the merchant shop | 0.499 s (22 016 samples) | 44 076 B | ~11.1 KB | −6 dBFS |
+| `UI/SFX_UI_Buy_01.wav` | purchase confirmed | 0.450 s (19 840 samples) | 39 724 B | ~10.0 KB | −3 dBFS |
+| `UI/SFX_UI_Sell_01.wav` | sale confirmed | 0.450 s (19 840 samples) | 39 724 B | ~10.0 KB | −3 dBFS |
+| `UI/SFX_UI_Denied_01.wav` | refusal (not enough talers, bag full) | 0.350 s (15 424 samples) | 30 892 B | ~7.8 KB | −14 dBFS (dense tone) |
+| `Status/SFX_Status_PoisonTick_01.wav` | one poison DoT tick (spider) | 0.250 s (11 008 samples) | 22 060 B | ~5.5 KB | −8 dBFS |
 
-Starter kit: 666 526 B source, ~168 KB as ADPCM (estimate: 4 bits per sample + block headers, not a Unity build
-measurement). All 27 SFX together: 1 340 064 B source (budget 2 MiB), ~337 KB ADPCM, ~1.34 MB PCM in RAM after
+Starter kit: 665 960 B source, ~168 KB as ADPCM (estimate: 4 bits per sample + block headers, not a Unity build
+measurement). All 27 SFX together: 1 338 532 B source (budget 2 MiB), ~337 KB ADPCM, ~1.34 MB PCM in RAM after
 Decompress On Load (spec: audio memory ≤ 8 MB).
 
 Levels: loudest 100 ms window of every clip between about −20 and −14 dBFS RMS (same range as the combat set); the poison
@@ -79,12 +79,18 @@ All are 2D UI-style one-shots except PoisonTick (player status; 2D as well). Rou
 4. Aura loop: budget category Loop (≤ 2.5 s, ≤ 64 KB) for `*Loop` clips instead of an exception; total 2 MiB unchanged.
 5. UI back to ≤ 0.5 s; level up moved to the new category Stinger (`SFX/Stinger/SFX_Stinger_LevelUp_01.wav`, same
    GUID `.meta` moved with `git mv`, same bytes and SHA-256). `SFX_UI_ShopOpen_01` shortened from 0.70 s to 0.50 s to fit UI.
+6. Manager decision in #42 (after the Unity run on `2ab3655`): every SFX length is a whole number of 64-sample ADPCM
+   blocks (merged from #43, `generate_sfx.py` rounds lengths **down**). Unity pads ADPCM clips to 64 samples, so the
+   0.5 s ShopOpen (22 050 samples) imported as 22 080 samples = 0.50068 s and failed UI ≤ 0.5 s in `AudioImportVerifier`.
+   Now ShopOpen is 22 016 samples (0.49923 s); all 14 kit sounds were regenerated the same way (≤ 1.5 ms shorter each).
 
 ## 5. Verification and limits
 
 - `dotnet test tests/AssetPipeline.Tests -c Release`, `Test-RepoHygiene.ps1`, `Test-DocLinks.ps1`,
   `python3 tools/audio/generate_sfx.py --check` (bit-identical regeneration of all 27 files).
-- Unity not run: the new `.meta` files are copies of the profile verified on LuzMen for PR #43 (Unity 6000.6.4f1,
+- Unity run on `2ab3655` (LuzMen, report in #60): 0 error CS, `.meta` unchanged, verifier FAIL only for ShopOpen
+  (ADPCM padding, fixed by decision 6). Earlier notes below kept for history.
+- Before that run: the new `.meta` files are copies of the profile verified on LuzMen for PR #43 (Unity 6000.6.4f1,
   AudioImportVerifier PASS) with new GUIDs; the pipeline code change is pure C# (no UnityEngine). Risk: a new folder
   `.meta` or category could behave differently on first import; to be checked in the next Unity slot (#33).
   `Editor/Audio/AudioImportVerifier.cs` (UnityEditor, not built by `dotnet test`) changed one line

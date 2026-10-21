@@ -192,7 +192,7 @@ namespace AssetPipeline.Tests
         [Fact]
         public void ValidateAssetUsesLoopBudgetOnlyForLoopClips()
         {
-            byte[] twoSeconds = WavFrom(Sine(220, 88200));
+            byte[] twoSeconds = WavFrom(Sine(220.0 * 44100 / 88192, 88192)); // 1378 ADPCM blocks (1.99982 s), whole cycles
             string sha = AudioPipelineRules.Sha256Hex(twoSeconds);
             Assert.Empty(AudioPipelineRules.ValidateAsset("Assets/MetinAR/Audio/SFX/Combat/SFX_Combat_AuraLoop_01.wav", twoSeconds, Meta(0, 2),
                 AudioLicenseLedger.Parse(Ledger("SFX/Combat/SFX_Combat_AuraLoop_01.wav", sha: sha))));
