@@ -189,10 +189,79 @@ No phone was attached over ADB, so P8 performance and physical GPS are **UNVERIF
 For the owner:
 
 1. Enable USB debugging, connect the phone to LuzMen, accept the RSA prompt; `adb devices` must list it.
-2. `adb install -r client/Builds/Android/MetinAR-osm-poc-dev.apk`.
+2. `adb install -r client/Builds/Android/MetinAR-osm-poc-dev.apk`. **Warning:** this APK uses the same package id
+   `com.metinar.game` as the FPP build (#31), so it replaces the installed FPP app. Coordinate in #33 first
+   (see "P8 measurement package" below).
 3. Start the app, choose **Demo: Kraków** (dense old-town block, no GPS used) and let the map load.
    Then orbit (one-finger drag), pinch-zoom and two-finger tilt for about 60 s.
 4. Read the overlay or `adb logcat -s Unity | findstr OsmPocPerf`: fps / frameMs avg / p95, drawCalls, setPass,
    usedMemMB, decodeMs / meshMs / uploadMs, initialAreaMs, initialNetKB. Target ≈ 30 FPS (≤ 33 ms avg).
 5. Optional: restart, choose **Use my GPS**, grant foreground location only, and check that the map
    follows you while walking. Don't post coordinates or screenshots that show your street.
+
+### P8 measurement package (prepared 2026-10-21, NOT yet run)
+
+Status: **UNVERIFIED**. This section is a protocol, not a result. The Samsung Galaxy A31 is reserved for #31 (FPP).
+Coordinate the slot in #33 before using it.
+
+#### Exact build under test
+
+| Item | Value |
+|---|---|
+| Branch | `feat/008b-osm-map-poc` |
+| APK built from tree | `d2618f03fbbfe260569569a93ad14aba36ede43f`. Every later commit on this branch only changes docs, so the runtime matches the branch head |
+| APK (LuzMen, not committed) | `C:\Users\mroma\MetinAR-008B\client\Builds\Android\MetinAR-osm-poc-dev.apk` |
+| Size | 51,537,451 bytes |
+| SHA256 (`Get-FileHash`, re-checked 2026-10-21) | `968D08182B3B7520FF2B1D45085F1A6121A8A3C9F9C1F117FCED8C164721F2D8` |
+| Package id | `com.metinar.game`, the same as the FPP / #31 dev build. **Installing replaces FPP.** Debug keystore, ARM64 IL2CPP development build |
+| Build-time local state | The LuzMen checkout still has 4 uncommitted settings files that Unity rewrote (`DefaultVolumeProfile`, `URP-Performant`, `UniversalRenderPipelineGlobalSettings`, `UnityConnectSettings`). These are URP shader-prefilter flags with no map code. They were written before the APK finished |
+
+Before you install, re-run `Get-FileHash <apk> -Algorithm SHA256` and compare it with the hash above.
+
+#### Preconditions (all must hold)
+
+1. #33 records that #31 has released the A31, and that someone has agreed on how the FPP app comes back afterwards: reinstall the FPP APK `52a1375` or another build named in #31.
+2. `adb devices` lists exactly one device. Don't paste its serial number or its wireless-debugging IP anywhere.
+3. Phone setup: charged above 50 %, not charging if possible, at room temperature, screen brightness fixed, Wi-Fi on. Write down whether the network was Wi-Fi or mobile data.
+4. `adb shell dumpsys package com.metinar.game | findstr versionName` is recorded before and after, so the swap is visible.
+
+#### Run (Demo: Kraków)
+
+1. `adb install -r <apk>`. This replaces FPP, so do it only under the agreed slot.
+2. `adb logcat -c`, then in a second shell `adb logcat -s Unity | findstr /C:"[OsmPocPerf]" > p8-osm.txt`. Keep this file outside the repo.
+3. Launch the app and tap **Demo: Kraków**. Wait until `initialAreaMs` shows a value (≠ 0 / -1). That is the cold-cache first run.
+4. **Idle 30 s.** Don't touch the screen.
+5. **Pan 30 s.** Make 10 repeatable one-finger drags with `adb shell input swipe 200 1200 900 1200 400`, with about 2 s between them, then pinch-zoom and two-finger tilt by hand for about 15 s.
+6. Run `adb shell dumpsys meminfo com.metinar.game` after the idle phase and again after the pan phase. Record `TOTAL PSS` only.
+7. Kill and restart the app, then repeat steps 3–4 once. That is the warm-cache run.
+8. Optionally record `adb shell dumpsys thermalservice | findstr "Status"` at the end.
+9. Afterwards, reinstall the FPP build as agreed in #33 and post `LOCAL SLOT RELEASED`.
+
+#### Measurement table (fill in; anything not measured stays UNVERIFIED)
+
+| Metric | Source | Idle (cold) | Pan / zoom | Warm restart | Target |
+|---|---|---|---|---|---|
+| FPS (avg) | `[OsmPocPerf] fps=` | | | | ≈ 30 |
+| Frame time p50 (ms) | median of the `frameMs avg=` samples (the overlay has no exact p50) | | | | ≤ 33 |
+| Frame time p95 / max (ms) | `p95=` / `max=` (240-frame window) | | | | p95 ≤ 50 |
+| Draw calls / SetPass | `drawCalls=` / `setPass=` | | | | record |
+| Memory PSS (MB) | `dumpsys meminfo` TOTAL PSS | | | | record |
+| Unity used / GC (MB) | `usedMemMB=` / `gcMB=` | | | | record |
+| Initial area (ms) / KB | `initialAreaMs=` / `initialNetKB=` | | n/a | | record |
+| Tiles built / failed / cached | `tiles=` / `failed=` / `cached=` | | | | failed = 0 |
+| Decode / mesh / upload max (ms) | `decodeMs(max)` / `meshMs(max)` / `uploadMs(max)` | | | | upload ≤ 16 |
+| Geometry | `tris=` / `renderers=` | | | | record |
+| Pan responsiveness | max `frameMs` during swipes plus a 1–5 rating (1 = smooth, 5 = clearly stuttering) | n/a | | n/a | record |
+| Spawn safety (demo) | `spawn mob=` / `npc=` | | | | Allowed |
+| APK size | file length | 51,537,451 B | | | record |
+| Thermal status | `dumpsys thermalservice` | | | | record |
+
+#### Privacy rules for the report
+
+- Paste only `[OsmPocPerf]` values (they contain no coordinates or tile ids) and the PSS total. Don't commit raw logcat, `adb devices` output, IP addresses, serial numbers or screenshots taken in GPS mode.
+- Write the device as "Samsung Galaxy A31" only.
+
+#### Not covered by this run
+
+- **Demo: Kraków is a synthetic origin** (a public square) and uses no GPS. It is **not a physical GPS test**. The physical GPS check ("Use my GPS", foreground permission only, walk test) stays **UNVERIFIED** and is reported separately, with no coordinates.
+- The same-tree baseline APK (`BuildBaselineApk`) has still not been built. LuzMen now has about 107 GB free, so it can run in a separate Unity slot if the controller wants an exact size delta.
