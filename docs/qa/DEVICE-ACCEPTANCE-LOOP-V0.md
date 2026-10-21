@@ -19,7 +19,7 @@ the phone. QA verifies.
   `adb kill-server` / adb restart.
 - **adb health:** before every device step run `adb devices` and confirm the phone shows as `device` (not `offline`
   / `unauthorized` / missing). If the connection drops, the step is recorded as **ADB LOST** with the time range
-  (logcat gap), not as FAIL or PASS of the product. `Invoke-MetinARDeviceSmoke.ps1` does this automatically (#73).
+  (logcat gap), not as FAIL or PASS of the product. `Invoke-MetinARDeviceSmoke.ps1` does this automatically once PR #75 (#73) is merged. Until then, check by hand.
 - **Privacy:** do not put pairing codes, IP addresses, device serials or GPS coordinates in GitHub. Mask them in
   logs (`<serial>`, `<ip>`) before attaching.
 - **Package:** the APK under test must not overwrite another team's install without a note in #33. QA builds use their
@@ -31,7 +31,7 @@ the phone. QA verifies.
 |---|---|---|---|
 | P1 | APK identity | SHA256 of the file on LuzMen = SHA256 in the handoff comment | `Get-FileHash` output |
 | P2 | Player data | `tools/qa/Test-ApkPlayerData.ps1 -ApkPath <apk>` → `[PASS]` | console line |
-| P3 | ApkAudit | `-Gates ApkAudit`: debuggable, minSdk 31, arm64-v8a, no `ACCESS_BACKGROUND_LOCATION` | report line |
+| P3 | ApkAudit | `-Gates ApkAudit`: `applicationIdentifier` matches the purpose (game `com.metinar.game`, QA `com.metinar.game.qa`), debuggable, minSdk 31, arm64-v8a, no `ACCESS_BACKGROUND_LOCATION`, **11/11 `Unity.XR.ARCore` registrations** in `assets/bin/Data/RuntimeInitializeOnLoads.json` (0/11 = "AR unavailable", e.g. QA APK `e18df69`). Until PR #75 merges, ApkAudit does not count the ARCore registrations. Count the records with `"assemblyName":"Unity.XR.ARCore"` in that file by hand. | report line (+ the count) |
 | P4 | adb | `adb devices` shows exactly the A31 as `device` | line with the serial masked |
 | P5 | Install | `adb install -r` → `Success`; `dumpsys package <id>` versionName matches | two lines |
 | P6 | Logcat start | `adb logcat -c` then capture `-v threadtime` to a file for the whole run | file name + start time |
@@ -56,11 +56,15 @@ screenshot; **MEAS** = measured number with its source command; **OWN** = owner'
 | L11 | **Exit/return** | exit to the map, open the map HUD, enter AR again | map HUD shows `Lv`, EXP orbs 101/160 = 2.525 of 4, talary = reward; re-entry gives a fresh, consistent encounter, no duplicate mob/hands | IMG of map HUD + LOG |
 | L12 | **FPS** | whole AR part (L3–L9), ≥ 3 perf windows | `[MetinARPerf] scene=ArEncounterPrototype`: fpsAvg ≥ 24, frame p95 ≤ 55 ms (`tools/qa/perf-budgets.json`, PROTOTYPE GATE); map ≥ 28 fps | LOG `[MetinARPerf]` lines + MEAS |
 | L13 | **PSS memory** | `adb shell dumpsys meminfo <id>` after L3, after L9 and after L11 | TOTAL PSS ≤ 850 MB in AR (≤ 600 MB on the map); growth across the 3 samples < 10% (no leak per encounter) | MEAS (3 values, MB) |
-| L14 | **Logcat** | review the whole capture | no `FATAL`, `ANR`, native crash, `Exception` from `MetinAR.*`; `[ArDamage] hit ignored` only when expected; gaps listed as ADB LOST | LOG summary (counts) + the file |
+| L14 | **Logcat** | review the whole capture | no `FATAL`, `ANR`, native crash, `Exception` from `MetinAR.*`; `[ArDamage] hit ignored` only when expected; gaps listed as ADB LOST. The harness `Crash` gate FAILs only on crash/ANR/`F` lines. Unity errors and exceptions (including `MetinAR.*`) appear only as WARN `unityErrors=<n>`, so read each one by hand. The Editor T15 `KnownEditorInfrastructure` exception does not apply on the device. | LOG summary (counts) + the file |
 | L15 | Thermal (short) | `dumpsys thermalservice` / battery at the end | thermal status < 4; battery < 45 °C during ≤ 5 min | MEAS |
 
 `Invoke-MetinARDeviceSmoke.ps1` covers P4–P6, L12–L14 automatically (perf parsing, PSS, crash scan). L3–L11 need the
 owner at the phone and a recording.
+
+Stage acceptance (audit UPDATE_1 §5.1) also includes the spider world-anchoring tests from audit UPDATE_1 §3 (its
+A1–A6). In reports, write them as `S3-A1`…`S3-A6` so they are not confused with the Editor items A1–A6 in
+[METINAR-031-FPP-ACCEPTANCE.md](METINAR-031-FPP-ACCEPTANCE.md).
 
 ## 4. Report format (comment on the PR/issue under test, and on #26)
 
