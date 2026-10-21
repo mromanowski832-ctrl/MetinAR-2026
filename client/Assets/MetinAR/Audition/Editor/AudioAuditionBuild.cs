@@ -52,6 +52,8 @@ namespace MetinAR.Editor.Audition
             int code = 1;
             string originalId = PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android);
             string originalProduct = PlayerSettings.productName;
+            ScriptingImplementation originalBackend = PlayerSettings.GetScriptingBackend(NamedBuildTarget.Android);
+            AndroidArchitecture originalArch = PlayerSettings.Android.targetArchitectures;
             try
             {
                 if (originalId != GamePackage)
@@ -64,6 +66,13 @@ namespace MetinAR.Editor.Audition
 
                 PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, AuditionPackage);
                 PlayerSettings.productName = AuditionProduct;
+                if (GetArg("-auditionBackend") == "mono")
+                {
+                    // faster test build (no IL2CPP C++ step); ARMv7 runs on the A31. Restored in finally.
+                    PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.Mono2x);
+                    PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7;
+                }
+
                 EditorUserBuildSettings.buildAppBundle = false;
                 EditorUserBuildSettings.androidBuildType = AndroidBuildType.Development;
                 Debug.Log("[AudioAudition] building id=" + PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android) +
@@ -100,8 +109,11 @@ namespace MetinAR.Editor.Audition
             {
                 PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, originalId);
                 PlayerSettings.productName = originalProduct;
+                PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, originalBackend);
+                PlayerSettings.Android.targetArchitectures = originalArch;
                 AssetDatabase.SaveAssets();
-                Debug.Log("[AudioAudition] restored id=" + PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android) + " product=" + PlayerSettings.productName);
+                Debug.Log("[AudioAudition] restored id=" + PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android) + " product=" + PlayerSettings.productName +
+                          " backend=" + PlayerSettings.GetScriptingBackend(NamedBuildTarget.Android) + " arch=" + PlayerSettings.Android.targetArchitectures);
             }
 
             EditorApplication.Exit(code);
