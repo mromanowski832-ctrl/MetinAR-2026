@@ -2,7 +2,7 @@
 
 > **WCZEŚNIEJSZA WERSJA — ZASTĄPIONA.** Właściciel przysłał o 03:48 i zatwierdził o 03:50 główną specyfikację
 > „METINAR 2026 — GŁÓWNA SPECYFIKACJA GRY I POLECENIE DLA KIEROWNIKA PRODUKCJI” (§1–20), dosłownie w PR #96:
-> https://github.com/mromanowski832-ctrl/MetinAR-2026/pull/96 (plik `docs/design/OWNER_SPEC_2026-10-23.md`, commit `2bb0a72`).
+> https://github.com/mromanowski832-ctrl/MetinAR-2026/pull/96 (plik `docs/design/OWNER_SPEC_2026-10-23.md`, commit `2a039cd`, dokładny plik właściciela).
 > **Tam, gdzie ten plik różni się od głównej specyfikacji, rozstrzyga główna specyfikacja** (np. pętla ETAP I ma 22 kroki,
 > nie 26; Aura ma 9 kroków, nie 7; etapy I–V; dźwięk, reakcje i ataki potworów oraz dopracowanie HUD należą do ETAPU II).
 > Ten plik zostaje wyłącznie jako zapis wcześniejszej wiadomości właściciela z 03:37 (szczegóły, których główna specyfikacja

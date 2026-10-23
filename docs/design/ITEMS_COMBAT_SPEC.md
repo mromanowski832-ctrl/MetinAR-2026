@@ -44,7 +44,8 @@ z limitem dobowym, sterowanie umiejętnościami gestami AR.
 | `Ring` | Pierścień | nie | slot dodatkowy — decyzja Q19 |
 | `Quick1`, `Quick2` | Szybkie sloty | przyciski w AR | mikstury w walce |
 
-Ograniczenia: broń dwuręczna i łuk blokują tarczę (łuk używa kołczanu). Tarcza tylko dla wojownika. Typy zbroi:
+Ograniczenia: broń dwuręczna i łuk blokują tarczę (łuk używa kołczanu). Tarcza tylko dla wojownika: od poziomu 1
+(`starter_buckler`), ścieżka Rozłam jej nie używa — założony puklerz wraca do ekwipunku ([D1](DECISIONS_2026-10-23.md)). Typy zbroi:
 ciężka (wojownik), lekka (ninja, Slajter), szata (szaman) — wpływ tylko na wartości, bez kar.
 
 ## 2. Typy przedmiotów
@@ -153,7 +154,8 @@ bez pomiaru na A31.
 |---|---|---|---|---|---|---|
 | Mob zwykły | ≤ 8 000 (cel 4–6k) | ≤ 40 | ≤ 2 (cel 1) | 1024² | 3 | METINAR-009 |
 | Strażnik (boss) | ≤ 20 000 | ≤ 75 | ≤ 3 | 2048² | 3 | METINAR-009 |
-| NPC (v1) | ≤ 10 000 | ≤ 40 | ≤ 2 | 1024² | 1 | #38 / PR #36 |
+| NPC drugoplanowy (v1) | ≤ 10 000 | ≤ 40 | ≤ 2 | 1024² | 1 | #38 / PR #36 |
+| Kowal i NPC pełnoprawne | 10 000–20 000 | ≤ 75 | ≤ 3 | 2048² | 3 (LOD0/1/2) | METINAR-009 §1.1, decyzja K7 ([D2](DECISIONS_2026-10-23.md)) |
 | Ręce FPP (Player) | ≤ 10 000 łącznie | ≤ 40 | ≤ 2 | 1024² | 1 | PR #36 |
 | Broń / rekwizyt ręki | ≤ 3 000 | 0 | 1 | 512²–1024² | opc. | METINAR-009 |
 | Tarcza / kołczan / totem / fokus (FPP) | ≤ 1 500 (propozycja) | 0 | 1 | 512² | — | propozycja |
