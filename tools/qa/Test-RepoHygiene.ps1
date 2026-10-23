@@ -48,6 +48,15 @@ if (-not $git) {
     })
     Add 'NoGeneratedFiles' $(if ($gen.Count) { 'FAIL' } else { 'PASS' }) $(if ($gen.Count) { "tracked: $(($gen | Select-Object -First 10) -join ', ')" } else { 'no tracked caches/builds/APK/keystores' })
 
+    # 2b. local credential filenames (templates are allowed).
+    $secretFiles = @($files | Where-Object {
+        $name = [IO.Path]::GetFileName($_)
+        $looksLikeEnv = ($name -match '(?i)(^\.env($|\.)|\.env($|\.))') -and ($name -notmatch '(?i)\.env\.(example|sample|template)$')
+        $looksLikeKey = $name -match '(?i)\.(pem|p8|p12|jks|keystore|mobileprovision|key)$'
+        $looksLikeEnv -or $looksLikeKey
+    })
+    Add 'NoSensitiveFiles' $(if ($secretFiles.Count) { 'FAIL' } else { 'PASS' }) $(if ($secretFiles.Count) { "blocked filenames: $(($secretFiles | Select-Object -First 12) -join ', ')" } else { 'no tracked/staged credential files or backup dotenv files' })
+
     # 3. .meta consistency under client/Assets
     $assetSet = New-Object System.Collections.Generic.HashSet[string]
     foreach ($f in $files) { if ($f.StartsWith('client/Assets/')) { [void]$assetSet.Add($f) } }
@@ -102,6 +111,9 @@ if (-not $git) {
         '\bAKIA[0-9A-Z]{16}\b',
         '\bAIza[0-9A-Za-z_-]{35}\b',
         '\bxox[abpr]-[A-Za-z0-9-]{10,}',
+        '\bsk-(proj-)?[A-Za-z0-9_-]{24,}',
+        '\b(sk|rk)_live_[A-Za-z0-9]{20,}',
+        '-----BEGIN PGP PRIVATE KEY BLOCK-----',
         '^\s*AndroidKeystorePass:\s*\S+',
         '^\s*AndroidKeyaliasPass:\s*\S+'
     )
