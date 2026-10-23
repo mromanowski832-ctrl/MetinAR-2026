@@ -1,5 +1,3 @@
-<!-- Źródło: właściciel projektu, czat 2026-10-23 03:48 (Europe/Warsaw). Zatwierdzone 03:50: „Zatwierdzam. Działaj zgodnie z pełną specyfikacją MetinAR.” Tekst dosłowny, bez zmian. Dokument nadrzędny wobec starszych dokumentów projektowych w zakresie kierunku produkcji; dokładne wartości wg §19. -->
-
 METINAR 2026 — GŁÓWNA SPECYFIKACJA GRY I POLECENIE DLA KIEROWNIKA PRODUKCJI
 
 Do: Grok — Kierownik produkcji MetinAR oraz wszystkich 7 agentów
