@@ -35,7 +35,7 @@ Trucizna i inne DoT: tik co 1 s, bez krytyków, bez rzutu na trafienie, ten sam 
 
 Zgodnie z prototypem FPP (#31, `FppHitGeometry`, `FppCombatTimeline`):
 
-- **Ostrze** = odcinek od `y = 0,13` do `0,94 m` w układzie rękojeści, pozycja z tej samej pozy co render.
+- **Ostrze** = odcinek od `y = 0,13` do `0,94 m` w układzie rękojeści × `SwordScale` 0,75 (= 0,10–0,71 m), pozycja z tej samej pozy co render. Zasięg poziomy od kamery `R_h` (`FppCombatController.BladeReachMeters`, log Unity ≈ 1,21 m) wyznacza dystans stand-off moba w AR (#97).
 - **Okno trafienia** ataku podstawowego 0,18–0,42 s z 0,72 s zamachu; próbkowanie co ≤ 10 ms; **1 trafienie na cel na zamach**.
 - **Mob** dostaje dane `CombatHitVolume` w prefabie zamiast stałej bryły pająka:
   - `Body`: 1–3 prostopadłościany/kapsuły (tolerancja 2,5 cm jak dziś),

@@ -2,60 +2,24 @@ using System;
 using MetinAR.ArEncounter;
 using Xunit;
 
-// #31 decision 18:58: v0 mob stands still, „Podejdź – x,x m” out of reach only; v0 spawn range 1.5–3.0 m (prototype).
+// #31 decision 18:58 + #97: distance-only attack reach (kept); the „Podejdź” prompt is gone (#97: the mob walks, the player
+// does not); v0 spawn range 1.10–3.0 m (prototype, #97 d_min).
 public class ArApproachAndSpawnRangeTests
 {
-    [Theory]
-    [InlineData(2.4, "Podejdź – 2,4 m")]
-    [InlineData(2.449, "Podejdź – 2,4 m")]
-    [InlineData(2.45, "Podejdź – 2,5 m")]
-    [InlineData(3.82, "Podejdź – 3,8 m")]
-    [InlineData(1.0, "Podejdź – 1,0 m")]
-    [InlineData(0.0, "Podejdź – 0,0 m")]
-    public void FormatUsesPolishCommaAndOneDecimal(double meters, string expected)
-    {
-        Assert.Equal(expected, ArApproachPrompt.Format(meters));
-    }
-
-    [Theory]
-    [InlineData(double.NaN)]
-    [InlineData(double.PositiveInfinity)]
-    [InlineData(-0.1)]
-    public void FormatRejectsInvalidDistance(double meters)
-    {
-        Assert.Equal(string.Empty, ArApproachPrompt.Format(meters));
-    }
-
-    [Theory]
-    //          placed usable defeated inReach expected
-    [InlineData(true,  true,  false, false, true)]   // out of reach → shown
-    [InlineData(true,  true,  false, true,  false)]  // in reach → hidden
-    [InlineData(true,  false, false, false, false)]  // tracking lost / relocating → „Szukam otoczenia…” instead
-    [InlineData(true,  true,  true,  false, false)]  // defeated → nothing to walk up to
-    [InlineData(false, true,  false, false, false)]  // not placed
-    public void ShowsOnlyOutOfReachForUsableLiveMob(bool placed, bool usable, bool defeated, bool inReach, bool expected)
-    {
-        Assert.Equal(expected, ArApproachPrompt.ShouldShow(placed, usable, defeated, inReach, 2.4));
-    }
-
     [Fact]
-    public void HiddenForInvalidDistance()
-    {
-        Assert.False(ArApproachPrompt.ShouldShow(true, true, false, false, double.NaN));
-    }
-
-    [Fact]
-    public void PrototypeSpawnRangeIsOnePointFiveToThree()
+    public void PrototypeSpawnRangeIsOnePointOneToThree()
     {
         var s = ArPlacementSettings.CreatePrototypeDefaults();
-        Assert.Equal(1.5f, s.minSpawnDistanceMeters);
+        Assert.Equal(1.1f, s.minSpawnDistanceMeters);
+        Assert.Equal(ArEncounterFraming.MinPlacementDistanceMeters, new ArNoWalkSettings().minDistanceMeters);
         Assert.Equal(3.0f, s.maxSpawnDistanceMeters);
     }
 
     [Theory]
     [InlineData(0.8, ArSpawnDistance.TooClose)]
-    [InlineData(1.48, ArSpawnDistance.TooClose)]
-    [InlineData(1.495, ArSpawnDistance.InRange)]  // 1 cm tolerance
+    [InlineData(1.08, ArSpawnDistance.TooClose)]
+    [InlineData(1.095, ArSpawnDistance.InRange)]  // 1 cm tolerance
+    [InlineData(1.1, ArSpawnDistance.InRange)]
     [InlineData(1.5, ArSpawnDistance.InRange)]
     [InlineData(2.4, ArSpawnDistance.InRange)]
     [InlineData(3.0, ArSpawnDistance.InRange)]
@@ -81,7 +45,7 @@ public class ArApproachAndSpawnRangeTests
     [InlineData(-0.1f, 3f)]
     [InlineData(3f, 3f)]
     [InlineData(3f, 1.5f)]
-    [InlineData(1.5f, float.PositiveInfinity)]
+    [InlineData(1.1f, float.PositiveInfinity)]
     [InlineData(float.NaN, 3f)]
     public void StateMachineRejectsInvalidSpawnRange(float min, float max)
     {
@@ -91,7 +55,7 @@ public class ArApproachAndSpawnRangeTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new ArEncounterStateMachine(s));
     }
 
-    // ---- #31 18:58 correction: attack reach for the prompt is DISTANCE ONLY (aim-independent) ----
+    // ---- #31 18:58 correction: attack reach is DISTANCE ONLY (aim-independent) ----
 
     private static readonly FppPoint[] Blade =
     {
@@ -133,16 +97,12 @@ public class ArApproachAndSpawnRangeTests
     }
 
     [Fact]
-    public void UpCloseAimingAwayNoPrompt_FarAwayPrompt()
+    public void UpCloseInReach_FarAwayOutOfReach()
     {
         double reach = ArApproachPrompt.BladeReach(Blade);
         // Same camera position whatever the aim: the decision has no aim input at all.
-        bool closeOut = ArApproachPrompt.IsOutOfReach(ToFootprint(0, 1.0), reach);
-        Assert.False(closeOut);
-        Assert.False(ArApproachPrompt.ShouldShow(true, true, false, !closeOut, 1.0));
-        bool farOut = ArApproachPrompt.IsOutOfReach(ToFootprint(0, 3.82), reach);
-        Assert.True(farOut);
-        Assert.True(ArApproachPrompt.ShouldShow(true, true, false, !farOut, 3.82));
+        Assert.False(ArApproachPrompt.IsOutOfReach(ToFootprint(0, 1.0), reach));
+        Assert.True(ArApproachPrompt.IsOutOfReach(ToFootprint(0, 3.82), reach));
     }
 
     [Fact]

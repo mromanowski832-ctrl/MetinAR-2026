@@ -278,3 +278,19 @@ This supersedes the "neither was added" note above.
   - Unity: T10e covers the prompt at 2.4 m and 3.82 m, none at 1.0 m in reach, **none at 1.0 m while aiming away** (where
     a swing cannot hit), **the prompt at 3.82 m while aiming away**, and the tracking-lost priority.
     T12 covers 3.5 m rejected and 2.95 m accepted. T12b covers relocation at 3.5 m refused.
+
+### #97 P0 (supersedes the 18:58 walk-up): AR combat without walking
+
+- Owner rules: walking only on the GPS map; in AR the player never walks, approaches or backs away. The mob is stable in
+  space but may move by itself; out of reach it walks to the player smoothly (no teleport); never so close it fills the
+  screen; tracking loss pauses movement + combat, after a session reset the mob returns at the same camera-relative pose
+  with HP kept; the reach matches the blade geometry.
+- The „Podejdź – x,x m” prompt is removed (`ArApproachPrompt` keeps only the distance-only reach math, used as a
+  diagnostic: `[ArEncounter] reach in|out …`). HUD while placed: „{mob} nadchodzi.” while it walks in, otherwise
+  „{mob} stoi na podłożu.”; „Szukam otoczenia…” has priority. Placement hints only ask to aim
+  („Za blisko. Unieś telefon i wyceluj dalej w podłoże (min. 1,1 m).” / „Za daleko. Pochyl telefon i wyceluj bliżej w
+  podłoże (maks. 3,0 m).”).
+- Stand-off `d_stop = R_h − m + f` (`ArMobStandoff`), d_min 1,10 m, spawn range 1,10–3,0 m, approach restarts beyond
+  d_stop + 0,15 m, speed 0,6 m/s (max 0,8, accel 0,2 s), turn 180°/s, ≤ 0,04 m per frame (`ArNoWalkSettings`, PROTOTYPE).
+- After a session reset the reticle re-placement is replaced by a camera-relative restore (`ArCameraRelativePose`,
+  `[ArSession] restored mob camera-relative …`).

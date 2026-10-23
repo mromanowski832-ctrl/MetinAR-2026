@@ -40,4 +40,17 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/PrimaryStats.cs" Link="Production/PrimaryStats.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/SkillTierRules.cs" Link="Production/SkillTierRules.cs" />
   </ItemGroup>
+  <!-- #97: the no-walk AR combat logic is engine-free; test 5 drives it together with the real EncounterCombatSession. -->
+  <ItemGroup>
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArNoWalkSettings.cs" Link="Production/ArEncounter/ArNoWalkSettings.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArMobApproach.cs" Link="Production/ArEncounter/ArMobApproach.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArCameraRelativePose.cs" Link="Production/ArEncounter/ArCameraRelativePose.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArNoWalkEncounter.cs" Link="Production/ArEncounter/ArNoWalkEncounter.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArEncounterStateMachine.cs" Link="Production/ArEncounter/ArEncounterStateMachine.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArEncounterState.cs" Link="Production/ArEncounter/ArEncounterState.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArPlaneObservation.cs" Link="Production/ArEncounter/ArPlaneObservation.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArTrackingRecovery.cs" Link="Production/ArEncounter/ArTrackingRecovery.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArEncounterFraming.cs" Link="Production/ArEncounter/ArEncounterFraming.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/FppHitGeometry.cs" Link="Production/ArEncounter/FppHitGeometry.cs" />
+  </ItemGroup>
 </Project>

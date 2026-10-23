@@ -6,7 +6,8 @@ namespace MetinAR.ArEncounter
 {
     /// <summary>
     /// The placed AR test monster (procedural placeholder spider): world-space name / level / HP bar
-    /// above the model, turned toward the AR camera. Stationary. HP and death are driven by
+    /// above the model, turned toward the AR camera. #97: it walks to the player by itself (moved by
+    /// <see cref="ArEncounterSceneController"/>); <see cref="SetGait"/> plays a procedural walk cycle while it moves. HP and death are driven by
     /// <see cref="ArEncounterCombat"/> (METINAR-020); no mob attacks (S3) or drops (S4) yet.
     /// </summary>
     public sealed class ArEncounterMob : MonoBehaviour
@@ -198,6 +199,93 @@ namespace MetinAR.ArEncounter
             }
 
             IsBodyHidden = true;
+        }
+
+        private struct GaitPart
+        {
+            public Transform Transform;
+            public Vector3 BasePosition;
+            public Quaternion BaseRotation;
+            public Vector3 Hip;
+            public bool Left;
+            public int Index;
+        }
+
+        private GaitPart[] _gaitParts;
+        private Transform _gaitModel;
+        private Vector3 _gaitModelBase;
+        private float _gaitWeight;
+
+        /// <summary>Current walk-cycle weight (0 = standing, 1 = full gait at cruise speed).</summary>
+        public float GaitWeight => _gaitWeight;
+
+        /// <summary>
+        /// #97 rule 5: procedural walk cycle (no clips on the placeholder spider). <paramref name="travelledMeters"/> drives
+        /// the phase (no foot skating), <paramref name="speed01"/> fades it in/out. Visual only: the mob root (hit geometry)
+        /// is not touched. Legs are the "Leg{L|R}{0-3}_{Upper|Lower}" children of "Model" built by the prototype scene builder.
+        /// </summary>
+        public void SetGait(double travelledMeters, float speed01)
+        {
+            if (_gaitParts == null)
+            {
+                CacheGaitParts();
+            }
+
+            float target = IsDefeated ? 0f : Mathf.Clamp01(speed01);
+            _gaitWeight = Mathf.MoveTowards(_gaitWeight, target, Time.deltaTime * 6f);
+            double phase = ArMobGait.Phase(travelledMeters);
+            if (_gaitModel != null)
+            {
+                _gaitModel.localPosition = _gaitModelBase + Vector3.up * (float)ArMobGait.Bob(phase, _gaitWeight);
+            }
+
+            foreach (GaitPart part in _gaitParts)
+            {
+                if (part.Transform == null)
+                {
+                    continue;
+                }
+
+                Quaternion swing = Quaternion.AngleAxis((float)ArMobGait.LegSwing(phase, part.Left, part.Index, _gaitWeight), Vector3.up);
+                float lift = (float)ArMobGait.LegLift(phase, part.Left, part.Index, _gaitWeight);
+                part.Transform.localPosition = part.Hip + swing * (part.BasePosition - part.Hip) + Vector3.up * lift;
+                part.Transform.localRotation = swing * part.BaseRotation;
+            }
+        }
+
+        private void CacheGaitParts()
+        {
+            var parts = new System.Collections.Generic.List<GaitPart>();
+            _gaitModel = transform.Find("Model");
+            if (_gaitModel != null)
+            {
+                _gaitModelBase = _gaitModel.localPosition;
+                for (int i = 0; i < 4; i++)
+                {
+                    for (int s = 0; s < 2; s++)
+                    {
+                        bool left = s == 0;
+                        string prefix = "Leg" + (left ? "L" : "R") + i;
+                        Transform upper = _gaitModel.Find(prefix + "_Upper");
+                        Transform lower = _gaitModel.Find(prefix + "_Lower");
+                        if (upper == null)
+                        {
+                            continue;
+                        }
+
+                        // Capsule segment: centre between its joints, local up along the segment, height 2·scale.y incl. caps.
+                        float half = Mathf.Max(0f, upper.localScale.y - upper.localScale.x * 0.5f);
+                        Vector3 hip = upper.localPosition - upper.localRotation * Vector3.up * half;
+                        parts.Add(new GaitPart { Transform = upper, BasePosition = upper.localPosition, BaseRotation = upper.localRotation, Hip = hip, Left = left, Index = i });
+                        if (lower != null)
+                        {
+                            parts.Add(new GaitPart { Transform = lower, BasePosition = lower.localPosition, BaseRotation = lower.localRotation, Hip = hip, Left = left, Index = i });
+                        }
+                    }
+                }
+            }
+
+            _gaitParts = parts.ToArray();
         }
 
         private void LateUpdate()

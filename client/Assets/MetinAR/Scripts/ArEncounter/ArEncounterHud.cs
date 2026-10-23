@@ -186,47 +186,20 @@ namespace MetinAR.ArEncounter
                 _actionButtons[1].interactable = ready && idle && !timeline.AuraActive;
         }
 
-        /// <summary>Updates status / place button / failure panel / radar from the controller state.</summary>
-        public const string PlacementTooCloseNotice = "Za blisko. Odsuń się albo wyceluj dalej w podłoże (min. 1,5 m).";
+        /// <summary>Ground under the reticle is closer than the minimum spawn distance; aim-only hint (#97 rule 2).</summary>
+        public static readonly string PlacementTooCloseNotice = ArEncounterStatusText.PlacementTooClose;
 
         /// <summary>Placed, tracking lost or waiting for new ground after an AR session reset (#31 MANAGER DECISION 18:50).</summary>
-        public const string SearchingSurroundingsNotice = "Szukam otoczenia…";
+        public const string SearchingSurroundingsNotice = ArEncounterStatusText.SearchingSurroundings;
 
-        /// <summary>Ground was found only beyond the v0 maximum spawn distance (#31 decision 18:58, PROTOTYPE 3.0 m).</summary>
-        public const string PlacementTooFarNotice = "Za daleko. Podejdź bliżej albo wyceluj bliżej w podłoże (maks. 3,0 m).";
+        /// <summary>Ground was found only beyond the v0 maximum spawn distance; aim-only hint (#97 rule 2).</summary>
+        public static readonly string PlacementTooFarNotice = ArEncounterStatusText.PlacementTooFar;
 
-        public void Refresh(ArEncounterState state, ArEncounterStateMachine machine, bool hasPlacementTarget, float notTrackingSeconds, string mobName, Transform mob, Transform viewer, bool targetTooClose = false, bool mobHidden = false, bool targetTooFar = false, string approachPrompt = null)
+        /// <summary>Updates status / place button / failure panel / radar from the controller state. Status text: <see cref="ArEncounterStatusText"/>.</summary>
+        public void Refresh(ArEncounterState state, ArEncounterStateMachine machine, bool hasPlacementTarget, float notTrackingSeconds, string mobName, Transform mob, Transform viewer, bool targetTooClose = false, bool mobHidden = false, bool targetTooFar = false, ArMobMotion mobMotion = ArMobMotion.Holding)
         {
-            string status;
-            switch (state)
-            {
-                case ArEncounterState.Starting:
-                    status = "Uruchamianie AR...";
-                    break;
-                case ArEncounterState.Scanning:
-                    status = "Skanuj teren: powoli przesuwaj telefon, celując w płaskie podłoże.";
-                    if (notTrackingSeconds > 10f)
-                    {
-                        status += "\nBrak śledzenia — sprawdź zgodę na aparat i oświetlenie.";
-                    }
-
-                    break;
-                case ArEncounterState.ReadyToPlace:
-                    status = hasPlacementTarget
-                        ? "Podłoże wykryte. Naciśnij \"Postaw potwora\"."
-                        : targetTooClose ? PlacementTooCloseNotice
-                        : targetTooFar ? PlacementTooFarNotice : "Podłoże wykryte. Wyceluj w podłoże.";
-                    break;
-                case ArEncounterState.Placed:
-                    status = mobHidden || (machine != null && machine.IsTrackingLimited)
-                        ? SearchingSurroundingsNotice
-                        : !string.IsNullOrEmpty(approachPrompt) ? approachPrompt
-                        : mobName + " stoi na podłożu.";
-                    break;
-                default:
-                    status = string.Empty;
-                    break;
-            }
+            string status = ArEncounterStatusText.For(state, hasPlacementTarget, notTrackingSeconds, mobName, targetTooClose, targetTooFar,
+                                                      mobHidden, machine != null && machine.IsTrackingLimited, mobMotion);
 
             bool failed = state == ArEncounterState.Unsupported || state == ArEncounterState.Failed;
             if (_statusText != null)
