@@ -1,8 +1,8 @@
 # METINAR-017 — Specyfikacja systemów gry: przedmioty, ekwipunek, walka
 
-> **Status: PROPOZYCJA do akceptacji właściciela. Issue #40. Bez implementacji.**
+> **Status: ZAAKCEPTOWANE przez właściciela 2026-10-21 (issue #40; maks. poziom 99, pozostałe propozycje domyślne). Bez implementacji.**
 > Każda liczba w tym dokumencie i w plikach powiązanych to **proponowana wartość startowa do balansowania**.
-> Nic tu nie jest finalnym balansem, dopóki właściciel tego nie zaakceptuje (AUTONOMOUS_WORKFLOW §9).
+> Właściciel zaakceptował zasady i propozycje; konkretne liczby dalej stroją się na etapie balansu (S12, AUTONOMOUS_WORKFLOW §9).
 
 ## 0. Zasady i spis plików
 
@@ -10,7 +10,7 @@
 umiejętności o podobnej funkcji, sloty ekwipunku, rzadkość, ulepszanie, drop, EXP i waluta), ale **wszystko jest
 własne**: nazwy, opisy, liczby, tabele, formuły, modele, ikony i dźwięki. Nie kopiujemy ani nie przerabiamy
 „literka w literkę” niczego z Metin2 i nie używamy żadnych jego assetów (#35 pozostaje `[BLOCKED]`).
-Celowe różnice od typowych rozwiązań gatunku: maks. poziom 60, 4 statystyki z własnymi formułami, obrona z malejącymi
+Celowe różnice od typowych rozwiązań gatunku: 4 statystyki z własnymi formułami, obrona z malejącymi
 zyskami, hartowanie +1…+10 **bez niszczenia przedmiotu**, brak wytrzymałości, osobiste moby i łup, EXP za spacer
 z limitem dobowym, sterowanie umiejętnościami gestami AR.
 
@@ -55,9 +55,10 @@ ciężka (wojownik), lekka (ninja, Slajter), szata (szaman) — wpływ tylko na 
 | `Consumable` | mikstury, antidotum, napary | 50 |
 | `Material` | Odłamek Rudy, Jedwab Pajęczy, Olej Kowalski | 99 (olej 20) |
 | `Quest` | przedmioty zadań | 20, nie do sprzedania |
+| `SkillTier` | Traktat Biegłości, Iskra Kunsztu, Pieczęć Szczytu (§4.1) | 20 / 10 / 5 |
 | `Service` | sakwa, reset | — (natychmiastowe) |
 
-Każdy przedmiot ma `itemLevel` (iL), wymagany poziom = `max(1, iL − 2)` i wymaganą klasę dla broni/drugiej ręki.
+Każdy przedmiot ma `itemLevel` (iL 1–99, jak poziomy postaci), wymagany poziom = `max(1, iL − 2)` i wymaganą klasę dla broni/drugiej ręki.
 
 ## 3. Rzadkość i losowane statystyki
 
@@ -73,7 +74,9 @@ Każdy przedmiot ma `itemLevel` (iL), wymagany poziom = `max(1, iL − 2)` i wym
 
 - **Statystyki bazowe** wynikają z typu i iL (np. `WeaponAtk = 4 + 1,6 × iL`, obrona zbroi `2 + 0,9 × iL`).
 - **Affiksy** losowane z puli dozwolonej dla slotu ([tables/affixes.csv](tables/affixes.csv)), wartość:
-  `lerp(valueAtIL1, valueAtIL60, (iL−1)/59) × U(0,6; 1,0)`. Ten sam affiks nie powtarza się na przedmiocie.
+  `lerp(valueAtIL1, valueAtIL99, (iL−1)/98) × U(0,6; 1,0)`. Ten sam affiks nie powtarza się na przedmiocie.
+  Wartości na iL 99 to liniowe przedłużenie dawnej kotwicy iL 60 (wartości do iL 60 praktycznie bez zmian);
+  limity statystyk (krytyk 40%, blok 35%, odporności 50%, skrócenie odnowienia 20%) obowiązują dalej.
 - Legendarne efekty (np. „co 5. trafienie wywołuje falę”) dopiero po włączeniu serwera — łatwo je nadużyć.
 
 ## 4. Ulepszanie: hartowanie i przekucie
@@ -89,6 +92,21 @@ Każdy przedmiot ma `itemLevel` (iL), wymagany poziom = `max(1, iL − 2)` i wym
 **Przedmiot nigdy nie jest niszczony.** Koszt: Odłamki Rudy + talary `round5(5 × iL × t^1.6)`.
 **Przekucie** (`Reforge`): losuje jeden affiks od nowa za talary i 3 Odłamki. Gniazda/kamienie: poza v1 (Q18).
 **Wytrzymałości brak** (propozycja, Q5): brak naprawy, brak irytacji przy spacerach.
+
+### 4.1 Przedmioty stopni umiejętności (decyzja właściciela 2026-10-21 10:13)
+
+Nazwy i liczby własne MetinAR. Zasady stopni: [CLASSES_SKILLS.md](CLASSES_SKILLS.md) §2.1.
+Tabela: [tables/skill_tier_items.csv](tables/skill_tier_items.csv).
+
+| Id | Nazwa | Do czego | Źródła (propozycja) | Sklep |
+|---|---|---|---|---|
+| `treatise_proficiency_<classId>` | **Traktat Biegłości** (4 wersje: Wojownik, Ninja, Szaman, Slajter) | Biegłość II–VIII | moby od poz. 20: zwykły 0,8%, elitarny 4%, strażnik 25%; zadanie dzienne od poz. 20: 15% szansy na 1 szt. | trener / Wędrowny Handlarz: `round5(60 × L)`, min. 1 200, 2/dobę |
+| `spark_artistry` | **Iskra Kunsztu** (wspólna) | Biegłość VIII → Kunszt I…VI | moby od poz. 55: elitarny 1,5%, strażnik 15%; zadania fabularne od poz. 60: 1 szt. | nie |
+| `seal_apex` | **Pieczęć Szczytu** (wspólna) | Kunszt VI → Szczyt | strażnicy od poz. 90: 2%; finał fabuły ścieżki (poz. 95): 1 szt. na ścieżkę | nie |
+
+Przedmioty są przypisane do postaci (brak handlu w v1, Q8), skup u NPC = 0 talarów. Drop, wynik próby i odstęp
+między próbami docelowo ustala serwer (#22/#39); dzienny limit dropu Iskier i Pieczęci na gracza po stronie serwera.
+Trujący Pająk (poz. 5) tych przedmiotów nie upuszcza.
 
 ## 5. Ekwipunek (inwentarz)
 

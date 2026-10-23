@@ -1,6 +1,6 @@
 # METINAR-017 — Moby i NPC
 
-> **Status: PROPOZYCJA do akceptacji właściciela (#40). Bez implementacji.**
+> **Status: ZAAKCEPTOWANE przez właściciela 2026-10-21 (#40; maks. poziom 99, pozostałe propozycje domyślne). Bez implementacji.**
 > Wszystkie liczby to **proponowane wartości startowe do balansowania**. Indeks: [README.md](README.md).
 > Bez nazw, statystyk i modeli z Metin2. Moby i NPC to własne projekty (#30 pająk, #38 handlarz).
 
@@ -26,9 +26,10 @@ Lista zestawu startowego zawiera **tylko Trującego Pająka**. Pozostałe rodzin
 | `Guardian` — strażnik strefy | ×12 | ×1,8 | ×10 | 100% × 2 | 1 na strefę, raz na dobę na gracza |
 | `Overlord` — władca świata | — | — | — | — | **później**, wymaga serwera i gry wieloosobowej (Q15) |
 
-Statystyki zwykłego moba wg poziomu `m` ([tables/mob_level_stats.csv](tables/mob_level_stats.csv)):
+Statystyki zwykłego moba wg poziomu `m` = 1–99 ([tables/mob_level_stats.csv](tables/mob_level_stats.csv)):
 `HP = round5(30 + 11 × m^1.3)`, `Atk = round(6 + 3 × m^1.1)`, `Def = round(4 + 2,2 × m)`,
 `EXP = round(20 + 10 × m^1.15)`. Kalibracja: poziom 5 daje **HP 120**, czyli wartości prototypu pająka bez zmian.
+Przykłady: poz. 60 — HP 2 285, Atk 277, EXP 1 129; poz. 99 — HP 4 350, Atk 476, EXP 1 992.
 
 ## 3. Trujący Pająk w nowym systemie (zestaw startowy)
 
@@ -76,8 +77,8 @@ Spawn → Approach → Engage ⇄ (Telegraph → Attack → Recover) → Death
 
 - Świat dzielimy na **komórki** (~200 m). Każda komórka ma pulę 0–3 mobów **osobistych** (każdy gracz ma własne,
   brak rywalizacji o moba w v1).
-- **Poziom moba** = poziom gracza −2…+1 (strefy dopasowane do gracza), z wyjątkiem strażników o stałym poziomie
-  strefy. Alternatywa: stałe poziomy stref (Q12).
+- **Poziom moba** = poziom gracza −2…+1 (strefy dopasowane do gracza), ograniczony do 1–99, z wyjątkiem strażników
+  o stałym poziomie strefy (też 1–99). Decyzja Q12 (propozycja zaakceptowana).
 - **Rodzina moba** z charakteru miejsca (park/las → bestie, pajęczaki; przy wodzie → ogniki, ale nigdy w wodzie;
   zabudowa → banici). Wymaga danych mapy (#20/#28).
 - **Odrodzenie:** po pokonaniu 15 min (zwykły), 45 min (elitarny), strażnik raz na dobę na gracza. Maks. 6 mobów
