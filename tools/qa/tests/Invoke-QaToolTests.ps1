@@ -30,6 +30,9 @@ $p2 = Test-MetinARPermissionPolicy -Permissions (@($b.Permissions) + 'android.pe
 Assert 'perm.background-location-fails' ($p2.Status -eq 'FAIL' -and -not $p2.BackgroundLocationAbsent)
 $p3 = Test-MetinARPermissionPolicy -Permissions (@($b.Permissions) + 'android.permission.BLUETOOTH_CONNECT') -Forbidden @($cfg.permissions.forbidden) -Allowed @($cfg.permissions.allowed)
 Assert 'perm.unexpected-warns' ($p3.Status -eq 'WARN' -and @($p3.Unexpected) -contains 'android.permission.BLUETOOTH_CONNECT')
+# METINAR-040 (#85): AudioService haptics add android.permission.VIBRATE (normal level, approved); ApkAudit must pass it.
+$p4 = Test-MetinARPermissionPolicy -Permissions (@($b.Permissions | Where-Object { $_ -ne 'android.permission.VIBRATE' }) + 'android.permission.VIBRATE') -Forbidden @($cfg.permissions.forbidden) -Allowed @($cfg.permissions.allowed)
+Assert 'perm.vibrate-allowed' ($p4.Status -eq 'PASS' -and @($p4.Unexpected).Count -eq 0 -and @($p4.Forbidden).Count -eq 0) "status=$($p4.Status) unexpected=$($p4.Unexpected -join ',')"
 
 # --- Unity log summary
 $u = Get-MetinARUnityLogSummary -Lines (Lines 'unity-compile.log.txt')

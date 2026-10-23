@@ -104,6 +104,16 @@ dependencies. Anti-spam and the volume and vibration switches apply automaticall
 JNI). Unity therefore adds the normal-level **`android.permission.VIBRATE`**, which does not need a runtime prompt.
 There is no other manifest change, and **ACCESS_BACKGROUND_LOCATION: ABSENT**.
 
+The production manager approved VIBRATE on #85 (2026-10-23). The QA **ApkAudit** gate (`tools/qa/Invoke-MetinARQa.ps1`
+→ `Test-MetinARPermissionPolicy`) reads `permissions.allowed` / `permissions.forbidden` from `tools/qa/qa-config.json`.
+VIBRATE has been on the allow-list since METINAR-011, so the audit passes it. Two tests keep it that way:
+
+- `perm.vibrate-allowed` in `tools/qa/tests/Invoke-QaToolTests.ps1`;
+- `AudioPlatformPolicyTests.ApkAuditAllowsVibrateAndStillForbidsBackgroundLocation`.
+
+The player can still turn vibration off in game with **„Wibracje: WŁ/WYŁ”**. This is covered by
+`AudioPlatformPolicyTests` (switch wiring, 0 vibrations when off, persisted) and `AudioDirectorTests.VibrationOffNeverCallsTheDevice`.
+
 ## Verification
 
 - `dotnet test tests/MetinAR.Audio.Tests/MetinAR.Audio.Tests.csproj` (CI `audio-core-tests`, also listed in
