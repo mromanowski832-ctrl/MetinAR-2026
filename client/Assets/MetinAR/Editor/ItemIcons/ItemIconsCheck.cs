@@ -11,7 +11,8 @@ using UnityEngine;
 namespace MetinAR.Editor.ItemIcons
 {
     /// <summary>
-    /// METINAR-032: verifies the 9 starter-kit item icons (ITEMS_COMBAT_SPEC §7/§8) after import and renders a
+    /// METINAR-032: verifies the item icons (batch 1: 9 starter-kit items of ITEMS_COMBAT_SPEC §7; batch 2: the other
+    /// item ids in docs/design/tables; budget §8) after import and renders a
     /// preview of the real imported sprites in an unsaved scene.
     /// Batch: -executeMethod MetinAR.Editor.ItemIcons.ItemIconsCheck.Run  (report: Builds/metinar-032/icon-check.txt)
     /// </summary>
@@ -20,11 +21,19 @@ namespace MetinAR.Editor.ItemIcons
         public const string Folder = "Assets/MetinAR/Textures/ItemIcons";
         public const string OutDir = "Builds/metinar-032";
 
-        /// <summary>Item ids from docs/design/tables/items_starter.csv and their texture part names.</summary>
+        /// <summary>
+        /// Item ids from docs/design/tables (items_starter.csv, shop_starter_merchant.csv, skill_tier_items.csv with
+        /// &lt;classId&gt; expanded from classes_skills.json); the texture part name is the PascalCase id.
+        /// </summary>
         public static readonly string[] ItemIds =
         {
+            // batch 1 (PR #64)
             "starter_jerkin", "starter_boots", "starter_buckler", "amber_earring", "starter_gloves",
             "starter_sword", "potion_hp_s", "antidote", "ore_shard",
+            // batch 2
+            "spider_silk", "potion_hp_m", "potion_mp_s", "smith_oil", "forget_draught", "bag_expansion",
+            "treatise_proficiency_warrior", "treatise_proficiency_ninja", "treatise_proficiency_shaman",
+            "treatise_proficiency_slajter", "spark_artistry", "seal_apex",
         };
 
         private static readonly StringBuilder Report = new StringBuilder();
@@ -139,7 +148,7 @@ namespace MetinAR.Editor.ItemIcons
             }
         }
 
-        /// <summary>3x3 grid of the imported sprites on inventory-like slots, orthographic camera, unsaved scene.</summary>
+        /// <summary>Square grid of the imported sprites on inventory-like slots, orthographic camera, unsaved scene.</summary>
         private static void Preview(List<Sprite> sprites, int size, string file)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -149,10 +158,12 @@ namespace MetinAR.Editor.ItemIcons
             Info("preview shader " + unlit.name);
             var slotMat = new Material(unlit);
             slotMat.SetColor("_BaseColor", new Color(0.25f, 0.235f, 0.23f));
+            int cols = Mathf.CeilToInt(Mathf.Sqrt(sprites.Count));
+            int rows = Mathf.CeilToInt(sprites.Count / (float)cols);
             for (int i = 0; i < sprites.Count; i++)
             {
-                int r = i / 3, c = i % 3;
-                var pos = new Vector3((c - 1) * 3.0f, (1 - r) * 3.0f, 0f);
+                int r = i / cols, c = i % cols;
+                var pos = new Vector3((c - (cols - 1) * 0.5f) * 3.0f, ((rows - 1) * 0.5f - r) * 3.0f, 0f);
                 GameObject bg = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 bg.transform.position = pos + new Vector3(0, 0, 0.1f);
                 bg.transform.localScale = Vector3.one * 2.8f;
@@ -176,7 +187,7 @@ namespace MetinAR.Editor.ItemIcons
 
             var cam = new GameObject("Cam").AddComponent<Camera>();
             cam.orthographic = true;
-            cam.orthographicSize = 4.6f;
+            cam.orthographicSize = 1.5f * Mathf.Max(cols, rows) + 0.1f;
             cam.transform.position = new Vector3(0, 0, -10);
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.12f, 0.115f, 0.13f);

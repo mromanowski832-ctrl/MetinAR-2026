@@ -1,8 +1,12 @@
-"""METINAR-032: draws the 9 starter-kit item icons (ITEMS_COMBAT_SPEC §7, budget §8: 256² PNG).
+"""METINAR-032: draws the item icons (budget ITEMS_COMBAT_SPEC §8: 256² PNG).
 
-Usage:  python make_icons.py <out_dir> [--masters]
-Writes  <out_dir>/T_ItemIcons_<PascalId>_BC.png (256×256 RGBA, transparent background) and
-        <out_dir>/contact_sheet.png. With --masters also the 1024² masters.
+Batch 1 (ITEMS): the 9 starter-kit items of §7. Batch 2 (ITEMS_BATCH2): every other item id in docs/design/tables
+(items_starter.csv, shop_starter_merchant.csv, skill_tier_items.csv / §4.1), one treatise per class id.
+
+Usage:  python make_icons.py <out_dir> [--masters] [--only=id1,id2]
+Writes  <out_dir>/T_ItemIcons_<PascalId>_BC.png (256×256 RGBA, transparent background),
+        <out_dir>/contact_sheet.png (batch 1) and <out_dir>/contact_sheet_batch2.png (batch 2).
+        With --masters also the 1024² masters.
 Deterministic: same script + same numpy/Pillow/scipy versions -> identical pixels.
 Original work for MetinAR (licence MetinAR-Owned). No external images, fonts, brushes or references are loaded.
 """
@@ -351,23 +355,380 @@ def ore_shard():
     return ic
 
 
-BUILDERS = {k: globals()[k] for k in ITEMS}
+# ================================================================== batch 2 (#59 follow-up): remaining item ids in
+# docs/design/tables (items_starter.csv, shop_starter_merchant.csv, skill_tier_items.csv / ITEMS_COMBAT_SPEC §4.1)
+CLASS_IDS = ["warrior", "ninja", "shaman", "slajter"]  # docs/design/tables/classes_skills.json
+ITEMS_BATCH2 = ["spider_silk", "potion_hp_m", "potion_mp_s", "smith_oil", "forget_draught", "bag_expansion"] + \
+               ["treatise_proficiency_%s" % c for c in CLASS_IDS] + ["spark_artistry", "seal_apex"]
 
 
-def contact_sheet(icons, path):
+def _ellipse_pts(cx, cy, rx, ry, n=96):
+    return [(cx + rx * math.cos(2 * math.pi * k / n), cy + ry * math.sin(2 * math.pi * k / n)) for k in range(n)]
+
+
+# ------------------------------------------------------------------ 10. spider_silk — Jedwab Pajęczy
+def spider_silk():
+    ic = Icon()
+    ang = -38
+    T = lambda pts: xform(pts, angle_deg=ang, scale=1.0, offset=(512, 500), pivot=(0, 0))
+    # local frame (rotated): u along the spindle, v across
+    a = math.radians(ang)
+    u = (XX - 512) * math.cos(a) + (YY - 500) * math.sin(a)
+    v = -(XX - 512) * math.sin(a) + (YY - 500) * math.cos(a)
+    stick = m_poly(T([(-430, -20), (430, -20), (430, 20), (-430, 20)]))
+    ic.put(shade(stick, tex((0.55, 0.38, 0.22), 101, 30, 0.3), bevel=18, spec=0.15))
+    for end in (-430, 430):
+        e = T([(end, 0)])[0]
+        ic.put(shade(m_ellipse(e[0], e[1], 44), tex((0.46, 0.30, 0.17), 102, 20, 0.3), bevel=44, spec=0.25))
+    skein = m_poly(T(_ellipse_pts(0, 0, 300, 205)))
+    # wound threads: two crossing helices modulate height and colour
+    w1 = 0.5 + 0.5 * np.sin((u + v * 0.35) * 2 * math.pi / 22)
+    w2 = 0.5 + 0.5 * np.sin((u * 0.6 - v * 0.8) * 2 * math.pi / 70)
+    wind = 0.75 * w1 ** 2 + 0.25 * w2 ** 4
+    silk = lerp_col((0.78, 0.79, 0.86), (0.99, 0.99, 1.0), wind)
+    ic.put(shade(skein, silk, bevel=160, profile="round", spec=0.55, shininess=30, ambient=0.55, diffuse=0.6,
+                 extra_height=wind * 3.0))
+    sheen = m_and(m_stroke(T(bezier((-200, -120), (-40, -190), (160, -150))), 34), skein)
+    ic.paint(ndimage.gaussian_filter(sheen, 8), (0.86, 1.0, 0.92), 0.55)
+    # loose strand drifting down with a venom-green bead
+    strand = m_stroke(bezier(T([(250, 110)])[0], (760, 760), (520, 900), (380, 820)), 9, caps=True)
+    ic.put(shade(strand, (0.93, 0.94, 0.98), bevel=4, spec=0.5, edge=1.2))
+    ic.put(shade(m_ellipse(380, 820, 24), (0.45, 0.85, 0.30), bevel=24, spec=0.9, shininess=60, ambient=0.6))
+    return ic
+
+
+# ------------------------------------------------------------------ potions (shared round flask)
+def _round_flask(ic, light, deep, surf_col, bubble_col, seed_cork=71):
+    bulb = m_ellipse(512, 640, 258)
+    neck = m_rect(452, 258, 572, 440, 10)
+    glass = m_or(bulb, neck)
+    ic.put(shade(glass, (0.70, 0.80, 0.86), bevel=40, spec=0.4, ambient=0.6), opacity=0.42)
+    inner = ndimage.binary_erosion(glass > 0.5, iterations=16).astype(np.float32)
+    wave = 480 + 8 * np.sin(XX / 40.0)
+    liquid = m_and(inner, (YY > wave).astype(np.float32))
+    r = np.sqrt((XX - 540) ** 2 + (YY - 660) ** 2) / 260
+    ic.put(shade(liquid, lerp_col(light, deep, np.clip(r, 0, 1)), bevel=160, spec=0.5, shininess=50, ambient=0.55,
+                 diffuse=0.55, edge=0))
+    ic.paint(m_and(liquid, (YY < wave + 18).astype(np.float32)), surf_col, 0.45)
+    for (x, y, rr) in ((600, 600, 14), (470, 720, 10), (560, 780, 8), (640, 700, 7)):
+        ic.paint(m_sub(m_ellipse(x, y, rr), m_ellipse(x + 2, y + 2, rr - 4)), bubble_col, 0.7)
+    _glass_front(ic, glass, m_stroke(bezier((330, 690), (320, 520), (420, 430)), 26))
+    ic.paint(m_ellipse(380, 760, 12), (1, 1, 1), 0.6)
+    lip = m_sub(m_ellipse(512, 262, 88, 30), m_ellipse(512, 262, 60, 16))
+    ic.put(shade(lip, (0.80, 0.88, 0.92), bevel=12, spec=0.7, ambient=0.6))
+    return liquid
+
+
+def potion_mp_s():
+    """Same small round flask as potion_hp_s (one family per size), blue mana and a blue wax-dipped cork."""
+    ic = Icon()
+    liquid = _round_flask(ic, (0.40, 0.70, 1.0), (0.03, 0.10, 0.45), (0.60, 0.85, 1.0), (0.75, 0.90, 1.0))
+    for (x, y, s) in ((585, 690, 26), (480, 630, 18)):
+        star = m_or(m_poly([(x - s, y), (x, y - 4), (x + s, y), (x, y + 4)]), m_poly([(x, y - s), (x + 4, y), (x, y + s), (x - 4, y)]))
+        ic.paint(m_and(star, liquid), (0.85, 0.95, 1.0), 0.9)
+        ic.add_glow(m_and(star, liquid), (0.3, 0.6, 1.0), radius=8, strength=0.7)
+    cork = m_rect(464, 150, 560, 262, 20)
+    ic.put(shade(cork, tex((0.74, 0.53, 0.32), 111, 18, 0.45), bevel=26, spec=0.1))
+    dip = m_and(cork, m_rect(0, 0, S, 196))
+    ic.put(shade(m_or(dip, m_ellipse(512, 160, 58, 26)), (0.16, 0.30, 0.62), bevel=20, spec=0.6, shininess=36))
+    ic.put(shade(m_rect(446, 392, 578, 418, 6), (0.86, 0.76, 0.55), bevel=8, spec=0.2, edge=1.5))
+    return ic
+
+
+# ------------------------------------------------------------------ 11. potion_hp_m — Mikstura Życia (gourd flask)
+def potion_hp_m():
+    ic = Icon()
+    low = m_ellipse(512, 690, 238, 206)
+    up = m_ellipse(512, 384, 150, 132)
+    waist = m_rect(420, 440, 604, 560, 30)
+    neck = m_rect(462, 168, 562, 280, 10)
+    glass = m_or(low, up, waist, neck)
+    ic.put(shade(glass, (0.70, 0.80, 0.86), bevel=40, spec=0.4, ambient=0.6), opacity=0.42)
+    inner = ndimage.binary_erosion(glass > 0.5, iterations=16).astype(np.float32)
+    wave = 330 + 7 * np.sin(XX / 34.0)
+    liquid = m_and(inner, (YY > wave).astype(np.float32))
+    r = np.sqrt((XX - 548) ** 2 + (YY - 640) ** 2) / 330
+    ic.put(shade(liquid, lerp_col((1.0, 0.32, 0.26), (0.42, 0.02, 0.05), np.clip(r, 0, 1)), bevel=160, spec=0.5,
+                 shininess=50, ambient=0.55, diffuse=0.55, edge=0))
+    ic.paint(m_and(liquid, (YY < wave + 16).astype(np.float32)), (1.0, 0.55, 0.5), 0.45)
+    for (x, y, rr) in ((610, 720, 14), (450, 780, 10), (560, 420, 9), (640, 640, 7)):
+        ic.paint(m_sub(m_ellipse(x, y, rr), m_ellipse(x + 2, y + 2, rr - 4)), (1.0, 0.75, 0.7), 0.7)
+    _glass_front(ic, glass, m_or(m_stroke(bezier((334, 760), (322, 620), (392, 548)), 26),
+                                 m_stroke(bezier((404, 420), (398, 350), (440, 300)), 18)))
+    # gold collar at the waist with a heart-shaped red stone
+    band = m_and(m_rect(380, 470, 644, 532, 0), m_or(waist, low, up))
+    ic.put(shade(band, GOLD, bevel=16, spec=0.7, shininess=36))
+    heart = m_or(m_ellipse(496, 494, 22), m_ellipse(528, 494, 22), m_poly([(476, 502), (548, 502), (512, 546)]))
+    ic.put(shade(heart, (0.85, 0.08, 0.10), bevel=22, spec=0.9, shininess=60))
+    lip = m_sub(m_ellipse(512, 172, 80, 28), m_ellipse(512, 172, 54, 14))
+    ic.put(shade(lip, (0.80, 0.88, 0.92), bevel=12, spec=0.7, ambient=0.6))
+    cork = m_rect(468, 70, 556, 172, 20)
+    ic.put(shade(cork, tex((0.74, 0.53, 0.32), 121, 18, 0.45), bevel=26, spec=0.1))
+    ic.put(shade(m_ellipse(512, 92, 56, 26), (0.62, 0.06, 0.08), bevel=20, spec=0.6, shininess=36))
+    return ic
+
+
+# ------------------------------------------------------------------ 12. smith_oil — Olej Kowalski (stoneware jug)
+def smith_oil():
+    ic = Icon()
+    handle = m_sub(m_stroke(bezier((600, 300), (800, 260), (830, 480), (690, 560)), 54), m_ellipse(512, 600, 230, 250))
+    ic.put(shade(handle, tex((0.42, 0.25, 0.15), 131, 30, 0.3), bevel=26, spec=0.25))
+    body = m_poly(catmull([(512, 330), (650, 360), (740, 500), (746, 680), (680, 840), (512, 890), (344, 840),
+                           (278, 680), (284, 500), (374, 360)], steps=10))
+    neck = m_rect(440, 200, 584, 380, 24)
+    jug = m_or(body, neck)
+    clay = tex((0.72, 0.56, 0.40), 132, 40, 0.25)
+    glaze = tex((0.36, 0.20, 0.12), 133, 50, 0.2)
+    dip = 560 + 26 * np.sin(XX / 55.0) + 18 * np.sin(XX / 23.0 + 1.3)
+    t = np.clip((YY - dip) / 10.0, 0, 1)[..., None]
+    ic.put(shade(jug, glaze * (1 - t) + clay * t, bevel=110, spec=0.45, shininess=26, vgrad=0.12))
+    for y in (650, 700):
+        ic.mul(m_and(m_stroke([(200, y), (820, y + 6)], 6, caps=False), body), 0.72)
+    lip = m_rect(418, 176, 606, 234, 22)
+    ic.put(shade(lip, (0.30, 0.17, 0.10), bevel=18, spec=0.45))
+    stopper = m_rect(460, 108, 564, 192, 18)
+    ic.put(shade(stopper, tex((0.74, 0.53, 0.32), 134, 18, 0.45), bevel=24, spec=0.1))
+    # anvil stamp on the belly
+    anvil = m_poly([(430, 712), (600, 712), (640, 690), (660, 712), (600, 740), (566, 742), (580, 790), (450, 790),
+                    (464, 742), (430, 740)])
+    ic.mul(m_and(ndimage.binary_dilation(anvil > 0.5, iterations=6).astype(np.float32), body), 0.6)
+    ic.put(shade(anvil, (0.62, 0.47, 0.33), bevel=8, spec=0.2, edge=1.5), opacity=0.9)
+    # golden oil run from the lip down the side
+    path = catmull([(440, 236), (436, 320), (398, 400), (360, 480), (346, 530)], closed=False, steps=8)
+    run = m_or(*[m_stroke(path[k:k + 2], 34 - 22 * k / len(path), caps=True) for k in range(len(path) - 1)])
+    run = m_or(run, m_rect(420, 226, 470, 250, 10))  # oil pooled on the lip
+    oil = lerp_col((1.0, 0.86, 0.35), (0.80, 0.50, 0.06), np.clip((YY - 230) / 400, 0, 1))
+    ic.put(shade(run, oil, bevel=8, profile="flat", spec=0.9, shininess=60, ambient=0.75, edge=2, edge_dark=0.3), opacity=0.92)
+    drop = m_or(m_ellipse(342, 586, 34, 40), m_poly([(316, 574), (368, 574), (346, 514)]))
+    ic.put(shade(drop, (0.96, 0.70, 0.16), bevel=40, spec=1.0, shininess=70, ambient=0.75))
+    ic.paint(m_ellipse(332, 570, 9), (1, 1, 0.92), 0.8)
+    return ic
+
+
+# ------------------------------------------------------------------ 13. forget_draught — Napar Zapomnienia
+def forget_draught():
+    ic = Icon()
+    body = m_poly(catmull([(450, 300), (574, 300), (580, 420), (760, 760), (742, 860), (512, 892), (282, 860),
+                           (264, 760), (444, 420)], steps=8))
+    neck = m_rect(452, 190, 572, 330, 10)
+    glass = m_or(body, neck)
+    ic.put(shade(glass, (0.76, 0.74, 0.86), bevel=40, spec=0.4, ambient=0.6), opacity=0.42)
+    inner = ndimage.binary_erosion(glass > 0.5, iterations=16).astype(np.float32)
+    wave = 560 + 8 * np.sin(XX / 38.0 + 0.6)
+    liquid = m_and(inner, (YY > wave).astype(np.float32))
+    r = np.sqrt((XX - 540) ** 2 + (YY - 760) ** 2) / 300
+    ic.put(shade(liquid, lerp_col((0.78, 0.50, 1.0), (0.20, 0.04, 0.36), np.clip(r, 0, 1)), bevel=150, spec=0.5,
+                 shininess=50, ambient=0.55, diffuse=0.55, edge=0))
+    ic.paint(m_and(liquid, (YY < wave + 16).astype(np.float32)), (0.88, 0.72, 1.0), 0.45)
+    # swirl (forgetting) inside the liquid
+    spiral = [(520 + (12 + 9 * k) * math.cos(k * 0.55), 740 + (12 + 9 * k) * 0.55 * math.sin(k * 0.55)) for k in range(22)]
+    sw = m_and(m_stroke(spiral, 12), liquid)
+    ic.paint(sw, (0.95, 0.85, 1.0), 0.75)
+    ic.add_glow(sw, (0.55, 0.25, 0.85), radius=12, strength=0.8)
+    _glass_front(ic, glass, m_stroke(bezier((330, 800), (380, 660), (444, 520)), 22))
+    lip = m_sub(m_ellipse(512, 194, 86, 30), m_ellipse(512, 194, 58, 16))
+    ic.put(shade(lip, (0.84, 0.84, 0.92), bevel=12, spec=0.7, ambient=0.6))
+    # vapour curling out of the open neck
+    for k, (pts, w) in enumerate((([(512, 186), (474, 150), (540, 118), (500, 88)], 34),
+                                   ([(534, 180), (600, 150), (584, 116), (636, 96)], 24))):
+        wisp = ndimage.gaussian_filter(m_stroke(catmull(pts, closed=False, steps=10), w), 7)
+        ic.paint(wisp, (0.82, 0.70, 0.98), 0.75 - 0.15 * k)
+    return ic
+
+
+# ------------------------------------------------------------------ 14. bag_expansion — Sakwa +8 miejsc
+def bag_expansion():
+    ic = Icon()
+    pouch = m_poly(catmull([(512, 330), (640, 340), (760, 470), (800, 650), (740, 830), (512, 896), (284, 830),
+                            (224, 650), (264, 470), (384, 340)], steps=10))
+    leather = tex((0.50, 0.31, 0.17), 141, 46, 0.3)
+    ic.put(shade(pouch, leather, bevel=150, profile="round", spec=0.2, shininess=16, vgrad=0.2))
+    for x0, x1 in ((420, 330), (470, 420), (554, 604), (604, 694)):
+        ic.mul(m_and(m_stroke([(x0, 360), (x1, 560)], 10), pouch), 0.72)
+    ruff = m_poly(catmull([(512, 200), (600, 196), (676, 240), (650, 330), (512, 352), (374, 330), (348, 240),
+                           (424, 196)], steps=10))
+    ic.put(shade(ruff, tex((0.58, 0.38, 0.22), 142, 36, 0.3), bevel=40, spec=0.15))
+    for x in (420, 470, 512, 554, 604):
+        ic.mul(m_and(m_stroke([(x, 210), (x + (x - 512) * 0.2, 336)], 9), ruff), 0.62)
+    cord = m_rect(352, 326, 672, 360, 14)
+    ic.put(shade(cord, (0.86, 0.76, 0.55), bevel=10, spec=0.2, edge=1.5))
+    for pts in (bezier((640, 344), (720, 380), (740, 470)), bezier((648, 350), (690, 420), (680, 500))):
+        ic.put(shade(m_stroke(pts, 14), (0.82, 0.72, 0.50), bevel=7, spec=0.2, edge=1.5))
+    for (x, y) in ((740, 486), (680, 516)):
+        ic.put(shade(m_rect(x - 16, y - 20, x + 16, y + 34, 10), (0.70, 0.18, 0.12), bevel=12, spec=0.3))
+    ic.paint(m_and(dashes(catmull([(300, 760), (512, 840), (724, 760)], closed=False, steps=8), 20, 16, 6), pouch),
+             (0.84, 0.70, 0.48), 0.75)
+    # brass "more room" badge: plus sign on a round plate
+    ic.put(shade(m_ellipse(512, 640, 128), GOLD, bevel=34, spec=0.75, shininess=40))
+    ic.put(shade(m_ellipse(512, 640, 98), (0.66, 0.44, 0.14), bevel=14, spec=0.4, ambient=0.5))
+    plus = m_or(m_rect(492, 570, 532, 710, 8), m_rect(442, 620, 582, 660, 8))
+    ic.put(shade(plus, (0.98, 0.84, 0.44), bevel=14, spec=0.9, shininess=50))
+    return ic
+
+
+# ------------------------------------------------------------------ 15–18. treatise_proficiency_<classId> — Traktat Biegłości
+TREATISE = {  # cover colour, emblem (own design per class role in CLASSES_SKILLS.md)
+    "warrior": ((0.56, 0.12, 0.10), "sword"),
+    "ninja": ((0.10, 0.36, 0.30), "star"),
+    "shaman": ((0.12, 0.26, 0.56), "bolt"),
+    "slajter": ((0.34, 0.14, 0.46), "moon"),
+}
+
+
+def _emblem(kind, cx, cy):
+    if kind == "sword":
+        return m_or(m_poly([(cx - 18, cy + 60), (cx - 18, cy - 90), (cx, cy - 122), (cx + 18, cy - 90), (cx + 18, cy + 60)]),
+                    m_rect(cx - 64, cy + 54, cx + 64, cy + 78, 10), m_rect(cx - 12, cy + 76, cx + 12, cy + 118, 4),
+                    m_ellipse(cx, cy + 126, 18))
+    if kind == "star":
+        p = []
+        for k in range(8):
+            r = 128 if k % 2 == 0 else 38
+            a = math.pi / 4 * k + math.pi / 4
+            p.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+        return m_sub(m_poly(p), m_ellipse(cx, cy, 20))
+    if kind == "bolt":
+        return m_poly([(cx + 30, cy - 130), (cx - 62, cy + 14), (cx - 4, cy + 14), (cx - 36, cy + 130), (cx + 66, cy - 22),
+                       (cx + 6, cy - 22), (cx + 44, cy - 130)])
+    # moon
+    return m_or(m_sub(m_ellipse(cx, cy, 116), m_ellipse(cx + 54, cy - 30, 100)), m_ellipse(cx + 54, cy - 36, 16))
+
+
+def _treatise(class_id):
+    cover_col, emblem = TREATISE[class_id]
+    ic = Icon()
+    T = lambda pts: xform(pts, angle_deg=-7, offset=(512, 520))
+    pages = m_poly(T([(-250, -350), (300, -340), (300, 352), (-250, 362)]))
+    page_tex = lerp_col((0.80, 0.74, 0.60), (0.96, 0.92, 0.80), 0.5 + 0.5 * np.sin((XX * 0.12 + YY * 0.99) / 3.2))
+    ic.put(shade(pages, page_tex, bevel=10, profile="flat", spec=0.05, edge=2))
+    cover = m_poly(T([(-280, -380), (270, -380), (270, 330), (-280, 330)]))
+    ic.put(shade(cover, tex(cover_col, 150 + CLASS_IDS.index(class_id), 40, 0.3), bevel=36, spec=0.3, shininess=20))
+    spine = m_poly(T([(-300, -392), (-200, -392), (-200, 342), (-300, 342)]))
+    ic.put(shade(spine, tex(tuple(c * 0.7 for c in cover_col), 155, 40, 0.3), bevel=30, spec=0.3))
+    for y in (-290, -150, 80, 230):
+        ic.put(shade(m_and(m_poly(T([(-306, y - 16), (-194, y - 16), (-194, y + 16), (-306, y + 16)])), spine),
+                     GOLD, bevel=10, spec=0.6))
+    # gold corner caps
+    for (x, y, sx, sy) in ((270, -380, -1, 1), (270, 330, -1, -1)):
+        ic.put(shade(m_poly(T([(x, y), (x + sx * 110, y), (x, y + sy * 110)])), GOLD, bevel=14, spec=0.7, shininess=36))
+    # embossed frame and emblem plate
+    frame = m_sub(m_poly(T([(-160, -320), (220, -320), (220, 270), (-160, 270)])),
+                  m_poly(T([(-140, -300), (200, -300), (200, 250), (-140, 250)])))
+    ic.put(shade(frame, GOLD, bevel=8, spec=0.6), opacity=0.9)
+    c = T([(30, -25)])[0]
+    ic.put(shade(m_ellipse(c[0], c[1], 160), GOLD, bevel=30, spec=0.7, shininess=40))
+    ic.put(shade(m_ellipse(c[0], c[1], 136), tuple(x * 0.6 for x in cover_col), bevel=12, spec=0.25, ambient=0.5))
+    em = _emblem(emblem, c[0], c[1])
+    ic.put(shade(em, (0.98, 0.82, 0.42), bevel=16, spec=0.85, shininess=50))
+    # bookmark ribbon
+    rb = T([(120, 320), (170, 320), (170, 450), (145, 425), (120, 450)])
+    ic.put(shade(m_poly(rb), (0.86, 0.72, 0.28), bevel=10, spec=0.4))
+    return ic
+
+
+def treatise_proficiency_warrior():
+    return _treatise("warrior")
+
+
+def treatise_proficiency_ninja():
+    return _treatise("ninja")
+
+
+def treatise_proficiency_shaman():
+    return _treatise("shaman")
+
+
+def treatise_proficiency_slajter():
+    return _treatise("slajter")
+
+
+# ------------------------------------------------------------------ 19. spark_artistry — Iskra Kunsztu
+def spark_artistry():
+    ic = Icon()
+    cx, cy = 512, 520
+    rays = np.zeros((S, S), np.float32)
+    for k in range(8):
+        a = math.pi / 4 * k
+        L, w = (410, 60) if k % 2 == 0 else (270, 40)
+        tip = (cx + L * math.cos(a), cy + L * math.sin(a))
+        l = (cx + w * math.cos(a + math.pi / 2), cy + w * math.sin(a + math.pi / 2))
+        r = (cx + w * math.cos(a - math.pi / 2), cy + w * math.sin(a - math.pi / 2))
+        rays = np.maximum(rays, m_poly([l, tip, r]))
+    ic.put(shade(rays, (1.0, 0.78, 0.30), bevel=14, profile="flat", spec=0.5, ambient=0.85, diffuse=0.3, edge=2))
+    ic.add_glow(rays, (1.0, 0.45, 0.05), radius=26, strength=0.55)
+    # faceted ember gem in the middle
+    top, bot, lft, rgt = (cx, cy - 290), (cx, cy + 290), (cx - 215, cy), (cx + 215, cy)
+    facets = [((top, lft, (cx, cy)), (1.0, 0.92, 0.55)), ((top, rgt, (cx, cy)), (1.0, 0.68, 0.18)),
+              ((bot, lft, (cx, cy)), (0.95, 0.52, 0.10)), ((bot, rgt, (cx, cy)), (0.75, 0.30, 0.04))]
+    gem = np.zeros((S, S), np.float32)
+    for tri, c in facets:
+        m = m_poly(tri)
+        gem = np.maximum(gem, m)
+        ic.put(shade(m, c, bevel=8, profile="flat", spec=0.4, ambient=0.9, diffuse=0.3, edge=1.5))
+    core = ndimage.gaussian_filter(m_ellipse(cx - 20, cy - 40, 60), 24) * gem
+    ic.paint(core, (1.0, 1.0, 0.85), 0.9)
+    ic.add_glow(gem, (1.0, 0.55, 0.10), radius=30, strength=0.6)
+    for (x, y, s) in ((300, 300, 16), (740, 320, 12), (760, 720, 18), (290, 740, 12), (520, 860, 10)):
+        e = m_ellipse(x, y, s)
+        ic.paint(e, (1.0, 0.95, 0.7), 1.0)
+        ic.add_glow(e, (1.0, 0.5, 0.1), radius=10, strength=0.9)
+    return ic
+
+
+# ------------------------------------------------------------------ 20. seal_apex — Pieczęć Szczytu
+def seal_apex():
+    ic = Icon()
+    cx, cy = 512, 450
+    for sx in (-1, 1):
+        tail = m_poly([(cx + sx * 40, cy + 160), (cx + sx * 170, cy + 200), (cx + sx * 250, cy + 470),
+                       (cx + sx * 180, cy + 430), (cx + sx * 140, cy + 500)])
+        ic.put(shade(tail, tex((0.66, 0.08, 0.10), 160, 30, 0.2), bevel=24, spec=0.35))
+        ic.mul(m_and(m_stroke([(cx + sx * 100, cy + 200), (cx + sx * 190, cy + 450)], 8), tail), 0.7)
+    p = []
+    for k in range(144):
+        a = 2 * math.pi * k / 144
+        r = 330 + 16 * math.cos(24 * a)
+        p.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    rim = m_poly(p)
+    ic.put(shade(rim, GOLD, bevel=40, spec=0.75, shininess=40))
+    ic.put(shade(m_ellipse(cx, cy, 262), (0.70, 0.48, 0.14), bevel=18, spec=0.45, ambient=0.5))
+    for k in range(32):
+        a = 2 * math.pi * k / 32
+        ic.put(shade(m_ellipse(cx + 236 * math.cos(a), cy + 236 * math.sin(a), 9), GOLD, bevel=9, spec=0.8))
+    # mountain peak (apex) with a star above it
+    mtn = m_poly([(cx - 190, cy + 140), (cx - 80, cy - 20), (cx - 30, cy + 40), (cx + 40, cy - 130), (cx + 190, cy + 140)])
+    ic.put(shade(mtn, (0.95, 0.76, 0.32), bevel=26, profile="flat", spec=0.8, shininess=44))
+    snow = m_and(mtn, m_poly([(cx + 40, cy - 130), (cx - 10, cy - 50), (cx + 20, cy - 30), (cx + 50, cy - 60),
+                              (cx + 80, cy - 40), (cx + 100, cy - 60)]))
+    ic.put(shade(snow, (1.0, 0.96, 0.82), bevel=10, profile="flat", spec=0.9))
+    s, x, y = 54, cx + 40, cy - 190
+    star = m_poly([(x + (s if k % 2 == 0 else s * 0.4) * math.cos(-math.pi / 2 + k * math.pi / 5),
+                    y + (s if k % 2 == 0 else s * 0.4) * math.sin(-math.pi / 2 + k * math.pi / 5)) for k in range(10)])
+    ic.put(shade(star, (1.0, 0.92, 0.6), bevel=14, spec=0.9, shininess=50))
+    ic.add_glow(star, (1.0, 0.8, 0.3), radius=12, strength=0.6)
+    return ic
+
+
+ALL_ITEMS = ITEMS + ITEMS_BATCH2
+BUILDERS = {k: globals()[k] for k in ALL_ITEMS}
+
+
+def contact_sheet(icons, path, items=ITEMS, cols=3,
+                  title="METINAR-032 — starter item icons (256² PNG, original, MetinAR-Owned)"):
     cell, pad, lab = 256, 28, 34
-    W = 3 * cell + 4 * pad
-    H = 3 * (cell + lab) + 4 * pad + 40
+    rows = (len(items) + cols - 1) // cols
+    W = cols * cell + (cols + 1) * pad
+    H = rows * (cell + lab) + (rows + 1) * pad + 40
     sheet = Image.new("RGBA", (W, H), (38, 36, 40, 255))
     d = ImageDraw.Draw(sheet)
     try:
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 17)
-        title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 19)
+        title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 19)
     except OSError:
-        font = title = ImageFont.load_default()
-    d.text((pad, 12), "METINAR-032 — starter item icons (256² PNG, original, MetinAR-Owned)", fill=(230, 222, 200), font=title)
-    for i, item in enumerate(ITEMS):
-        r, c = divmod(i, 3)
+        font = title_font = ImageFont.load_default()
+    d.text((pad, 12), title, fill=(230, 222, 200), font=title_font)
+    for i, item in enumerate(items):
+        r, c = divmod(i, cols)
         x = pad + c * (cell + pad)
         y = 40 + pad + r * (cell + lab + pad)
         d.rounded_rectangle([x - 4, y - 4, x + cell + 4, y + cell + 4], 14, fill=(64, 60, 58, 255), outline=(120, 112, 100, 255), width=2)
@@ -377,11 +738,14 @@ def contact_sheet(icons, path):
 
 
 def main():
-    out = sys.argv[1] if len(sys.argv) > 1 else "out"
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    out = args[0] if args else "out"
     masters = "--masters" in sys.argv
+    only = [a.split("=", 1)[1].split(",") for a in sys.argv[1:] if a.startswith("--only=")]
+    items = only[0] if only else ALL_ITEMS
     os.makedirs(out, exist_ok=True)
     icons = {}
-    for item in ITEMS:
+    for item in items:
         big = BUILDERS[item]().finish()
         if masters:
             Image.fromarray(big, "RGBA").save(os.path.join(out, "master_%s.png" % item))
@@ -389,7 +753,11 @@ def main():
         icons[item] = im
         im.save(os.path.join(out, "T_ItemIcons_%s_BC.png" % pascal(item)), optimize=True)
         print(item, "->", "T_ItemIcons_%s_BC.png" % pascal(item))
-    contact_sheet(icons, os.path.join(out, "contact_sheet.png"))
+    if all(i in icons for i in ITEMS):
+        contact_sheet(icons, os.path.join(out, "contact_sheet.png"))
+    if all(i in icons for i in ITEMS_BATCH2):
+        contact_sheet(icons, os.path.join(out, "contact_sheet_batch2.png"), ITEMS_BATCH2, cols=4,
+                      title="METINAR-032 batch 2 — item icons (256² PNG, original, MetinAR-Owned)")
 
 
 if __name__ == "__main__":

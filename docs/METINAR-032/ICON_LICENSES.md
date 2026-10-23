@@ -1,4 +1,4 @@
-# METINAR-032 — rejestr licencji ikon przedmiotów (zestaw startowy)
+# METINAR-032 — rejestr licencji ikon przedmiotów (zestaw startowy + partia 2)
 
 Issue #59 · spec `docs/design/ITEMS_COMBAT_SPEC.md` §7 (pozycje) i §8 (budżet: 256² PNG, ASTC) · folder `client/Assets/MetinAR/Textures/ItemIcons/`.
 
@@ -21,3 +21,29 @@ Atrybucja nie jest wymagana (brak treści CC-BY). Rekord w `ASSET_SOURCE.txt`: `
 
 Reprodukcja: `python art-source/ItemIcons/make_icons.py <out_dir>` daje bajtowo identyczne PNG (sprawdzone dwoma przebiegami; numpy 2.5.4, scipy 1.18.1, Pillow 13.0.0).
 Puklerz (`starter_buckler`): ikona narysowana niezależnie od mesha od modeli 3D (#59), więc nie ma między nimi zależności.
+
+## Partia 2 (gałąź `feat/032b-item-icons-batch2`)
+
+Pozostałe identyfikatory przedmiotów z `docs/design/tables/` (`items_starter.csv`, `shop_starter_merchant.csv`,
+`skill_tier_items.csv` = ITEMS_COMBAT_SPEC §4.1). `treatise_proficiency_<classId>` rozwinięty na 4 klasy z `classes_skills.json`
+(`warrior`, `ninja`, `shaman`, `slajter`). Ta sama metoda, ten sam skrypt, te same zasady: praca własna, MetinAR-Owned, bez
+zewnętrznych obrazów, fontów, pędzli, paczek ikon, treści AI ani plików z innych gier (w tym Metin2). Atrybucja nie dotyczy.
+Emblematy na okładkach traktatów (miecz, gwiazda, błyskawica, półksiężyc) i wszystkie kształty to własne proste figury geometryczne.
+
+| Item id | Nazwa (gra) | Plik | Tabela | Źródło | Autor | Licencja | Atrybucja | SHA-256 (PNG) |
+|---|---|---|---|---|---|---|---|---|
+| `spider_silk` | Jedwab Pajęczy | `T_ItemIcons_SpiderSilk_BC.png` | items_starter.csv | oryginał, `make_icons.py` → `spider_silk()` | MetinAR project (agent „grafik” dla właściciela) | MetinAR-Owned | nie dotyczy | `89c6a6a6489ffe19…` |
+| `potion_hp_m` | Mikstura Życia | `T_ItemIcons_PotionHpM_BC.png` | shop_starter_merchant.csv | oryginał, `make_icons.py` → `potion_hp_m()` | MetinAR project (agent „grafik” dla właściciela) | MetinAR-Owned | nie dotyczy | `8f384d9d4bb3a852…` |
+| `potion_mp_s` | Mała Mikstura Many | `T_ItemIcons_PotionMpS_BC.png` | shop_starter_merchant.csv | oryginał, `make_icons.py` → `potion_mp_s()` | MetinAR project (agent „grafik” dla właściciela) | MetinAR-Owned | nie dotyczy | `370fa351aa2441d0…` |
+| `smith_oil` | Olej Kowalski | `T_ItemIcons_SmithOil_BC.png` | shop_starter_merchant.csv | oryginał, `make_icons.py` → `smith_oil()` | MetinAR project (agent „grafik” dla właściciela) | MetinAR-Owned | nie dotyczy | `a84d9df8549b92fe…` |
+| `forget_draught` | Napar Zapomnienia | `T_ItemIcons_ForgetDraught_BC.png` | shop_starter_merchant.csv | oryginał, `make_icons.py` → `forget_draught()` | MetinAR project (agent „grafik” dla właściciela) | MetinAR-Owned | nie dotyczy | `0e1dee65e9966132…` |
+| `bag_expansion` | Sakwa +8 miejsc | `T_ItemIcons_BagExpansion_BC.png` | shop_starter_merchant.csv | oryginał, `make_icons.py` → `bag_expansion()` | MetinAR project (agent „grafik” dla właściciela) | MetinAR-Owned | nie dotyczy | `05e7fabd4571d88d…` |
+| `treatise_proficiency_warrior` | Traktat Biegłości (Wojownik) | `T_ItemIcons_TreatiseProficiencyWarrior_BC.png` | skill_tier_items.csv / shop (§4.1), `<classId>` = `warrior` | oryginał, `make_icons.py` → `_treatise("warrior")` | MetinAR project (agent „grafik” dla właściciela) | MetinAR-Owned | nie dotyczy | `562b20ea10f4996e…` |
+| `treatise_proficiency_ninja` | Traktat Biegłości (Ninja) | `T_ItemIcons_TreatiseProficiencyNinja_BC.png` | skill_tier_items.csv / shop (§4.1), `<classId>` = `ninja` | oryginał, `make_icons.py` → `_treatise("ninja")` | MetinAR project (agent „grafik” dla właściciela) | MetinAR-Owned | nie dotyczy | `e477b3e9fa403a30…` |
+| `treatise_proficiency_shaman` | Traktat Biegłości (Szaman) | `T_ItemIcons_TreatiseProficiencyShaman_BC.png` | skill_tier_items.csv / shop (§4.1), `<classId>` = `shaman` | oryginał, `make_icons.py` → `_treatise("shaman")` | MetinAR project (agent „grafik” dla właściciela) | MetinAR-Owned | nie dotyczy | `6f8f1e0cedc5153d…` |
+| `treatise_proficiency_slajter` | Traktat Biegłości (Slajter) | `T_ItemIcons_TreatiseProficiencySlajter_BC.png` | skill_tier_items.csv / shop (§4.1), `<classId>` = `slajter` | oryginał, `make_icons.py` → `_treatise("slajter")` | MetinAR project (agent „grafik” dla właściciela) | MetinAR-Owned | nie dotyczy | `48f74077fecd82c2…` |
+| `spark_artistry` | Iskra Kunsztu | `T_ItemIcons_SparkArtistry_BC.png` | skill_tier_items.csv (§4.1) | oryginał, `make_icons.py` → `spark_artistry()` | MetinAR project (agent „grafik” dla właściciela) | MetinAR-Owned | nie dotyczy | `71085754e6197201…` |
+| `seal_apex` | Pieczęć Szczytu | `T_ItemIcons_SealApex_BC.png` | skill_tier_items.csv (§4.1) | oryginał, `make_icons.py` → `seal_apex()` | MetinAR project (agent „grafik” dla właściciela) | MetinAR-Owned | nie dotyczy | `56d311fa20d68882…` |
+
+Podgląd partii 2: [contact_sheet_batch2.png](contact_sheet_batch2.png). Partia 1 przy regeneracji pozostaje bajtowo identyczna
+(sprawdzone 2026-10-21; numpy 2.5.4, scipy 1.18.1, Pillow 12.3.0).
