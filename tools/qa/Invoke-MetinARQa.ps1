@@ -25,7 +25,7 @@
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARQa.ps1 -Gates Hygiene,DotNetTests
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARQa.ps1 -SkipAndroid -ApkPath client\Builds\Android\MetinAR-ar-encounter-dev.apk
+  powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARQa.ps1 -SkipAndroid -ApkPath client\Builds\Android\MetinAR-ar-encounter-qa.apk
 #>
 [CmdletBinding()]
 param(
@@ -34,6 +34,11 @@ param(
     [string]$UnityPath,
     [string]$OutputDir,
     [string]$ApkPath,
+    # ApkAudit: required package. Default: the QA build (androidBuild.expectedPackage); with -ApkPath any package in
+    # androidBuild.auditAcceptedPackages (QA build or the game APK of another bot).
+    [string]$ExpectedPackage,
+    # ApkAudit: intended use of the APK -> applicationIdentifier via androidBuild.packagesByPurpose (qa / game / mappoc).
+    [string]$ApkPurpose,
     [switch]$SkipUnity,
     [switch]$SkipAndroid,
     [switch]$StopOnFail,
@@ -245,7 +250,9 @@ try {
                 if ($SkipAndroid) { Add-Result (New-MetinARGateResult -Name 'AndroidBuild' -Status 'SKIP' -Detail 'skipped (-SkipAndroid)'); break }
                 $apk = Join-Path $repo $config.androidBuild.apk
                 if (Test-Path $apk) { Remove-Item $apk -Force }
-                $u = Invoke-UnityGate 'AndroidBuild' $config.androidBuild.method @() -noGraphics ([int]$config.androidBuild.timeoutMinutes)
+                # Platform guard (#31 f194aa9 / audit N-01): the editor's ACTIVE target must be Android, otherwise ARCore's
+                # runtime registrations are left out of the APK. Unity is started with -buildTarget Android.
+                $u = Invoke-UnityGate 'AndroidBuild' $config.androidBuild.method @('-buildTarget', [string]$config.androidBuild.unityBuildTarget) -noGraphics ([int]$config.androidBuild.timeoutMinutes)
                 if ($u -isnot [pscustomobject] -or -not $u.PSObject.Properties['Run']) { Add-Result $u; break }
                 $okLine = @($u.Lines | Where-Object { $_ -match '\[MetinARAndroidDevBuild\] (SUCCESS|FAILED|scenes=)' })
                 # Surface environment causes seen on LuzMen (full disk -> LLVM IO failure / Gradle daemon death) instead of a bare FAIL.
@@ -259,16 +266,17 @@ try {
                 if (-not (Test-Path $apk)) { Add-Result (New-MetinARGateResult -Name 'ApkAudit' -Status 'FAIL' -Detail "APK not found: $(Rel $apk)"); break }
                 $aapt = Find-MetinARAndroidTool -Name aapt -UnityPath $unity
                 if (-not $aapt) { $aapt = Find-MetinARAndroidTool -Name aapt2 -UnityPath $unity }
-                $rep = Get-MetinARApkReport -ApkPath $apk -AaptPath $aapt
+                $rep = Get-MetinARApkReport -ApkPath $apk -AaptPath $aapt -ArCoreRule $config.androidBuild.arCore
                 $budgets = Read-MetinARJson -Path (Join-Path $repo $config.budgetsFile)
                 $problems = @(); $warnings = @()
                 $b = $rep.Badging
                 if ($null -eq $b -or -not $b.Package) { $problems += 'aapt badging unavailable (cannot audit manifest)' }
                 else {
-                    if ($b.Package -ne $config.androidBuild.expectedPackage) { $problems += "package $($b.Package) != $($config.androidBuild.expectedPackage)" }
+                    $accepted = Resolve-MetinARExpectedPackages -AndroidBuild $config.androidBuild -ExpectedPackage $ExpectedPackage -ApkPurpose $ApkPurpose -ExternalApk:([bool]$ApkPath)
+                    if ($accepted -cnotcontains $b.Package) { $problems += "package $($b.Package) not in expected [$($accepted -join ', ')]" }
                     if ($config.androidBuild.requireDebuggable -and -not $b.Debuggable) { $problems += 'not a development (debuggable) build' }
                     if ($b.MinSdk -lt [int]$config.androidBuild.minSdk) { $problems += "minSdk $($b.MinSdk) < $($config.androidBuild.minSdk)" }
-                    $perm = Test-MetinARPermissionPolicy -Permissions $b.Permissions -Forbidden @($config.permissions.forbidden) -Allowed @($config.permissions.allowed)
+                    $perm = Test-MetinARPermissionPolicy -Permissions $b.Permissions -Forbidden @($config.permissions.forbidden) -Allowed (Resolve-MetinARPermissionAllowList -Allowed @($config.permissions.allowed) -Package $b.Package)
                     if ($perm.Forbidden.Count) { $problems += "FORBIDDEN permissions: $($perm.Forbidden -join ', ')" }
                     if ($perm.Unexpected.Count) { $warnings += "permissions not in allow-list (review): $($perm.Unexpected -join ', ')" }
                 }
@@ -278,6 +286,7 @@ try {
                 if (-not $rep.HasIl2Cpp -or -not $rep.HasGlobalMetadata) { $problems += 'IL2CPP markers missing (libil2cpp.so / global-metadata.dat)' }
                 if ($rep.HasMonoAssemblies) { $problems += 'Mono managed assemblies present (expected IL2CPP)' }
                 foreach ($pd in @($rep.PlayerData.Problems)) { $problems += "PLAYER DATA: $pd" }   # #31 stale .split chunks
+                foreach ($ac in @($rep.ArCore.Problems)) { $problems += "ARCORE: $ac" }            # #31 f194aa9 / audit N-01
                 if ($rep.SizeMB -gt [double]$budgets.apk.maxDevApkMB) { $problems += "APK $($rep.SizeMB) MB > prototype budget $($budgets.apk.maxDevApkMB) MB" }
                 elseif ($rep.SizeMB -gt [double]$budgets.apk.warnDevApkMB) { $warnings += "APK $($rep.SizeMB) MB > warn level $($budgets.apk.warnDevApkMB) MB" }
                 $st = if ($problems.Count) { 'FAIL' } elseif ($warnings.Count) { 'WARN' } else { 'PASS' }
@@ -288,7 +297,9 @@ try {
                     "abis: $($rep.Abis -join ',')  il2cpp: $($rep.HasIl2Cpp)  global-metadata: $($rep.HasGlobalMetadata)",
                     ("player data (assets/bin/Data): {0} whole, split: {1}; consistency {2}" -f @($rep.PlayerData.WholeFiles).Count,
                         ((@($rep.PlayerData.SplitFiles.PSObject.Properties) | ForEach-Object { "$($_.Name) x$($_.Value)" }) -join ', '),
-                        $(if (@($rep.PlayerData.Problems).Count) { 'FAIL' } else { 'OK' }))
+                        $(if (@($rep.PlayerData.Problems).Count) { 'FAIL' } else { 'OK' })),
+                    ("ARCore registrations ({0} in {1}): {2}/{3} required, {4} {0} records; {5}" -f $config.androidBuild.arCore.assembly,
+                        $config.androidBuild.arCore.runtimeInitializeEntry, $rep.ArCore.Found, $rep.ArCore.Required, $rep.ArCore.AssemblyRecords, $rep.ArCore.Status)
                 )
                 if ($b) {
                     $ev += "package: $($b.Package)  version: $($b.VersionName) ($($b.VersionCode))  minSdk: $($b.MinSdk)  targetSdk: $($b.TargetSdk)  debuggable: $($b.Debuggable)"

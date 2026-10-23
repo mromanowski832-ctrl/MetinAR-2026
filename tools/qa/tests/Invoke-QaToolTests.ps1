@@ -24,7 +24,7 @@ Assert 'badging.permissions' (@($b.Permissions).Count -eq 5)
 
 # --- permission policy
 $cfg = Get-Content -Raw (Join-Path $PSScriptRoot '..\qa-config.json') | ConvertFrom-Json
-$p = Test-MetinARPermissionPolicy -Permissions $b.Permissions -Forbidden @($cfg.permissions.forbidden) -Allowed @($cfg.permissions.allowed)
+$p = Test-MetinARPermissionPolicy -Permissions $b.Permissions -Forbidden @($cfg.permissions.forbidden) -Allowed (Resolve-MetinARPermissionAllowList -Allowed @($cfg.permissions.allowed) -Package $b.Package)
 Assert 'perm.current-build-pass' ($p.Status -eq 'PASS' -and $p.BackgroundLocationAbsent) "status=$($p.Status) unexpected=$($p.Unexpected -join ',')"
 $p2 = Test-MetinARPermissionPolicy -Permissions (@($b.Permissions) + 'android.permission.ACCESS_BACKGROUND_LOCATION') -Forbidden @($cfg.permissions.forbidden) -Allowed @($cfg.permissions.allowed)
 Assert 'perm.background-location-fails' ($p2.Status -eq 'FAIL' -and -not $p2.BackgroundLocationAbsent)
@@ -203,9 +203,8 @@ try {
     Assert 'playerdata.apkreport-good' (@((Get-MetinARApkReport -ApkPath $good).PlayerData.Problems).Count -eq 0)
     $tool = Join-Path $PSScriptRoot '../Test-ApkPlayerData.ps1'
     $psExe = (Get-Process -Id $PID).Path
-    & $psExe -NoProfile -File $tool -ApkPath $good *> $null; $codeGood = $LASTEXITCODE
     & $psExe -NoProfile -File $tool -ApkPath $bad *> $null; $codeBad = $LASTEXITCODE
-    Assert 'playerdata.cli-exit-codes' ($codeGood -eq 0 -and $codeBad -eq 1) "good=$codeGood bad=$codeBad"
+    Assert 'playerdata.cli-exit-codes' ($codeBad -eq 1) "bad=$codeBad (pass case with ARCore records: arcore.cli-exit-codes)"
 } finally { Remove-Item -Recurse -Force $zdir -ErrorAction SilentlyContinue }
 
 # --- #31 follow-up: serialized fields under #if UNITY_EDITOR / DEVELOPMENT_BUILD
@@ -247,6 +246,164 @@ Assert 'condfields.count' ($cf.Count -eq 4) ($cfl -join ',')
 $hyg = @(& (Join-Path $PSScriptRoot '../Test-RepoHygiene.ps1') -RepoRoot (Join-Path $PSScriptRoot '../../..') -PassThru)
 Assert 'condfields.repo-clean' (@($hyg | Where-Object { $_.Name -eq 'EditorOnlySerializedFields' -and $_.Status -eq 'PASS' }).Count -eq 1) (($hyg | Where-Object { $_.Name -match 'EditorOnly|ManagedStripping' } | ForEach-Object { "$($_.Name)=$($_.Status): $($_.Detail)" }) -join ' || ')
 Assert 'stripping.reported' (@($hyg | Where-Object { $_.Name -eq 'ManagedStripping' -and $_.Detail -match 'Android stripping=' }).Count -eq 1)
+
+# --- METINAR-037 (#73): adb devices parsing, lost-connection output, install guard, package-scoped allow-list
+$hdr = 'List of devices attached'
+Assert 'adb.device' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, "R58N123ABC`tdevice", '')).State -eq 'device')
+Assert 'adb.missing-empty' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, '')).State -eq 'missing')
+Assert 'adb.missing-nooutput' ((ConvertFrom-MetinARAdbDevices -Lines @()).State -eq 'missing')
+Assert 'adb.daemon-chatter' ((ConvertFrom-MetinARAdbDevices -Lines @('* daemon not running; starting now at tcp:5037', '* daemon started successfully', $hdr, "R58N123ABC`tdevice")).State -eq 'device')
+Assert 'adb.offline' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, "R58N123ABC`toffline")).State -eq 'offline')
+Assert 'adb.unauthorized' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, "R58N123ABC`tunauthorized")).State -eq 'unauthorized')
+Assert 'adb.no-permissions' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, 'R58N123ABC      no permissions (user in plugdev group; are your udev rules wrong?)')).State -eq 'unauthorized')
+$two = @($hdr, "R58N123ABC`tdevice", "emulator-5554`tdevice")
+Assert 'adb.multiple' ((ConvertFrom-MetinARAdbDevices -Lines $two).State -eq 'multiple')
+Assert 'adb.serial-selects' ((ConvertFrom-MetinARAdbDevices -Lines $two -Serial 'R58N123ABC').State -eq 'device')
+Assert 'adb.serial-gone' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, "emulator-5554`tdevice") -Serial 'R58N123ABC').State -eq 'missing')
+Assert 'adb.serial-offline' ((ConvertFrom-MetinARAdbDevices -Lines @($hdr, "R58N123ABC`toffline", "emulator-5554`tdevice") -Serial 'R58N123ABC').State -eq 'offline')
+Assert 'adb.lost-notfound' (Test-MetinARAdbOutputLost -Lines @("error: device 'R58N123ABC' not found"))
+Assert 'adb.lost-nodevices' (Test-MetinARAdbOutputLost -Lines @('adb.exe: error: no devices/emulators found'))
+Assert 'adb.lost-offline' (Test-MetinARAdbOutputLost -Lines @('error: device offline'))
+Assert 'adb.not-lost-logcat' (-not (Test-MetinARAdbOutputLost -Lines (Lines 'logcat-clean.txt')))
+$okDump = @('10-20 04:30:18.123  4242  4242 I Unity   : [MetinARPerf] v=1 event=start', '10-20 04:30:18.500  1500  1600 I ActivityManager: Displayed com.metinar.game/com.unity3d.player.UnityPlayerGameActivity')
+Assert 'cap.ok-pid' ((Test-MetinARLogcatCapture -Lines $okDump -ExitCode 0 -Package 'com.metinar.game' -Pids @(4242)).Kind -eq 'Ok')
+Assert 'cap.ok-package-no-pid' ((Test-MetinARLogcatCapture -Lines $okDump[1] -ExitCode 0 -Package 'com.metinar.game').Kind -eq 'Ok')
+Assert 'cap.empty-array' ((Test-MetinARLogcatCapture -Lines @() -ExitCode 0 -Package 'com.metinar.game' -Pids @(4242)).Reason -eq 'empty logcat dump')
+Assert 'cap.null' ((Test-MetinARLogcatCapture -Lines $null -ExitCode 0 -Package 'com.metinar.game').Kind -eq 'CollectionError')
+Assert 'cap.whitespace-only' ((Test-MetinARLogcatCapture -Lines @('', '   ', "`t") -ExitCode 0 -Package 'com.metinar.game' -Pids @(4242)).Kind -eq 'CollectionError')
+$c = Test-MetinARLogcatCapture -Lines $okDump -ExitCode 1 -Package 'com.metinar.game' -Pids @(4242)
+Assert 'cap.exit-nonzero-with-content' ($c.Kind -eq 'CollectionError' -and $c.Reason -match 'code 1')
+Assert 'cap.exit-unknown' ((Test-MetinARLogcatCapture -Lines $okDump -ExitCode $null -Package 'com.metinar.game' -Pids @(4242)).Kind -eq 'CollectionError')
+$noApp = @('10-20 04:30:18.500  1500  1600 I ActivityManager: Displayed com.other.app/.Main', '10-20 04:30:19.000   999   999 I chatty  : x')
+Assert 'cap.no-app-lines' ((Test-MetinARLogcatCapture -Lines $noApp -ExitCode 0 -Package 'com.metinar.game' -Pids @(4242)).Kind -eq 'CollectionError')
+Assert 'cap.qa-package-is-not-game' ((Test-MetinARLogcatCapture -Lines @('10-20 04:30:18.500  1500  1600 I ActivityManager: Start proc com.metinar.game.qa') -ExitCode 0 -Package 'com.metinar.game').Kind -eq 'CollectionError')
+Assert 'cap.lost-wins' ((Test-MetinARLogcatCapture -Lines @('error: device offline') -ExitCode 0 -Package 'com.metinar.game').Kind -eq 'Lost')
+Assert 'cap.lost-with-exit' ((Test-MetinARLogcatCapture -Lines @('adb.exe: error: no devices/emulators found') -ExitCode 1 -Package 'com.metinar.game').Kind -eq 'Lost')
+Assert 'cap.brief-format-pid' ((Test-MetinARLogcatCapture -Lines @('I/Unity   ( 4242): hello') -ExitCode 0 -Package 'com.metinar.game' -Pids @(4242)).Kind -eq 'Ok')
+Assert 'adb.not-lost-app-error' (-not (Test-MetinARAdbOutputLost -Lines @('10-20 04:30:30.000  4242  4242 E Unity   : error: device not ready in game')))
+$g = Test-MetinARInstallGuard -Package 'com.metinar.game' -ProtectedPackages @('com.metinar.game', 'com.metinar.game.mappoc') -InstalledPackages @('com.metinar.game')
+Assert 'guard.blocks-installed-game' ($g.Status -eq 'FAIL' -and $g.Reason -match 'would replace the installed com\.metinar\.game')
+$g = Test-MetinARInstallGuard -Package 'com.metinar.game' -ProtectedPackages @('com.metinar.game') -InstalledPackages @('com.metinar.game') -AllowReplace
+Assert 'guard.allow-replace' ($g.Status -eq 'PASS' -and $g.Reason -match 'replacing installed')
+Assert 'guard.game-not-installed' ((Test-MetinARInstallGuard -Package 'com.metinar.game' -ProtectedPackages @('com.metinar.game') -InstalledPackages @()).Status -eq 'PASS')
+Assert 'guard.qa-next-to-game' ((Test-MetinARInstallGuard -Package 'com.metinar.game.qa' -ProtectedPackages @('com.metinar.game', 'com.metinar.game.mappoc') -InstalledPackages @('com.metinar.game', 'com.metinar.game.qa')).Status -eq 'PASS')
+Assert 'guard.prefix-is-not-protected' ((Test-MetinARInstallGuard -Package 'com.metinar.gam' -ProtectedPackages @('com.metinar.game') -InstalledPackages @('com.metinar.gam')).Status -eq 'PASS')
+$al = Resolve-MetinARPermissionAllowList -Allowed @('android.permission.CAMERA', '{package}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION') -Package 'com.metinar.game.qa'
+Assert 'perm.package-expanded' ($al -contains 'com.metinar.game.qa.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION' -and $al -contains 'android.permission.CAMERA')
+$pol = Test-MetinARPermissionPolicy -Permissions @('com.metinar.game.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION') -Forbidden @() -Allowed $al
+Assert 'perm.other-package-receiver-flagged' ($pol.Status -eq 'WARN')
+$qcfg = Get-Content -Raw (Join-Path $PSScriptRoot '../qa-config.json') | ConvertFrom-Json
+Assert 'config.qa-package-separate' ($qcfg.androidBuild.expectedPackage -eq 'com.metinar.game.qa' -and $qcfg.androidBuild.gamePackage -eq 'com.metinar.game' -and
+    @($qcfg.androidBuild.protectedPackages) -contains 'com.metinar.game' -and @($qcfg.androidBuild.protectedPackages) -notcontains $qcfg.androidBuild.expectedPackage -and
+    $qcfg.androidBuild.method -match 'BuildArEncounterQaApk$' -and $qcfg.androidBuild.apk -match '-qa\.apk$')
+
+# --- lead decision 2026-10-21 15:28: a Unity exception with a MetinAR. frame anywhere in its stack FAILs the device smoke
+function LcBlock([int]$sec, [string[]]$msgs, [string]$level = 'E', [string]$tid = '4260', [string]$procId = '4242') {
+    @($msgs | ForEach-Object { "10-21 15:00:0$sec.100  $procId  $tid $level Unity   : $_" })
+}
+$arfStack = @('NullReferenceException: Object reference not set to an instance of an object.',
+              '  at UnityEngine.XR.ARFoundation.ARSession.Update () [0x00000] in <00000000000000000000000000000000>:0 ',
+              '(Filename: currently not available on il2cpp Line: -1)')
+$deepStack = @('InvalidOperationException: Sequence contains no elements',
+               '  at System.Linq.Enumerable.First[TSource] (System.Collections.Generic.IEnumerable`1[T] source) [0x00000] in <00000000000000000000000000000000>:0 ',
+               '  at UnityEngine.Events.InvokableCall.Invoke () [0x00000] in <00000000000000000000000000000000>:0 ',
+               '  at MetinAR.Combat.ArDamageDealer.TryHit (System.Int32 swingId) [0x00000] in <00000000000000000000000000000000>:0 ',
+               '  at UnityEngine.UI.Button.Press () [0x00000] in <00000000000000000000000000000000>:0 ',
+               '(Filename: currently not available on il2cpp Line: -1)')
+$x = Find-MetinARLogcatProblems -Lines (LcBlock 1 $arfStack) -Package 'com.metinar.game.qa' -Pids @(4242)
+Assert 'mex.non-metinar-stays-warn' ($x.Status -eq 'WARN' -and $x.MetinARExceptions.Count -eq 0 -and $x.UnityErrors.Count -ge 1)
+$x = Find-MetinARLogcatProblems -Lines (LcBlock 1 $deepStack) -Package 'com.metinar.game.qa' -Pids @(4242)
+Assert 'mex.frame-deep-in-stack-fails' ($x.Status -eq 'FAIL' -and $x.MetinARExceptions.Count -eq 1 -and $x.MetinARExceptions[0] -match 'InvalidOperationException.*\| at MetinAR\.Combat\.ArDamageDealer\.TryHit') ($x.MetinARExceptions -join ' || ')
+$x = Find-MetinARLogcatProblems -Lines (LcBlock 1 @('MetinAR.Encounter.EncounterStateException: bad transition Placed -> Scanning', '(Filename: x Line: 1)')) -Package 'com.metinar.game.qa' -Pids @(4242)
+Assert 'mex.metinar-exception-type-fails' ($x.Status -eq 'FAIL' -and $x.MetinARExceptions.Count -eq 1)
+$il2cppStyle = @('ArgumentException: bad value', 'MetinAR.Hands.FppHandsRig:LateUpdate()', '')
+Assert 'mex.il2cpp-colon-frame-fails' ((Find-MetinARLogcatProblems -Lines (LcBlock 1 $il2cppStyle) -Package 'com.metinar.game.qa' -Pids @(4242)).MetinARExceptions.Count -eq 1)
+$rethrow = @('Exception: wrapper', 'Rethrow as TargetInvocationException: inner', '  at MetinAR.Map.WorldMapController.Start () [0x00000] in <0>:0 ')
+Assert 'mex.rethrow-same-block' ((Find-MetinARLogcatProblems -Lines (LcBlock 1 $rethrow) -Package 'com.metinar.game.qa' -Pids @(4242)).MetinARExceptions.Count -eq 1)
+# not an exception block: MetinAR text on normal lines, after the block ended, or on another thread
+$noise = @() + (LcBlock 1 $arfStack) + (LcBlock 2 @('MetinAR.QA.MetinARPerfProbe bootstrap', '[MetinARPerf] v=1 event=start', 'package com.metinar.game.qa ready') 'I' '4260') +
+         (LcBlock 3 @('NullReferenceException: x')) + (LcBlock 3 @('  at MetinAR.Combat.ArDamageDealer.TryHit () [0x0] in <0>:0 ') 'E' '4299')
+$x = Find-MetinARLogcatProblems -Lines $noise -Package 'com.metinar.game.qa' -Pids @(4242)
+Assert 'mex.no-false-positive-text-other-thread' ($x.Status -eq 'WARN' -and $x.MetinARExceptions.Count -eq 0) ($x.MetinARExceptions -join ' || ')
+$afterEnd = @() + (LcBlock 1 @('NullReferenceException: x', '(Filename: y Line: 2)')) + (LcBlock 1 @('  MetinAR.Combat.ArDamageDealer:TryHit() mentioned in a later log') 'I')
+Assert 'mex.filename-ends-block' ((Find-MetinARLogcatProblems -Lines $afterEnd -Package 'com.metinar.game.qa' -Pids @(4242)).MetinARExceptions.Count -eq 0)
+$otherProc = LcBlock 1 $deepStack 'E' '5000' '5000'
+Assert 'mex.other-process-ignored' ((Find-MetinARLogcatProblems -Lines $otherProc -Package 'com.metinar.game.qa' -Pids @(4242)).Status -eq 'PASS')
+$lower = LcBlock 1 @('NullReferenceException: x', '  at metinar.combat.Foo.Bar () [0x0] in <0>:0 ', '  at XMetinAR.Foo.Bar () [0x0] in <0>:0 ')
+Assert 'mex.case-and-prefix-exact' ((Find-MetinARLogcatProblems -Lines $lower -Package 'com.metinar.game.qa' -Pids @(4242)).MetinARExceptions.Count -eq 0)
+$brief = @('E/Unity   ( 4242): NullReferenceException: x', 'E/Unity   ( 4242):   at MetinAR.Combat.ArDamageDealer.TryHit () [0x0] in <0>:0 ')
+Assert 'mex.brief-format' ((Find-MetinARLogcatProblems -Lines $brief -Package 'com.metinar.game.qa' -Pids @(4242)).MetinARExceptions.Count -eq 1)
+$x = Find-MetinARLogcatProblems -Lines ((LcBlock 1 $deepStack) + (LcBlock 2 $deepStack)) -Package 'com.metinar.game.qa' -Pids @(4242)
+Assert 'mex.two-blocks-counted' ($x.MetinARExceptions.Count -eq 2)
+$x = Find-MetinARLogcatProblems -Lines ((LcBlock 1 $arfStack) + @('10-21 15:00:05.000  4242  4242 F libc    : Fatal signal 6 (SIGABRT)')) -Package 'com.metinar.game.qa' -Pids @(4242)
+Assert 'mex.non-metinar-but-fatal-fails' ($x.Status -eq 'FAIL' -and $x.MetinARExceptions.Count -eq 0)
+
+# --- METINAR-037 / audit UPDATE_1 N-01: ARCore registrations, platform guard, applicationIdentifier by purpose
+$arRule = $qcfg.androidBuild.arCore
+$arNoReg = Get-Content -Raw (Join-Path $fx 'runtime-init-e18df69-no-arcore.json')     # real QA APK e18df69 (built without -buildTarget Android)
+$arOkReg = Get-Content -Raw (Join-Path $fx 'runtime-init-synthetic-arcore-ok.json')   # same + the 11 Unity.XR.ARCore records
+$arEntries = @('lib/arm64-v8a/libUnityARCore.so', 'assets/bin/Data/UnitySubsystems/UnityARCore/UnitySubsystemsManifest.json', 'assets/bin/Data/RuntimeInitializeOnLoads.json')
+Assert 'arcore.rule-11' (@($arRule.requiredRegistrations).Count -eq 11 -and $arRule.assembly -eq 'Unity.XR.ARCore')
+$a = Test-MetinARApkArCore -Entries $arEntries -RuntimeInitializeJson $arOkReg -Rule $arRule
+Assert 'arcore.ok' ($a.Status -eq 'PASS' -and $a.Found -eq 11 -and $a.AssemblyRecords -eq 11 -and @($a.Problems).Count -eq 0) (($a.Problems) -join ' | ')
+$a = Test-MetinARApkArCore -Entries $arEntries -RuntimeInitializeJson $arNoReg -Rule $arRule
+Assert 'arcore.e18df69-has-none' ($a.Status -eq 'FAIL' -and $a.Found -eq 0 -and @($a.Missing).Count -eq 11 -and (($a.Problems -join ' ') -match '0/11 Unity\.XR\.ARCore.*-buildTarget Android'))
+$noSession = $arOkReg -replace '"className":"ARCoreSessionSubsystem"', '"className":"ARCoreSessionSubsystemX"'
+$a = Test-MetinARApkArCore -Entries $arEntries -RuntimeInitializeJson $noSession -Rule $arRule
+Assert 'arcore.session-missing' ($a.Status -eq 'FAIL' -and $a.Found -eq 10 -and @($a.Missing) -contains 'ARCoreSessionSubsystem.RegisterDescriptor')
+$wrongAsm = $arOkReg -replace '"assemblyName":"Unity.XR.ARCore"', '"assemblyName":"Unity.XR.ARFoundation"'
+Assert 'arcore.wrong-assembly-not-counted' ((Test-MetinARApkArCore -Entries $arEntries -RuntimeInitializeJson $wrongAsm -Rule $arRule).Found -eq 0)
+$caseAsm = $arOkReg -replace '"assemblyName":"Unity.XR.ARCore"', '"assemblyName":"unity.xr.arcore"'
+Assert 'arcore.assembly-case-sensitive' ((Test-MetinARApkArCore -Entries $arEntries -RuntimeInitializeJson $caseAsm -Rule $arRule).Status -eq 'FAIL')
+$a = Test-MetinARApkArCore -Entries @($arEntries | Where-Object { $_ -notmatch 'RuntimeInitialize' }) -RuntimeInitializeJson $null -Rule $arRule
+Assert 'arcore.json-missing' ($a.Status -eq 'FAIL' -and (($a.Problems -join ' ') -match 'missing assets/bin/Data/RuntimeInitializeOnLoads\.json'))
+$a = Test-MetinARApkArCore -Entries $arEntries -RuntimeInitializeJson '{"root":[{"assemblyName":' -Rule $arRule
+Assert 'arcore.json-malformed' ($a.Status -eq 'FAIL' -and (($a.Problems -join ' ') -match 'not valid JSON'))
+$a = Test-MetinARApkArCore -Entries @($arEntries | Where-Object { $_ -notmatch 'libUnityARCore' }) -RuntimeInitializeJson $arOkReg -Rule $arRule
+Assert 'arcore.native-lib-missing' ($a.Status -eq 'FAIL' -and $a.Found -eq 11 -and (($a.Problems -join ' ') -match 'missing lib/arm64-v8a/libUnityARCore\.so'))
+Assert 'arcore.backslash-entries' ((Test-MetinARApkArCore -Entries @($arEntries | ForEach-Object { $_ -replace '/', '\' }) -RuntimeInitializeJson $arOkReg -Rule $arRule).Status -eq 'PASS')
+# applicationIdentifier by purpose
+$ab = $qcfg.androidBuild
+Assert 'pkg.purpose-qa' ((Resolve-MetinARExpectedPackages -AndroidBuild $ab -ApkPurpose 'qa') -join ',' -eq 'com.metinar.game.qa')
+Assert 'pkg.purpose-game' ((Resolve-MetinARExpectedPackages -AndroidBuild $ab -ApkPurpose 'game') -join ',' -eq 'com.metinar.game')
+Assert 'pkg.purpose-mappoc' ((Resolve-MetinARExpectedPackages -AndroidBuild $ab -ApkPurpose 'mappoc') -join ',' -eq 'com.metinar.game.mappoc')
+Assert 'pkg.default-own-build-qa' ((Resolve-MetinARExpectedPackages -AndroidBuild $ab) -join ',' -eq 'com.metinar.game.qa')
+Assert 'pkg.external-accepts-qa-or-game' ((Resolve-MetinARExpectedPackages -AndroidBuild $ab -ExternalApk) -join ',' -eq 'com.metinar.game.qa,com.metinar.game')
+Assert 'pkg.explicit-wins' ((Resolve-MetinARExpectedPackages -AndroidBuild $ab -ExpectedPackage 'com.x.y' -ApkPurpose 'qa') -join ',' -eq 'com.x.y')
+$threw = $false; try { Resolve-MetinARExpectedPackages -AndroidBuild $ab -ApkPurpose 'release2' | Out-Null } catch { $threw = $true }
+Assert 'pkg.unknown-purpose-throws' $threw
+Assert 'pkg.game-apk-not-qa' (@(Resolve-MetinARExpectedPackages -AndroidBuild $ab -ApkPurpose 'qa') -cnotcontains 'com.metinar.game')
+# platform guard: the runner starts the Android build with -buildTarget Android
+$runner = Get-Content -Raw (Join-Path $PSScriptRoot '../Invoke-MetinARQa.ps1')
+Assert 'guard.runner-buildtarget' ($ab.unityBuildTarget -eq 'Android' -and $runner -match "Invoke-UnityGate 'AndroidBuild' \S+ @\('-buildTarget', \[string\]\`$config\.androidBuild\.unityBuildTarget\)")
+$devBuild = Get-Content -Raw (Join-Path $PSScriptRoot '../../../client/Assets/MetinAR/Editor/MetinARAndroidDevBuild.cs')
+Assert 'guard.qa-build-refuses-non-android' ($devBuild -match 'activeBuildTarget != BuildTarget\.Android')
+# end-to-end over zip files (what ApkAudit / the device harness read)
+$zd = Join-Path ([IO.Path]::GetTempPath()) ("metinar-qa-arcore-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $zd | Out-Null
+function New-ArApk([string]$path, [hashtable]$content) {
+    $fs = [IO.File]::Open($path, [IO.FileMode]::Create)
+    $za = New-Object System.IO.Compression.ZipArchive($fs, [System.IO.Compression.ZipArchiveMode]::Create)
+    foreach ($k in $content.Keys) { $e = $za.CreateEntry($k); $w = New-Object IO.StreamWriter($e.Open()); $w.Write([string]$content[$k]); $w.Dispose() }
+    $za.Dispose(); $fs.Dispose()
+}
+try {
+    $base = @{ 'lib/arm64-v8a/libil2cpp.so' = 'x'; 'assets/bin/Data/Managed/Metadata/global-metadata.dat' = 'x'; 'assets/bin/Data/globalgamemanagers' = 'x'
+               'lib/arm64-v8a/libUnityARCore.so' = 'x'; 'assets/bin/Data/UnitySubsystems/UnityARCore/UnitySubsystemsManifest.json' = '{}' }
+    $okApk = Join-Path $zd 'ok.apk'; $badApk = Join-Path $zd 'bad.apk'
+    $c = $base.Clone(); $c['assets/bin/Data/RuntimeInitializeOnLoads.json'] = $arOkReg; New-ArApk $okApk $c
+    $c = $base.Clone(); $c['assets/bin/Data/RuntimeInitializeOnLoads.json'] = $arNoReg; New-ArApk $badApk $c
+    $r1 = Get-MetinARApkReport -ApkPath $okApk -ArCoreRule $arRule
+    $r2 = Get-MetinARApkReport -ApkPath $badApk -ArCoreRule $arRule
+    Assert 'arcore.apkreport-ok' ($r1.ArCore.Status -eq 'PASS' -and $r1.ArCore.Found -eq 11)
+    Assert 'arcore.apkreport-bad' ($r2.ArCore.Status -eq 'FAIL' -and $r2.ArCore.Found -eq 0)
+    Assert 'arcore.apkreport-no-rule' ($null -eq (Get-MetinARApkReport -ApkPath $okApk).ArCore)
+    $tool = Join-Path $PSScriptRoot '../Test-ApkPlayerData.ps1'; $psExe = (Get-Process -Id $PID).Path
+    & $psExe -NoProfile -File $tool -ApkPath $okApk *> $null; $cOk = $LASTEXITCODE
+    $out = & $psExe -NoProfile -File $tool -ApkPath $badApk 2>&1 | Out-String; $cBad = $LASTEXITCODE
+    Assert 'arcore.cli-exit-codes' ($cOk -eq 0 -and $cBad -eq 1 -and $out -match 'ARCORE: .*0/11') "ok=$cOk bad=$cBad"
+    Assert 'zip.entry-text-absent' ($null -eq (Get-MetinARZipEntryText -Path $okApk -Entry 'nope.txt'))
+} finally { Remove-Item -Recurse -Force $zd -ErrorAction SilentlyContinue }
 
 Write-Host ''
 Write-Host "QA tool tests: $script:passed passed, $script:failed failed"

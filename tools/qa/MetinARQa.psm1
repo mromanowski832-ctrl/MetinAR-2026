@@ -338,8 +338,89 @@ function Test-MetinARApkPlayerData {
     [pscustomobject]@{ Problems = $problems.ToArray(); WholeFiles = @($whole | Sort-Object); SplitFiles = [pscustomobject]$splitInfo }
 }
 
+function Get-MetinARZipEntryText {
+    <# UTF-8 text of one zip entry, or $null when the entry is absent. #>
+    param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][string]$Entry)
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $Path).Path)
+    try {
+        $e = $zip.GetEntry($Entry)
+        if ($null -eq $e) { return $null }
+        $r = New-Object System.IO.StreamReader($e.Open(), [System.Text.Encoding]::UTF8)
+        try { return $r.ReadToEnd() } finally { $r.Dispose() }
+    } finally { $zip.Dispose() }
+}
+
+function Test-MetinARApkArCore {
+    <#
+      METINAR-037 / audit UPDATE_1 N-01 (independent of the C# build validator): an Android APK can start ARCore only when
+      the Unity.XR.ARCore [RuntimeInitializeOnLoadMethod] registrations (session, camera, planes, ...) are listed in
+      assets/bin/Data/RuntimeInitializeOnLoads.json. They are missing when the APK was built while the editor's ACTIVE build
+      target was not Android (#31 f194aa9: "Failed to load session subsystem" -> AR unavailable). The JSON is parsed as JSON
+      (records under "root"), the rule (assembly, required entries, required Class.Method list) comes from qa-config.json.
+      Returns { Status, Found, Required, AssemblyRecords, Missing, Problems }.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Entries,
+        [AllowNull()][AllowEmptyString()][string]$RuntimeInitializeJson,
+        [Parameter(Mandatory = $true)]$Rule
+    )
+    $names = @{}
+    foreach ($n in @($Entries)) { if ($n) { $names[("$n" -replace '\\', '/')] = $true } }
+    $problems = New-Object System.Collections.Generic.List[string]
+    foreach ($req in @($Rule.requiredEntries)) { if (-not $names.ContainsKey($req)) { $problems.Add("missing $req") } }
+    $required = @($Rule.requiredRegistrations)
+    $found = 0; $asmRecords = 0; $missing = @()
+    $records = $null
+    if (-not $names.ContainsKey($Rule.runtimeInitializeEntry) -or [string]::IsNullOrEmpty($RuntimeInitializeJson)) {
+        $problems.Add("missing $($Rule.runtimeInitializeEntry)")
+        $missing = $required
+    } else {
+        try { $records = @((ConvertFrom-Json -InputObject $RuntimeInitializeJson -ErrorAction Stop).root) } catch { $records = $null }
+        if ($null -eq $records) {
+            $problems.Add("$($Rule.runtimeInitializeEntry) is not valid JSON with a 'root' array")
+            $missing = $required
+        } else {
+            $have = @{}
+            foreach ($r in $records) {
+                if ($null -eq $r -or -not $r.PSObject.Properties['assemblyName']) { continue }
+                if ([string]$r.assemblyName -cne [string]$Rule.assembly) { continue }
+                $asmRecords++
+                $have[("{0}.{1}" -f $r.className, $r.methodName)] = $true
+            }
+            foreach ($q in $required) { if ($have.ContainsKey($q)) { $found++ } else { $missing += $q } }
+            if ($missing.Count) {
+                $problems.Add(("{0}: {1}/{2} {3} registrations (missing: {4}) - ARCore subsystems will not load ('AR unavailable'); build with the active target Android (-buildTarget Android)" -f $Rule.runtimeInitializeEntry, $found, $required.Count, $Rule.assembly, ($missing -join ', ')))
+            }
+        }
+    }
+    [pscustomobject]@{
+        Status          = $(if ($problems.Count) { 'FAIL' } else { 'PASS' })
+        Found           = $found
+        Required        = $required.Count
+        AssemblyRecords = $asmRecords
+        Missing         = @($missing)
+        Problems        = @($problems)
+    }
+}
+
+function Resolve-MetinARExpectedPackages {
+    <# Which applicationIdentifier ApkAudit accepts: -ExpectedPackage pins one id; -ApkPurpose (qa/game/mappoc) maps through
+       androidBuild.packagesByPurpose; otherwise the runner's own build (expectedPackage) or, for an external -ApkPath, the
+       auditAcceptedPackages list. #>
+    param([Parameter(Mandatory = $true)]$AndroidBuild, [string]$ExpectedPackage, [string]$ApkPurpose, [switch]$ExternalApk)
+    if ($ExpectedPackage) { return @($ExpectedPackage) }
+    if ($ApkPurpose) {
+        $map = $AndroidBuild.packagesByPurpose
+        if ($null -eq $map -or -not $map.PSObject.Properties[$ApkPurpose]) { throw "unknown -ApkPurpose '$ApkPurpose' (qa-config androidBuild.packagesByPurpose)" }
+        return @([string]$map.$ApkPurpose)
+    }
+    if ($ExternalApk) { return @($AndroidBuild.auditAcceptedPackages) }
+    return @([string]$AndroidBuild.expectedPackage)
+}
+
 function Get-MetinARApkReport {
-    param([Parameter(Mandatory = $true)][string]$ApkPath, [string]$AaptPath)
+    param([Parameter(Mandatory = $true)][string]$ApkPath, [string]$AaptPath, $ArCoreRule)
     $item = Get-Item $ApkPath
     $hash = (Get-FileHash -Algorithm SHA256 -Path $ApkPath).Hash.ToLowerInvariant()
     $entries = Get-MetinARZipEntries -Path $ApkPath
@@ -359,6 +440,7 @@ function Get-MetinARApkReport {
         HasGlobalMetadata = [bool](@($entries | Where-Object { $_ -match 'global-metadata\.dat$' }).Count)
         HasMonoAssemblies = [bool](@($entries | Where-Object { $_ -match '^assets/bin/Data/Managed/.+\.dll$' }).Count)
         PlayerData     = Test-MetinARApkPlayerData -Entries @($entries)
+        ArCore         = $(if ($ArCoreRule) { Test-MetinARApkArCore -Entries @($entries) -RuntimeInitializeJson (Get-MetinARZipEntryText -Path $ApkPath -Entry $ArCoreRule.runtimeInitializeEntry) -Rule $ArCoreRule } else { $null })
         Badging        = $badging
     }
 }
@@ -414,7 +496,10 @@ function Find-MetinARLogcatProblems {
     <#
       Detects crash / ANR / fatal markers for the app in `adb logcat -v threadtime` output.
       With -Package (and optionally -Pids) only markers that belong to the app are counted, so unrelated system
-      processes do not fail the gate. Unity error/exception lines from the app are reported as WARN.
+      processes do not fail the gate. Unity error/exception lines from the app are reported as WARN, except:
+      a Unity exception whose message or stack (the continuation lines of the same pid/tid/Unity tag) contains a
+      MetinAR. frame is a product exception -> MetinARExceptions -> FAIL (lead decision 2026-10-21 15:28, #66/#33;
+      the Editor-only T15 classifier never applies on the device).
     #>
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines,
@@ -425,7 +510,14 @@ function Find-MetinARLogcatProblems {
     $anr = New-Object System.Collections.Generic.List[string]
     $fatal = New-Object System.Collections.Generic.List[string]
     $unityErrors = New-Object System.Collections.Generic.List[string]
+    $metinarExceptions = New-Object System.Collections.Generic.List[string]
     $pkg = if ($Package) { [regex]::Escape($Package) } else { $null }
+    # Unity exception block: header '<Type>Exception: ...' on a Unity line, then the stack on the following Unity lines
+    # of the same pid/tid. Ends at '(Filename: ...)', an empty message, another header or a line of another thread/tag.
+    $block = $null
+    $closeBlock = {
+        if ($null -ne $block -and $block.MetinAR) { $metinarExceptions.Add(($block.Header + ' | ' + $block.Frame)) }
+    }
     foreach ($l in $Lines) {
         if ($null -eq $l) { continue }
         $linePid = $null; $level = $null
@@ -448,16 +540,36 @@ function Find-MetinARLogcatProblems {
 
         if ($level -eq 'F' -and $ours) { $fatal.Add($l) }
         if ($ours -and ($l -match ' E Unity\s*:' -or $l -match '^E/Unity' -or $l -match 'Unity\s*:\s*\w*Exception')) { $unityErrors.Add($l) }
+
+        # --- MetinAR exception blocks
+        $unityKey = $null; $msg = $null
+        if ($l -match '^\d\d-\d\d \S+\s+(\d+)\s+(\d+) [VDIWEFA] Unity\s*: ?(.*)$') { $unityKey = $Matches[1] + '/' + $Matches[2]; $msg = $Matches[3] }
+        elseif ($l -match '^[VDIWEFA]/Unity\s*\(\s*(\d+)\): ?(.*)$') { $unityKey = $Matches[1]; $msg = $Matches[2] }
+        $isHeader = $ours -and $null -ne $unityKey -and $msg -cmatch '^\s*(Rethrow as )?([A-Za-z_][\w.]*\.)?\w*Exception\b'
+        $continues = $null -ne $block -and $unityKey -eq $block.Key -and -not $isHeader -and
+                     $msg.Trim().Length -gt 0 -and $msg -notmatch '^\s*\(Filename:'
+        if ($continues -or ($isHeader -and $null -ne $block -and $unityKey -eq $block.Key -and $msg -cmatch '^\s*Rethrow as ')) {
+            if (-not $block.MetinAR -and $msg -cmatch '(?<![\w.])MetinAR\.[A-Za-z_]') { $block.MetinAR = $true; $block.Frame = $msg.Trim() }
+            continue
+        }
+        & $closeBlock
+        $block = $null
+        if ($isHeader) {
+            $block = @{ Key = $unityKey; Header = $l; MetinAR = $false; Frame = '' }
+            if ($msg -cmatch '(?<![\w.])MetinAR\.[A-Za-z_]') { $block.MetinAR = $true; $block.Frame = $msg.Trim() }
+        }
     }
+    & $closeBlock
     $status = 'PASS'
     if ($unityErrors.Count -gt 0) { $status = 'WARN' }
-    if ($crash.Count -gt 0 -or $anr.Count -gt 0 -or $fatal.Count -gt 0) { $status = 'FAIL' }
+    if ($crash.Count -gt 0 -or $anr.Count -gt 0 -or $fatal.Count -gt 0 -or $metinarExceptions.Count -gt 0) { $status = 'FAIL' }
     [pscustomobject]@{
         Status      = $status
         Crashes     = @($crash | Select-Object -First 20)
         Anrs        = @($anr | Select-Object -First 20)
         FatalLines  = @($fatal | Select-Object -First 20)
         UnityErrors = @($unityErrors | Select-Object -First 20)
+        MetinARExceptions = @($metinarExceptions | Select-Object -First 20)
     }
 }
 
@@ -758,6 +870,103 @@ function ConvertTo-MetinARMarkdownReport {
         foreach ($n in $Notes) { [void]$sb.AppendLine("- $n") }
     }
     return $sb.ToString()
+}
+
+# --- METINAR-037 (#73): adb connection state, install guard, package-scoped permissions --------------------------------
+
+function ConvertFrom-MetinARAdbDevices {
+    <# Parses `adb devices` output. State: device | offline | unauthorized | missing | multiple (no -Serial and
+       more than one attached). Daemon start-up chatter and the header are ignored. Serials are returned for
+       redaction only and must never be written to a report. #>
+    param(
+        [AllowEmptyCollection()][string[]]$Lines = @(),
+        [string]$Serial
+    )
+    $entries = @()
+    foreach ($l in @($Lines)) {
+        if ("$l" -match '^(\S+)\s+(device|offline|unauthorized|recovery|sideload|bootloader|no permissions.*)$') {
+            $entries += [pscustomobject]@{ Serial = $Matches[1]; State = $Matches[2] }
+        }
+    }
+    $pool = @($entries)
+    if ($Serial) { $pool = @($entries | Where-Object { $_.Serial -eq $Serial }) }
+    $ready = @($pool | Where-Object { $_.State -eq 'device' })
+    $state = 'missing'
+    if ($ready.Count -gt 1) { $state = 'multiple' }
+    elseif ($ready.Count -eq 1) { $state = 'device' }
+    elseif ($pool.Count -ge 1) { $state = [string]$pool[0].State }
+    if ($state -like 'no permissions*') { $state = 'unauthorized' }
+    [pscustomobject]@{
+        State   = $state
+        Count   = @($entries).Count
+        Serials = @(@($entries) | ForEach-Object { $_.Serial })
+    }
+}
+
+function Test-MetinARLogcatCapture {
+    <#
+      Decides whether an `adb logcat -d` dump can be used as crash evidence. Kind:
+        Ok              - adb exit 0, non-empty dump with at least one line of the app (pid in -Pids or the package name);
+        Lost            - adb reports the device gone (see Test-MetinARAdbOutputLost);
+        CollectionError - adb exited non-zero, the dump is empty / whitespace only, or it has no line of the app.
+      Anything but Ok must never be reported as "no crash" (PASS): the caller reports UNVERIFIED (or FAIL when the
+      partial dump still shows a crash).
+    #>
+    param(
+        [AllowNull()][AllowEmptyCollection()][string[]]$Lines = @(),
+        [AllowNull()][object]$ExitCode = 0,
+        [string]$Package,
+        [int[]]$Pids = @()
+    )
+    $all = @($Lines | Where-Object { $null -ne $_ })
+    if (Test-MetinARAdbOutputLost -Lines $all) { return [pscustomobject]@{ Kind = 'Lost'; Reason = 'adb reports the device is gone' } }
+    if ($null -eq $ExitCode -or "$ExitCode" -notmatch '^-?\d+$') { return [pscustomobject]@{ Kind = 'CollectionError'; Reason = 'adb logcat exit code unknown' } }
+    if ([int]"$ExitCode" -ne 0) { return [pscustomobject]@{ Kind = 'CollectionError'; Reason = ("adb logcat exited with code {0}" -f $ExitCode) } }
+    $content = @($all | Where-Object { "$_".Trim().Length -gt 0 })
+    if ($content.Count -eq 0) { return [pscustomobject]@{ Kind = 'CollectionError'; Reason = 'empty logcat dump' } }
+    $pkg = if ($Package) { [regex]::Escape($Package) } else { $null }
+    $app = @($content | Where-Object {
+        $l = "$_"; $hit = $false
+        if ($l -match '^\d\d-\d\d \S+\s+(\d+)\s' -and $Pids -contains [int]$Matches[1]) { $hit = $true }
+        elseif ($l -match '^[VDIWEFA]/[^(]*\(\s*(\d+)\)' -and $Pids -contains [int]$Matches[1]) { $hit = $true }
+        if (-not $hit -and $pkg -and $l -match ('(?<![\w.])' + $pkg + '(?![\w.])')) { $hit = $true }
+        $hit
+    })
+    if ($app.Count -eq 0) { return [pscustomobject]@{ Kind = 'CollectionError'; Reason = ("logcat dump ({0} lines) has no line of {1} (pids {2})" -f $content.Count, $Package, ($Pids -join ',')) } }
+    return [pscustomobject]@{ Kind = 'Ok'; Reason = ("{0} lines, {1} of the app" -f $content.Count, $app.Count) }
+}
+
+function Test-MetinARAdbOutputLost {
+    <# True when adb output shows the connection to the device is gone (a command that silently returns nothing
+       useful, e.g. an empty logcat dump, would otherwise look like a clean run). #>
+    param([AllowEmptyCollection()][string[]]$Lines = @())
+    return [bool](@($Lines | Where-Object { "$_" -match "^(adb(\.exe)?: )?error: (device ('[^']*' )?not found|no devices/emulators found|device offline|closed|protocol fault)" }).Count)
+}
+
+function Test-MetinARInstallGuard {
+    <# Refuses to install over a protected package that is already on the phone (e.g. the game build another bot
+       is testing), unless explicitly allowed. QA builds use their own applicationIdentifier (com.metinar.game.qa). #>
+    param(
+        [string]$Package,
+        [AllowEmptyCollection()][string[]]$ProtectedPackages = @(),
+        [AllowEmptyCollection()][string[]]$InstalledPackages = @(),
+        [switch]$AllowReplace
+    )
+    $isProtected = [bool]($Package -and (@($ProtectedPackages) -ccontains $Package))
+    $isInstalled = [bool]($Package -and (@($InstalledPackages) -ccontains $Package))
+    $blocked = $isProtected -and $isInstalled -and -not $AllowReplace
+    [pscustomobject]@{
+        Status    = $(if ($blocked) { 'FAIL' } else { 'PASS' })
+        Protected = $isProtected
+        Installed = $isInstalled
+        Reason    = $(if ($blocked) { "would replace the installed $Package (protected; another build may be under test). Use the QA APK (own applicationIdentifier) or pass -AllowReplaceInstalled after a note in #33" } elseif ($isProtected -and $isInstalled) { "replacing installed $Package (-AllowReplaceInstalled)" } else { $null })
+    }
+}
+
+function Resolve-MetinARPermissionAllowList {
+    <# Expands '{package}' in allow-list entries (AndroidX adds <applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION). #>
+    param([AllowEmptyCollection()][string[]]$Allowed = @(), [string]$Package)
+    return @($Allowed | ForEach-Object { if ($Package) { "$_".Replace('{package}', $Package) } else { "$_" } })
 }
 
 Export-ModuleMember -Function *-MetinAR*
