@@ -57,5 +57,6 @@ Każdy etap: osobny branch i PR, testy czystego C#, kompilacja Unity i testy na 
 | S11 | Autorytet serwera dla nagród | wynik spotkania, łup, saldo, ekwipunek po stronie serwera | #39, decyzja Q1 z PR #27 |
 | S12 | Balans na A31 | pomiary czasu walki i wydajności, korekta tabel | S3+ |
 | S13 | Ekran Napisy i bramka atrybucji | `credits.json` generowany z `Audio/LICENSES.md` (i przyszłych rejestrów), ekran Menu główne / Ustawienia → Napisy, test FAIL dla CC-BY bez atrybucji, kontrola w audycie APK (MODES_DATA_MODEL §5) | #43 (rejestr audio), pierwsze menu/ustawienia; przed pierwszym buildem z assetem CC-BY |
+| S14 | Hosting i HTTPS backendu (ETAP V) | backend dostępny przez HTTPS, uwierzytelnianie, identyfikacja gracza; do tego czasu serwer tylko na `localhost` ([specyfikacja właściciela §18 ETAP V L748–759](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2a039cd8bad5eaa4547caddb4981c6b68429dfe6/docs/design/OWNER_SPEC_2026-10-23.md#L748-L759), [§14 L573–578](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2a039cd8bad5eaa4547caddb4981c6b68429dfe6/docs/design/OWNER_SPEC_2026-10-23.md#L573-L578)); decyzje o hostingu i uwierzytelnianiu należą do właściciela | #39, S11 (#56) |
 
 Kolejność S1→S2→S3→S4 daje pierwszy grywalny wycinek (zestaw startowy, ITEMS_COMBAT_SPEC §7).

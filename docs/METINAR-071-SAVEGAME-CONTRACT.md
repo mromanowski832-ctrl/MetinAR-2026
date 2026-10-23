@@ -42,7 +42,7 @@ them (§11.12) still waits for the owner's consent to a `.github/` change.
 | `character.classId`, `pathId` | server | `warrior\|ninja\|shaman\|slajter`. Default class `warrior` with `starter_sword` until class choice exists (§11.7). |
 | `character.totalExp`, `level` | server | `level` is **derived** from `totalExp` via [`design/tables/exp_curve.csv`](design/tables/exp_curve.csv) (embedded in the server). A mismatched pair is invalid. EXP is capped at the level-99 threshold. |
 | `character.hpCurrent`, `mpCurrent` | client | Persisted across sessions. The server clamps them to 0…max HP/MP for the level and class on every write (§11.6), so a too-high value is stored as the max, not rejected. |
-| `stats.*` | server | Allocated primary stats and free points. Each level-up grants **2** free stat points (§11.3). There is no allocation endpoint yet (S6), so the client cannot spend them today. |
+| `stats.*` | server | Allocated primary stats and free points. Each level-up grants **2** free stat points (§11.3). There is no allocation endpoint yet (ETAP III, plan step S6), so the client cannot spend them today. |
 | `skills.freeSkillPoints`, `skills.progress[]` | server | Rank model per `classes_skills.json` (PROPOSAL #40). Each level-up grants **1** free skill point (§11.3). |
 | `skills.loadout` | client | Attack/aura/slot1/slot2 skill ids. |
 | `inventory.capacity` | server | `24`, `32`, `40`, `48` or `56`: 24 at start, Sakwa +8, max 56 = the **bag** maximum ([ITEMS_COMBAT_SPEC.md#L113](design/ITEMS_COMBAT_SPEC.md#L113) to L114, Q17). |
@@ -284,16 +284,16 @@ The twelve questions from the first version of this contract were settled by the
 3. **Level-up grants.** **ROZSTRZYGNIĘTE** (decyzja kierownika produkcji 2026-10-23 04:31): per CHARACTER_PROGRESSION, computed by the server: **2** free
    stat points and the class's automatic +1 in two stats per level-up ([CHARACTER_PROGRESSION.md#L23](design/CHARACTER_PROGRESSION.md#L23),
    class table [L25–L30](design/CHARACTER_PROGRESSION.md#L25)), and **1** skill point per level-up from level 2
-   ([CLASSES_SKILLS.md#L26](design/CLASSES_SKILLS.md#L26)). Implemented. Not in this PR (production lead, 04:47):
-   - **Point-spending endpoint**: S6 "Awans i statystyki" ([OPEN_QUESTIONS_PLAN.md#L52](design/OPEN_QUESTIONS_PLAN.md#L52):
+   ([CLASSES_SKILLS.md#L26](design/CLASSES_SKILLS.md#L26)). Implemented. Not in this PR:
+   - **Point-spending endpoint**: **ETAP III** "Rozwój postaci" per the owner spec ([§18 L729–L731](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2a039cd8bad5eaa4547caddb4981c6b68429dfe6/docs/design/OWNER_SPEC_2026-10-23.md#L729-L731)); in the
+     S1–S13 plan this is step **S6** "Awans i statystyki" ([OPEN_QUESTIONS_PLAN.md#L52](design/OPEN_QUESTIONS_PLAN.md#L52):
      "rozdawanie punktów, panel postaci, reset"). Free points accumulate in `stats.freeStatPoints` and
      `skills.freeSkillPoints` and cannot be spent yet. Not implemented now.
-   - **Death EXP loss**: Stage II / S6 together with Q4 ([CHARACTER_PROGRESSION.md#L113](design/CHARACTER_PROGRESSION.md#L113):
-     "Utrata 2% EXP bieżącego poziomu (nie schodzi poniżej 0 na poziomie)"; Q4
-     [OPEN_QUESTIONS_PLAN.md#L15](design/OPEN_QUESTIONS_PLAN.md#L15); owner spec [§7 L337](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2a039cd8bad5eaa4547caddb4981c6b68429dfe6/docs/design/OWNER_SPEC_2026-10-23.md#L337)). Not implemented:
-     the server never lowers `character.totalExp` today, and `PUT` refuses a client that does (`409`). Note for the
-     owner: the owner spec lists "Rozwój postaci" under ETAP III ([§18 L729–L731](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2a039cd8bad5eaa4547caddb4981c6b68429dfe6/docs/design/OWNER_SPEC_2026-10-23.md#L729-L731)), not ETAP II,
-     and does not place the death penalty in any stage; the stage given here is the production lead's.
+   - **Death penalty / EXP loss**: **NIEPRZYPISANE DO ETAPU, OTWARTE.** The owner spec states the penalty
+     ([§7 L337](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2a039cd8bad5eaa4547caddb4981c6b68429dfe6/docs/design/OWNER_SPEC_2026-10-23.md#L337): "Kara śmierci: 2% EXP bieżącego poziomu"; also
+     [CHARACTER_PROGRESSION.md#L113](design/CHARACTER_PROGRESSION.md#L113)) but no ETAP in §18 lists it. Not implemented
+     and not assigned to any stage: the server never lowers `character.totalExp` today, and `PUT` refuses a client
+     that does (`409`).
 4. **Materials.** **ROZSTRZYGNIĘTE** (decyzja kierownika produkcji 2026-10-23 04:31): there is no separate bag in the player model
    ([MODES_DATA_MODEL.md#L48](design/MODES_DATA_MODEL.md#L48) to L51), so materials are inventory stacks (bag 24 → 56,
    [ITEMS_COMBAT_SPEC.md#L113](design/ITEMS_COMBAT_SPEC.md#L113) to L115; Sakwa [ECONOMY.md#L38](design/ECONOMY.md#L38)) with the stack
@@ -335,8 +335,9 @@ The twelve questions from the first version of this contract were settled by the
       [§18 "ETAP V — PEŁNY ŚWIAT I PRZYGOTOWANIE WYDANIA" L748–L759](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2a039cd8bad5eaa4547caddb4981c6b68429dfe6/docs/design/OWNER_SPEC_2026-10-23.md#L748-L759), in particular
       "Stabilny backend" (L755) and "Testy wydajności i bezpieczeństwa" (L758); the target itself is in
       [§14 L573–L578](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2a039cd8bad5eaa4547caddb4981c6b68429dfe6/docs/design/OWNER_SPEC_2026-10-23.md#L573-L578) (localhost is not a solution; HTTPS backend, authentication, player identity);
-    - S1–S13 plan: there is no step for hosting/HTTPS; the nearest is **S11** "Autorytet serwera dla nagród", which
-      depends on #39 ([OPEN_QUESTIONS_PLAN.md#L57](design/OPEN_QUESTIONS_PLAN.md#L57)).
+    - plan step: **S14** "Hosting i HTTPS backendu (ETAP V)", appended to the plan table
+      ([OPEN_QUESTIONS_PLAN.md#L60](design/OPEN_QUESTIONS_PLAN.md#L60)); no other step was renumbered or changed. It
+      depends on #39 and on S11 "Autorytet serwera dla nagród" ([OPEN_QUESTIONS_PLAN.md#L57](design/OPEN_QUESTIONS_PLAN.md#L57), #56).
 11. **JSON Schema library.** **ROZSTRZYGNIĘTE** (decyzja kierownika produkcji 2026-10-23 04:31): validation stays in code (§8), no new dependency. Unchanged.
 12. **CI path filter.** **zatwierdzone przez kierownika, czeka na zgodę właściciela na zmianę .github/** (decyzja kierownika produkcji 2026-10-23 04:31):
     add `docs/design/tables/**` and `docs/contracts/**` to the `push` and `pull_request` paths of
