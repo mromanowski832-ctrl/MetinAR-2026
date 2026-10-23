@@ -259,6 +259,39 @@ namespace AssetPipeline.Tests
             Assert.Contains(e, x => x.Contains("Licence '" + license + "'"));
         }
 
+        /// <summary>
+        /// Two separate, deliberate owner decisions (pinned here so neither register drifts to the other's rule):
+        /// graphics (2026-10-21, METINAR-009 §11 / MODES_DATA_MODEL §5): CC-BY-4.0 only, SA only with owner_approved;
+        /// audio (#42, 2026-10-21 05:02): CC-BY-x.y with authors, SA always rejected. NC/ND rejected in both.
+        /// </summary>
+        [Theory]
+        [InlineData("CC-BY-4.0", true, true)]
+        [InlineData("CC-BY-3.0", false, true)]
+        [InlineData("CC0-1.0", true, true)]
+        [InlineData("CC-BY-SA-4.0", false, false)]
+        [InlineData("CC-BY-NC-4.0", false, false)]
+        [InlineData("CC-BY-ND-4.0", false, false)]
+        public void GraphicsAndAudioLicencePoliciesAreSeparateOwnerDecisions(string license, bool graphicsAccepts, bool audioAccepts)
+        {
+            string manifest = "asset_id: A\norigin: third_party\nauthor: Jane\nlicense: " + license + "\ncommercial_use: yes\ncreated_with: x\n" +
+                              "date_added: 2026-10-23\nsource_url: https://example.org/a\nlicense_file: LICENSE.txt\nattribution: a\n";
+            bool graphicsOk = !AssetSourceManifest.Parse(manifest).Validate("A/ASSET_SOURCE.txt", null).Any(i => i.Message.Contains("icence"));
+            bool audioOk = MetinAR.Editor.Audio.AudioPipelineRules.IsAllowedLicense(license) && !MetinAR.Editor.Audio.AudioLicenseLedger.IsRestrictedCc(license);
+            Assert.Equal(graphicsAccepts, graphicsOk);
+            Assert.Equal(audioAccepts, audioOk);
+        }
+
+        [Fact]
+        public void ShareAlikeOnlyWithOwnerApprovalForGraphicsNeverForAudio()
+        {
+            string manifest = "asset_id: A\norigin: third_party\nauthor: Jane\nlicense: CC-BY-SA-4.0\ncommercial_use: yes\ncreated_with: x\n" +
+                              "date_added: 2026-10-23\nsource_url: https://example.org/a\nlicense_file: LICENSE.txt\nattribution: a\nowner_approved: yes\n";
+            Assert.DoesNotContain(AssetSourceManifest.Parse(manifest).Validate("A/ASSET_SOURCE.txt", null), i => i.Message.Contains("icence"));
+            Assert.True(MetinAR.Editor.Audio.AudioLicenseLedger.IsRestrictedCc("CC-BY-SA-4.0"));
+            Assert.True(MetinAR.Editor.Audio.AudioLicenseLedger.IsRestrictedCc("CC-BY-SA-3.0"));
+            Assert.False(MetinAR.Editor.Audio.AudioPipelineRules.IsAllowedLicense("CC-BY-SA-4.0") && !MetinAR.Editor.Audio.AudioLicenseLedger.IsRestrictedCc("CC-BY-SA-4.0"));
+        }
+
         [Fact]
         public void CsvRowAcceptsCcBy40Licence()
         {

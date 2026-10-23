@@ -55,11 +55,14 @@ dotnet test tests/AssetPipeline.Tests --filter AssetProvenance
 - One logical record for audio and graphics: `path, sha256, origin, author, license, source_url` plus, for CC-BY, the
   credits fields `title, license_url, attribution, changes` (names/order as the credits spec, MODES_DATA_MODEL §5).
   Audio keeps its two Markdown tables (`Audio/LICENSES.md`, unchanged); graphics use `ASSET_SOURCE.txt` / this CSV.
-- Graphics accept `MetinAR-Owned`, `CC0-1.0`, `CC-BY-4.0` (with attribution), `MIT`, `Apache-2.0`, `BSD-3-Clause`
-  (METINAR-009 §11; owner decision 2026-10-21 names CC-BY-4.0). NC/ND are always rejected; SA/GPL need
-  `owner_approved: yes` in an `ASSET_SOURCE.txt` (the CSV has no such column, so SA is always rejected there).
-- Audio currently accepts `CC-BY-x.y` (METINAR-018). Whether graphics should also accept CC-BY-3.0 is an open
-  controller/owner decision; until then graphics stay on 4.0 only.
+- **Two separate, deliberate owner decisions** (controller confirmation 2026-10-23 04:39, #99); neither register
+  copies the other's rule:
+  - **Graphics** (owner decision 2026-10-21; METINAR-009 §11, MODES_DATA_MODEL §5, ITEMS_COMBAT_SPEC): `MetinAR-Owned`,
+    `CC0-1.0`, **`CC-BY-4.0` only** (with attribution), `MIT`, `Apache-2.0`, `BSD-3-Clause`. SA/GPL only with
+    `owner_approved: yes` in an `ASSET_SOURCE.txt` (the CSV has no such column, so SA is always rejected there).
+  - **Audio** (owner decision #42, 2026-10-21 05:02; METINAR-018, `Audio/LICENSES.md`): `MetinAR-Owned`, `CC0-1.0`,
+    **`CC-BY-x.y` (any version)** with authors and a full CC-BY attribution row. **SA always rejected.**
+  - NC/ND are always rejected in both. Pinned by `GraphicsAndAudioLicencePoliciesAreSeparateOwnerDecisions`.
 - CC-BY columns (`title, license_url, attribution, changes`) will be appended to the CSV in that order when the first
   CC-BY graphic lands (credits generator #40 then reads one attribution schema). Until then third-party/CC-BY graphics
   go into an `ASSET_SOURCE.txt` folder with `license_file` and `attribution`.
