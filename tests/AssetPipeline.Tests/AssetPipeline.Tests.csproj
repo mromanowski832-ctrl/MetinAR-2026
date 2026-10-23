@@ -16,6 +16,8 @@
     <!-- METINAR-009: pure asset-pipeline rules (no UnityEngine/UnityEditor references). -->
     <Compile Include="../../client/Assets/MetinAR/Editor/AssetPipeline/AssetPipelineRules.cs" Link="Production/AssetPipelineRules.cs" />
     <Compile Include="../../client/Assets/MetinAR/Editor/AssetPipeline/AssetSourceManifest.cs" Link="Production/AssetSourceManifest.cs" />
+    <!-- METINAR-041 E1 (#86): per-asset licence and provenance register. -->
+    <Compile Include="../../client/Assets/MetinAR/Editor/AssetPipeline/AssetProvenanceRegister.cs" Link="Production/AssetProvenanceRegister.cs" />
     <!-- METINAR-018: pure audio pipeline rules (licence ledger, budgets, .meta import profile). -->
     <Compile Include="../../client/Assets/MetinAR/Editor/Audio/AudioPipelineRules.cs" Link="Production/AudioPipelineRules.cs" />
   </ItemGroup>

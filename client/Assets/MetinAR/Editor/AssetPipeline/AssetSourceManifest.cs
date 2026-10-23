@@ -28,7 +28,7 @@ namespace MetinAR.Editor.AssetPipeline
         public static readonly string[] OwnerDecisionLicenseTokens = { "SA", "GPL", "ASSETSTORE", "MIXAMO", "TOS" };
 
         /// <summary>Sources that can never be used (proprietary game content).</summary>
-        public static readonly string[] ForbiddenSourceTokens = { "metin2", "metin 2", "gameforge", "ymir" };
+        public static readonly string[] ForbiddenSourceTokens = { "metin2", "metin 2", "webzen", "gameforge", "ymir" };
 
         private readonly Dictionary<string, string> _values;
 
