@@ -640,5 +640,125 @@ namespace MetinAR.Gameplay.Tests
             Assert.Equal("[Combo] step=1 weapon=1H hit=yes swing=4", ComboLog.Line(1, ComboWeaponKind.OneHanded, true, 4));
             Assert.Equal("[Combo] step=3 weapon=2H hit=no swing=9", ComboLog.Line(3, ComboWeaponKind.TwoHanded, false, 9));
         }
+    
+        // ---------- QA log lines (#100 collector, #90 protocol) ----------
+
+        private static List<string> Logged(WarriorComboMachine m, out ComboStepLogger logger)
+        {
+            var lines = new List<string>();
+            logger = new ComboStepLogger(m, lines.Add);
+            return lines;
+        }
+
+        [Fact]
+        public void QaLog_ExactStrings()
+        {
+            Assert.Equal("[Combo] step=1", ComboLog.Step(1));
+            Assert.Equal("[Combo] step=2", ComboLog.Step(2));
+            Assert.Equal("[Combo] step=3", ComboLog.Step(3));
+            Assert.Equal("[Combo] heavy", ComboLog.Heavy);
+            Assert.Throws<ArgumentOutOfRangeException>(() => ComboLog.Step(0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => ComboLog.Step(4));
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void QaLog_FullCombo_LogsEachFiredStepOnce(bool twoHanded)
+        {
+            var m = Machine(twoHanded ? WeaponComboConfig.Default2H() : WeaponComboConfig.Default1H());
+            var lines = Logged(m, out _);
+            Tap(m); RunUntilPhaseChanges(m);
+            Tap(m); RunUntilPhaseChanges(m);
+            Tap(m); RunUntilPhaseChanges(m);
+            Assert.Equal(ComboPhase.Idle, m.Phase);
+            Assert.Equal(new[] { "[Combo] step=1", "[Combo] step=2", "[Combo] step=3" }, lines);
+        }
+
+        [Fact]
+        public void QaLog_IgnoredTapsMidSwing_LogNothing_BufferedChainLogsWhenItFires()
+        {
+            var m = Machine();
+            var lines = Logged(m, out _);
+            Tap(m);
+            Run(m, 0.10);
+            Assert.Equal(ComboInputResult.Ignored, Tap(m)); // mid-swing spam
+            Assert.Equal(ComboInputResult.Ignored, Tap(m));
+            Assert.Equal(new[] { "[Combo] step=1" }, lines);
+            double left = m.Weapon.SwingRealSeconds(1) - m.SwingElapsed;
+            Run(m, left - 0.05);
+            Assert.Equal(ComboInputResult.BufferedStep, Tap(m));
+            Assert.Equal(new[] { "[Combo] step=1" }, lines); // buffered input alone logs nothing
+            Run(m, 0.10);
+            Assert.Equal(2, m.Step);
+            Assert.Equal(new[] { "[Combo] step=1", "[Combo] step=2" }, lines);
+        }
+
+        [Fact]
+        public void QaLog_WindowExpired_NextTapLogsStepOneAgain()
+        {
+            var m = Machine();
+            var lines = Logged(m, out _);
+            Tap(m); RunUntilPhaseChanges(m);
+            RunUntilPhaseChanges(m); // window expires
+            Assert.Equal(ComboPhase.Idle, m.Phase);
+            Tap(m);
+            Assert.Equal(new[] { "[Combo] step=1", "[Combo] step=1" }, lines);
+        }
+
+        [Fact]
+        public void QaLog_Hold_LogsHeavyOnly()
+        {
+            var m = Machine();
+            var lines = Logged(m, out _);
+            m.PressAttack(true);
+            Run(m, 0.58);
+            Assert.Empty(lines);
+            Run(m, 0.04);
+            Assert.Equal(ComboInputResult.HoldConsumed, m.ReleaseAttack(true));
+            Run(m, 1.0);
+            Assert.Equal(new[] { "[Combo] heavy" }, lines);
+        }
+
+        [Fact]
+        public void QaLog_HoldFromWindow_LogsStepThenHeavy()
+        {
+            var m = Machine();
+            var lines = Logged(m, out _);
+            Tap(m); RunUntilPhaseChanges(m);
+            m.PressAttack(true);
+            Run(m, 0.62);
+            m.ReleaseAttack(true);
+            Assert.Equal(new[] { "[Combo] step=1", "[Combo] heavy" }, lines);
+        }
+
+        [Fact]
+        public void QaLog_RejectedHeavy_CanCastFalse_LogsNothing()
+        {
+            var m = Machine();
+            var slot = ChargedSkillSlot.WarriorHeavySlash();
+            slot.CanCast = id => false;
+            m.ChargedSkill = slot;
+            var lines = Logged(m, out _);
+            m.PressAttack(true);
+            Run(m, 0.7);
+            Assert.Equal(ComboInputResult.HoldConsumed, m.ReleaseAttack(true));
+            Run(m, 1.0);
+            Assert.Empty(lines);
+        }
+
+        [Fact]
+        public void QaLog_Dispose_StopsLogging()
+        {
+            var m = Machine();
+            var lines = Logged(m, out ComboStepLogger logger);
+            Tap(m);
+            logger.Dispose();
+            RunUntilPhaseChanges(m);
+            Tap(m);
+            Assert.Equal(new[] { "[Combo] step=1" }, lines);
+            Assert.Throws<ArgumentNullException>(() => new ComboStepLogger(null, lines.Add));
+            Assert.Throws<ArgumentNullException>(() => new ComboStepLogger(m, null));
+        }
     }
 }

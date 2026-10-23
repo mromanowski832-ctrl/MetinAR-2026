@@ -59,15 +59,60 @@ namespace MetinAR.ArEncounter
         }
     }
 
-    /// <summary>Log line required by the #82 Unity smoke: <c>[Combo] step=1/2/3 weapon=1H/2H hit=…</c>.</summary>
+    /// <summary>
+    /// <c>[Combo]</c> log lines. The QA evidence collector (#100) and the #90 protocol grep for the exact lines
+    /// <see cref="Step"/> (<c>[Combo] step=N</c>, N = 1, 2, 3; 3 = finisher) and <see cref="Heavy"/> (<c>[Combo] heavy</c>),
+    /// emitted once per actually fired step / Ciężkie Cięcie by <see cref="ComboStepLogger"/>.
+    /// <see cref="Line"/> is a separate detail format and is NOT what the QA greps match.
+    /// </summary>
     public static class ComboLog
     {
         public const string Prefix = "[Combo] ";
+        /// <summary>Hold ATAK fired Ciężkie Cięcie (passed its cost/cooldown check).</summary>
+        public const string Heavy = "[Combo] heavy";
+
+        /// <summary>Exactly <c>[Combo] step=N</c> for a started combo swing, N = 1..3 (3 = finisher).</summary>
+        public static string Step(int step)
+        {
+            if (step < 1 || step > WeaponComboConfig.StepCount) throw new ArgumentOutOfRangeException(nameof(step));
+            return Prefix + "step=" + step;
+        }
 
         public static string Line(int step, ComboWeaponKind weapon, bool hit, int swingId)
         {
             return Prefix + "step=" + step + " weapon=" + (weapon == ComboWeaponKind.TwoHanded ? "2H" : "1H")
                 + " hit=" + (hit ? "yes" : "no") + " swing=" + swingId;
+        }
+    }
+
+    /// <summary>
+    /// Engine-free bridge from <see cref="WarriorComboMachine"/> events to the <see cref="ComboLog"/> QA lines: one
+    /// <see cref="ComboLog.Step"/> per <see cref="WarriorComboMachine.StepStarted"/> (a started swing, including a buffered
+    /// chain — never per input) and one <see cref="ComboLog.Heavy"/> per <see cref="WarriorComboMachine.ChargedSkillFired"/>.
+    /// A refused hold (<see cref="ChargedSkillSlot.CanCast"/> false) and ignored taps log nothing. The Unity side supplies the
+    /// sink (<c>WarriorComboDevLog</c>: Debug.Log only in Editor / Development builds).
+    /// </summary>
+    public sealed class ComboStepLogger : IDisposable
+    {
+        private readonly WarriorComboMachine _machine;
+        private readonly Action<string> _sink;
+
+        public ComboStepLogger(WarriorComboMachine machine, Action<string> sink)
+        {
+            _machine = machine ?? throw new ArgumentNullException(nameof(machine));
+            _sink = sink ?? throw new ArgumentNullException(nameof(sink));
+            _machine.StepStarted += OnStepStarted;
+            _machine.ChargedSkillFired += OnChargedSkillFired;
+        }
+
+        private void OnStepStarted(int step, int swingId) { _sink(ComboLog.Step(step)); }
+        private void OnChargedSkillFired(string skillId) { _sink(ComboLog.Heavy); }
+
+        /// <summary>Unsubscribes from the machine; no more lines afterwards.</summary>
+        public void Dispose()
+        {
+            _machine.StepStarted -= OnStepStarted;
+            _machine.ChargedSkillFired -= OnChargedSkillFired;
         }
     }
 
