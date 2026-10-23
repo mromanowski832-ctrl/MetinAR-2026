@@ -19,6 +19,8 @@ namespace AssetPipeline.Tests
         [InlineData("Assets/MetinAR/Animations/HumanoidBase/A_HumanoidBase_Walk.fbx", AssetCategory.SharedAnimation)]
         [InlineData("Assets/MetinAR/Materials/Common/M_Common_Shadow.mat", AssetCategory.SharedMaterial)]
         [InlineData("Assets/MetinAR/Textures/Common/T_Common_Shadow_BC.png", AssetCategory.SharedTexture)]
+        [InlineData("Assets/MetinAR/Characters/Player/FppArms/Models/SK_Player_FppArms.fbx", AssetCategory.Player)]
+        [InlineData("Assets/MetinAR/Characters/PlayerX/Foo/Models/SK_Player_Foo.fbx", AssetCategory.Unknown)]
         [InlineData("Assets/MetinAR/Art/ArEncounter/T_ArReticle.png", AssetCategory.Unknown)]
         [InlineData("Assets/MetinAR/Prefabs/ArPrototypeSpider.prefab", AssetCategory.Unknown)]
         public void ClassifiesByFolder(string path, AssetCategory expected)
@@ -192,6 +194,7 @@ namespace AssetPipeline.Tests
         [InlineData(AssetCategory.Boss, 20000, 75, 3, 2048, 3)]
         [InlineData(AssetCategory.Npc, 20000, 75, 3, 2048, 3)]
         [InlineData(AssetCategory.Weapon, 3000, 0, 1, 1024, 1)]
+        [InlineData(AssetCategory.Player, 10000, 40, 2, 1024, 1)]
         public void BudgetsMatchTheDocument(AssetCategory c, int tris, int bones, int mats, int tex, int lods)
         {
             AssetBudget b = AssetPipelineRules.GetBudget(c);
@@ -255,5 +258,123 @@ namespace AssetPipeline.Tests
         {
             Assert.Equal(lod, AssetPipelineRules.LodIndex(name));
         }
+
+        // ---- METINAR-FPP-ART-001: Player category (first-person arms)
+        private const string Arms = "Assets/MetinAR/Characters/Player/FppArms";
+
+        [Theory]
+        [InlineData(Arms + "/ASSET_SOURCE.txt")]
+        [InlineData(Arms + "/Models/SK_Player_FppArms.fbx")]
+        [InlineData(Arms + "/Animations/A_FppArms_Idle.fbx")]
+        [InlineData(Arms + "/Animations/A_FppArms_AuraActivate.fbx")]
+        [InlineData(Arms + "/Animations/AC_FppArms.controller")]
+        [InlineData(Arms + "/Textures/T_FppArms_MS.png")]
+        [InlineData(Arms + "/Materials/M_FppArms.mat")]
+        [InlineData(Arms + "/Prefabs/PF_Player_FppArms.prefab")]
+        [InlineData("Assets/MetinAR/Weapons/FppSword/Models/SM_Weapon_FppSword.fbx")]
+        [InlineData("Assets/MetinAR/Weapons/FppSword/Prefabs/PF_Weapon_FppSword.prefab")]
+        public void PlayerNamesPass(string path)
+        {
+            Assert.False(HasError(path), string.Join("; ", AssetPipelineRules.ValidatePath(path)));
+        }
+
+        [Theory]
+        [InlineData(Arms + "/Models/SK_Mob_FppArms.fbx")]
+        [InlineData(Arms + "/Models/SK_Player_Other.fbx")]
+        [InlineData(Arms + "/Prefabs/PF_Weapon_FppArms.prefab")]
+        [InlineData(Arms + "/Animations/A_Other_Idle.fbx")]
+        [InlineData(Arms + "/Rig/SK_Player_FppArms.fbx")]
+        [InlineData("Assets/MetinAR/Characters/Player/fpp_arms/Models/SK_Player_fpp_arms.fbx")]
+        [InlineData(Arms + "/Models/FppArms.blend")]
+        public void PlayerBadNamesFail(string path)
+        {
+            Assert.True(HasError(path));
+        }
+
+        [Fact]
+        public void PlayerFolderIsAPipelineFolderNotSilentlySkipped()
+        {
+            Assert.Contains(AssetPipelineRules.PlayerFolder, AssetPipelineRules.PipelineFolders);
+            Assert.True(AssetPipelineRules.IsPipelinePath(Arms + "/Models/SK_Player_FppArms.fbx"));
+            Assert.Equal(AssetCategory.Player, AssetPipelineRules.ClassifyPath(Arms + "/Models/SK_Player_FppArms.fbx"));
+            Assert.Equal("FppArms", AssetPipelineRules.GetAssetId(Arms + "/Textures/T_FppArms_BC.png"));
+            Assert.Equal(Arms, AssetPipelineRules.GetAssetFolder(Arms + "/Textures/T_FppArms_BC.png"));
+            Assert.Equal("Player", AssetPipelineRules.CategoryToken(AssetCategory.Player));
+        }
+
+        [Fact]
+        public void PlayerBudgetAndStates()
+        {
+            AssetBudget b = AssetPipelineRules.GetBudget(AssetCategory.Player);
+            Assert.Equal(10000, b.MaxTrianglesLod0);
+            Assert.Equal(40, b.MaxBones);
+            Assert.Equal(2, b.MaxMaterials);
+            Assert.Equal(1024, b.MaxTextureSize);
+            Assert.Equal(1, b.RequiredLods);
+            Assert.Empty(AssetPipelineRules.CheckBudget("a", AssetCategory.Player, new[] { 4932 }, 29, 1));
+            Assert.Contains(AssetPipelineRules.CheckBudget("a", AssetCategory.Player, new[] { 12000 }, 41, 3), i => i.Message.Contains("bones"));
+            Assert.Equal(new[] { "Idle", "Attack", "AuraActivate" }, AssetPipelineRules.MissingRequiredStates(AssetCategory.Player, new string[0]));
+            Assert.Empty(AssetPipelineRules.MissingRequiredStates(AssetCategory.Player, new[] { "Idle", "Attack", "AuraActivate" }));
+            Assert.True(AssetPipelineRules.IsLoopingState("Idle"));
+            Assert.False(AssetPipelineRules.IsLoopingState("AuraActivate"));
+        }
+
+        // ---- METINAR-FPP-ART-001 regression: adding Player must not change the existing categories
+        [Fact]
+        public void PipelineFoldersAreExistingOnesPlusPlayer()
+        {
+            Assert.Equal(new[]
+            {
+                "Assets/MetinAR/Characters/Mobs", "Assets/MetinAR/Characters/Bosses", "Assets/MetinAR/Characters/NPC",
+                "Assets/MetinAR/Weapons", "Assets/MetinAR/Characters/Player",
+                "Assets/MetinAR/Animations", "Assets/MetinAR/Materials", "Assets/MetinAR/Textures",
+            }, AssetPipelineRules.PipelineFolders);
+        }
+
+        [Theory]
+        [InlineData(Spider + "/Models/SK_Player_VenomousSpider.fbx")]
+        [InlineData(Spider + "/Prefabs/PF_Player_VenomousSpider.prefab")]
+        [InlineData(Smith + "/Models/SK_Player_Blacksmith.fbx")]
+        [InlineData(Hammer + "/Models/SM_Player_BlacksmithHammer.fbx")]
+        [InlineData(Hammer + "/Prefabs/PF_Player_BlacksmithHammer.prefab")]
+        [InlineData("Assets/MetinAR/Characters/Bosses/SpiderQueen/Models/SK_Player_SpiderQueen.fbx")]
+        [InlineData(Arms + "/Models/SK_Npc_FppArms.fbx")]
+        [InlineData(Arms + "/Models/SM_Weapon_FppArms.fbx")]
+        [InlineData(Arms + "/Prefabs/PF_Mob_FppArms.prefab")]
+        public void PlayerTokenDoesNotLeakIntoOtherCategories(string path)
+        {
+            Assert.True(HasError(path), path);
+        }
+
+        [Theory]
+        [InlineData(Spider + "/Models/SK_Mob_VenomousSpider.fbx", AssetCategory.Mob, "VenomousSpider")]
+        [InlineData("Assets/MetinAR/Characters/Bosses/SpiderQueen/Models/SK_Boss_SpiderQueen.fbx", AssetCategory.Boss, "SpiderQueen")]
+        [InlineData(Smith + "/Models/SK_Npc_Blacksmith.fbx", AssetCategory.Npc, "Blacksmith")]
+        [InlineData(Hammer + "/Models/SM_Weapon_BlacksmithHammer.fbx", AssetCategory.Weapon, "BlacksmithHammer")]
+        [InlineData("Assets/MetinAR/Weapons/FppSword/Models/SM_Weapon_FppSword.fbx", AssetCategory.Weapon, "FppSword")]
+        [InlineData(Arms + "/Models/SK_Player_FppArms.fbx", AssetCategory.Player, "FppArms")]
+        public void EveryPerAssetCategoryIsValidatedNotSkipped(string path, AssetCategory c, string id)
+        {
+            Assert.True(AssetPipelineRules.IsPipelinePath(path));
+            Assert.Equal(c, AssetPipelineRules.ClassifyPath(path));
+            Assert.True(AssetPipelineRules.IsPerAssetCategory(c));
+            Assert.Equal(id, AssetPipelineRules.GetAssetId(path));
+            Assert.False(HasError(path), string.Join("; ", AssetPipelineRules.ValidatePath(path)));
+            // a wrongly named file in the same folder must be caught (i.e. the folder is really validated)
+            string bad = path.Substring(0, path.LastIndexOf('/') + 1) + "wrong_name.fbx";
+            Assert.True(HasError(bad), bad);
+        }
+
+        [Fact]
+        public void ExistingCategoryRulesUnchangedByPlayer()
+        {
+            Assert.Equal(new[] { "Idle", "Walk", "Attack", "Hit", "Death" }, AssetPipelineRules.MobRequiredStates);
+            Assert.Equal(new[] { "Idle", "Walk", "TurnLeft", "TurnRight", "Talk", "Interact" }, AssetPipelineRules.NpcRequiredStates);
+            Assert.Equal(new[] { "Idle", "Walk", "Run", "Hammering", "Talk" }, AssetPipelineRules.LoopingStates);
+            Assert.Contains(AssetPipelineRules.CheckBudget("a", AssetCategory.Weapon, new[] { 1452 }, 1, 1), i => i.Message.Contains("bones"));
+            Assert.Contains(AssetPipelineRules.CheckBudget("a", AssetCategory.Mob, new[] { 4932 }, 29, 1), i => i.Message.Contains("LOD"));
+            Assert.Empty(AssetPipelineRules.CheckBudget("a", AssetCategory.Player, new[] { 4932 }, 29, 1));
+        }
     }
 }
+

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MetinAR.Presentation;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -30,6 +31,7 @@ namespace MetinAR.ArEncounter
         private readonly List<Material> _materials = new List<Material>();
         private Transform _rightGrip, _leftHand, _rightArm, _leftArm, _sword;
         private LineRenderer _ribbonA, _ribbonB, _burst;
+        private FppModelPresenter _production;
         public Transform RightGrip => _rightGrip;
         public Transform LeftHand => _leftHand;
         /// <summary>Sword model root under the grip, uniformly scaled by <see cref="SwordScale"/>.</summary>
@@ -71,6 +73,9 @@ namespace MetinAR.ArEncounter
             _ribbonA = Ribbon("AuraRibbonA", energy, 24, false);
             _ribbonB = Ribbon("AuraRibbonB", energy, 24, false);
             _burst = Ribbon("AuraBurst", energy, 32, true);
+            GameArtCatalog catalog = GameArtCatalog.Load();
+            if (catalog != null && catalog.FppArms != null)
+                _production = FppModelPresenter.Attach(this, catalog.FppArms);
         }
 
         public static Pose SwordPose(FppCombatAction action, float time)
@@ -142,6 +147,7 @@ namespace MetinAR.ArEncounter
                         + new Vector3(0, 0.38f, 0));
                 }
             }
+            if (_production != null) _production.Render(timeline, visualTime);
         }
 
         private static void Arm(Transform arm, Vector3 a, Vector3 b)
@@ -248,3 +254,4 @@ namespace MetinAR.ArEncounter
         }
     }
 }
+

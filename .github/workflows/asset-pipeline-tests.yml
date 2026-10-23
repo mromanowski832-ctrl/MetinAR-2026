@@ -21,5 +21,9 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Validate integrated art references and pinned source bytes
+        run: python3 tools/assets/check_presentation_integration.py
+
       - name: Test asset pipeline rules (METINAR-009)
         run: dotnet test tests/AssetPipeline.Tests/AssetPipeline.Tests.csproj --configuration Release --logger "console;verbosity=normal"
+

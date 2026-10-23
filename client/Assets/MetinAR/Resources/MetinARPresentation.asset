@@ -1,0 +1,123 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dbc476202b8b5e649437a567defa73b8, type: 3}
+  m_Name: MetinARPresentation
+  m_EditorClassIdentifier: 
+  _fppArms: {fileID: 6217380364688890643, guid: 430e2e46e8d02704189683a1fb9cde0f, type: 3}
+  _wanderingMerchant: {fileID: 1439045768584454618, guid: 25e8fe7db9a2a6244bed5ae4b5734331, type: 3}
+  _starterBuckler: {fileID: 9091437674999746120, guid: ff1919cdcfa45bd4ab83576660bc8385, type: 3}
+  _items:
+  - _definitionId: treatise_proficiency_ninja
+    _displayName: "Traktat Biegłości: Ninja"
+    _description: "Przedmiot rozwoju umiejętności dla klasy Ninja."
+    _icon: {fileID: 21300000, guid: b144ae70b91d63d8c6aaa507ad677703, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: spider_silk
+    _displayName: "Jedwab Pajęczy"
+    _description: "Materiał zdobywany z Trującego Pająka."
+    _icon: {fileID: 21300000, guid: d841e8509801e8dc799e67070e0af338, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: starter_jerkin
+    _displayName: "Kaftan Wędrowca"
+    _description: "Lekka zbroja. Obrona +4, maksymalne HP +10."
+    _icon: {fileID: 21300000, guid: 6c3048f2bdbba0843a2c361d0f5b17e7, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: ore_shard
+    _displayName: "Odłamek Rudy"
+    _description: "Materiał rzemieślniczy do ulepszania wyposażenia."
+    _icon: {fileID: 21300000, guid: c455b0eb7c0cf4d45bb56d1082916aa6, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: potion_hp_m
+    _displayName: "Mikstura Życia"
+    _description: "Przywraca 320 HP w ciągu 2 sekund."
+    _icon: {fileID: 21300000, guid: f0351c24b5c7e7fad76c42af30b94464, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: treatise_proficiency_shaman
+    _displayName: "Traktat Biegłości: Szaman"
+    _description: "Przedmiot rozwoju umiejętności dla klasy Szaman."
+    _icon: {fileID: 21300000, guid: e5249061df4022fe008e3c6adf082fb3, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: potion_hp_s
+    _displayName: "Mała Mikstura Życia"
+    _description: "Przywraca 80 HP w ciągu 2 sekund."
+    _icon: {fileID: 21300000, guid: e799d6c22eaabf646a8731f890770028, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: amber_earring
+    _displayName: "Bursztynowy Kolczyk"
+    _description: "Odporność na truciznę +5%."
+    _icon: {fileID: 21300000, guid: 837f75c37962754499c504d4804029ce, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: starter_buckler
+    _displayName: "Lipowy Puklerz"
+    _description: "Tarcza wojownika. Obrona +3, blok +8%."
+    _icon: {fileID: 21300000, guid: 0a6ccfc6a8f938b47bb6ddf6a5b7f03c, type: 3}
+    _modelPrefab: {fileID: 9091437674999746120, guid: ff1919cdcfa45bd4ab83576660bc8385, type: 3}
+  - _definitionId: starter_boots
+    _displayName: "Buty Traktowe"
+    _description: "Obrona +2, unik +2%."
+    _icon: {fileID: 21300000, guid: 552893a10ab95834eb86521fb5a0a4a6, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: seal_apex
+    _displayName: "Pieczęć Szczytu"
+    _description: "Przedmiot rozwoju umiejętności do stopnia Szczyt."
+    _icon: {fileID: 21300000, guid: fdc74fdb4af84506221e1c59eb543532, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: bag_expansion
+    _displayName: "Sakwa +8 miejsc"
+    _description: "Rozszerzenie plecaka o 8 miejsc."
+    _icon: {fileID: 21300000, guid: 256e16b66c47b7959beb8ad1c88191b5, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: starter_gloves
+    _displayName: "Rękawice Rekruta"
+    _description: "Obrona +1, celność +2%."
+    _icon: {fileID: 21300000, guid: fca81fd6baf41824abcce437fb0ab701, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: spark_artistry
+    _displayName: "Iskra Kunsztu"
+    _description: "Przedmiot rozwoju umiejętności do stopnia Kunszt."
+    _icon: {fileID: 21300000, guid: 58af3339cc3bbed7d152060e91c63e17, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: starter_sword
+    _displayName: "Miecz Rekruta"
+    _description: "Broń jednoręczna. Atak +6."
+    _icon: {fileID: 21300000, guid: a66ec341f228d3145b051438f7a10fd9, type: 3}
+    _modelPrefab: {fileID: 6984491356934107637, guid: 3f2c866b9de3bab4398eb49f1397e97b, type: 3}
+  - _definitionId: forget_draught
+    _displayName: "Napar Zapomnienia"
+    _description: "Napar służący do resetowania punktów statystyk."
+    _icon: {fileID: 21300000, guid: fc867c70678c0f7d295c3f04e21f13ff, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: antidote
+    _displayName: "Antidotum"
+    _description: "Usuwa truciznę i daje 10 sekund odporności."
+    _icon: {fileID: 21300000, guid: 0d45f34e3e6712b42b2b5db9180e39e4, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: potion_mp_s
+    _displayName: "Mała Mikstura Many"
+    _description: "Przywraca 50 MP w ciągu 2 sekund."
+    _icon: {fileID: 21300000, guid: cc8316321b7cc071a161271b90cc363e, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: treatise_proficiency_slajter
+    _displayName: "Traktat Biegłości: Slajter"
+    _description: "Przedmiot rozwoju umiejętności dla klasy Slajter."
+    _icon: {fileID: 21300000, guid: f5af545074561233ab9a45b047e9161a, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: smith_oil
+    _displayName: "Olej Kowalski"
+    _description: "Materiał kowalski chroniący hartowane wyposażenie."
+    _icon: {fileID: 21300000, guid: 4058df98aa7d0045081be1aec2bb297a, type: 3}
+    _modelPrefab: {fileID: 0}
+  - _definitionId: treatise_proficiency_warrior
+    _displayName: "Traktat Biegłości: Wojownik"
+    _description: "Przedmiot rozwoju umiejętności dla klasy Wojownik."
+    _icon: {fileID: 21300000, guid: 5aecf2ddd117f50ec4ac6cd1e8513173, type: 3}
+    _modelPrefab: {fileID: 0}

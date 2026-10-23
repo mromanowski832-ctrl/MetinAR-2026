@@ -1,0 +1,54 @@
+{
+  "asset": "StarterBuckler",
+  "item_id": "starter_buckler",
+  "name_pl": "Lipowy Puklerz",
+  "triangles": 1368,
+  "vertices": 818,
+  "materials": 1,
+  "bones": 0,
+  "lods": 1,
+  "texture_size": 512,
+  "textures": [
+    "T_StarterBuckler_BC.png",
+    "T_StarterBuckler_MS.png",
+    "T_StarterBuckler_N.png"
+  ],
+  "budget_spec_section_8": {
+    "triangles_max": 1500,
+    "bones": 0,
+    "materials": 1,
+    "texture": 512,
+    "lod": "none"
+  },
+  "diameter_m": 0.362,
+  "bounds_unity_m": {
+    "min": [
+      -0.181,
+      -0.181,
+      -0.0135
+    ],
+    "max": [
+      0.181,
+      0.181,
+      0.1104
+    ],
+    "size": [
+      0.362,
+      0.362,
+      0.1239
+    ]
+  },
+  "pivot": "centre of the grip (fist), handle along Unity +Y, front face towards Unity +Z",
+  "sockets_unity_m": {
+    "Socket_Grip": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "Socket_FxBlock": [
+      0.0,
+      0.0,
+      0.1104
+    ]
+  }
+}

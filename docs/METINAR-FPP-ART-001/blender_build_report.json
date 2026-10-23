@@ -1,0 +1,260 @@
+{
+  "triangles": {
+    "SK_Player_FppArms": 4932,
+    "SM_Weapon_FppSword": 1452
+  },
+  "vertices": {
+    "SK_Player_FppArms": 2588,
+    "SM_Weapon_FppSword": 765
+  },
+  "bones": 29,
+  "bone_names": [
+    "B_Root",
+    "B_UpperArm_R",
+    "B_Forearm_R",
+    "B_Hand_R",
+    "B_Index1_R",
+    "B_Index2_R",
+    "B_Middle1_R",
+    "B_Middle2_R",
+    "B_Ring1_R",
+    "B_Ring2_R",
+    "B_Pinky1_R",
+    "B_Pinky2_R",
+    "B_Thumb1_R",
+    "B_Thumb2_R",
+    "B_Socket_Sword",
+    "B_UpperArm_L",
+    "B_Forearm_L",
+    "B_Hand_L",
+    "B_Index1_L",
+    "B_Index2_L",
+    "B_Middle1_L",
+    "B_Middle2_L",
+    "B_Ring1_L",
+    "B_Ring2_L",
+    "B_Pinky1_L",
+    "B_Pinky2_L",
+    "B_Thumb1_L",
+    "B_Thumb2_L",
+    "B_Socket_GripL"
+  ],
+  "materials": {
+    "SK_Player_FppArms": 1,
+    "SM_Weapon_FppSword": 1
+  },
+  "texture_size": 1024,
+  "textures": {
+    "FppArms": [
+      "BC",
+      "MS",
+      "N"
+    ],
+    "FppSword": [
+      "BC",
+      "E",
+      "MS",
+      "N"
+    ]
+  },
+  "contract_id": "v3-a31-retest",
+  "sword_scale": 0.75,
+  "contract_unity": {
+    "rest": [
+      [
+        0.09000000357627869,
+        -0.17000000178813934,
+        0.46000000834465027
+      ],
+      [
+        15.0,
+        -30.0,
+        -22.0
+      ]
+    ],
+    "aura_hold": [
+      [
+        0.10000000149011612,
+        -0.14000000059604645,
+        0.5
+      ],
+      [
+        10.0,
+        -30.0,
+        -18.0
+      ]
+    ],
+    "left_rest": [
+      [
+        -0.07999999821186066,
+        -0.23000000417232513,
+        0.41999998688697815
+      ],
+      [
+        0.0,
+        0.0,
+        12.0
+      ]
+    ],
+    "hit_blade_base": [
+      0.0,
+      0.09749999642372131,
+      0.0
+    ],
+    "hit_blade_tip": [
+      0.0,
+      0.7049999833106995,
+      0.0
+    ],
+    "left_grip": [
+      0.0,
+      -0.08999999612569809,
+      0.0
+    ]
+  },
+  "sword_sockets_unity_model": {
+    "Socket_GripR": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "Socket_GripL": [
+      0.0,
+      -0.11999999731779099,
+      0.0
+    ],
+    "Socket_FxBladeBase": [
+      0.0,
+      0.12999999523162842,
+      0.0
+    ],
+    "Socket_FxBladeTip": [
+      0.0,
+      0.9399999976158142,
+      0.0
+    ],
+    "Socket_FxAuraBurst": [
+      0.0,
+      0.3799999952316284,
+      0.0
+    ],
+    "Socket_FxGuardGem": [
+      0.0,
+      0.116,
+      0.0
+    ]
+  },
+  "shoulders_unity": {
+    "R": [
+      0.16,
+      -0.295,
+      0.025
+    ],
+    "L": [
+      -0.14,
+      -0.295,
+      -0.125
+    ]
+  },
+  "upper_forearm_len_m": [
+    0.3,
+    0.285
+  ],
+  "hand_yaw_deg": -45.0,
+  "fps": 100,
+  "clips": {
+    "Idle": {
+      "frames": 201,
+      "seconds": 2.0,
+      "loop": true,
+      "max_wrist_gap_m": 0.0,
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "Attack": {
+      "frames": 73,
+      "seconds": 0.72,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "left_finger_fit_frames": 29,
+      "left_finger_fit_range": [
+        -0.5,
+        0.0
+      ]
+    },
+    "AuraActivate": {
+      "frames": 116,
+      "seconds": 1.15,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "left_finger_fit_frames": 43,
+      "left_finger_fit_range": [
+        -0.014,
+        0.2
+      ]
+    }
+  },
+  "socket_vs_pr32_blender": {
+    "Attack": {
+      "right_pos_m": 0.0,
+      "right_rot_deg": 0.0,
+      "left_pos_m": 0.0,
+      "left_rot_deg": 0.0
+    },
+    "AuraActivate": {
+      "right_pos_m": 0.0,
+      "right_rot_deg": 0.0,
+      "left_pos_m": 0.0,
+      "left_rot_deg": 0.0
+    }
+  },
+  "hand_sword_contact": {
+    "Idle": {
+      "hilt_min_clearance_m": {
+        "R": 0.0038,
+        "L": 9.0
+      },
+      "penetrating_vertices": 0,
+      "nearest_camera_m": 0.294
+    },
+    "Attack": {
+      "hilt_min_clearance_m": {
+        "R": 0.0038,
+        "L": 9.0
+      },
+      "penetrating_vertices": 0,
+      "nearest_camera_m": 0.288
+    },
+    "AuraActivate": {
+      "hilt_min_clearance_m": {
+        "R": 0.0038,
+        "L": 0.0021
+      },
+      "penetrating_vertices": 0,
+      "nearest_camera_m": 0.277
+    }
+  },
+  "attack_hilt_left_socket": {
+    "min_m": 0.0748,
+    "at_s": 0.42,
+    "required_m": 0.05,
+    "contract_min_m": 0.0748
+  },
+  "left_attack_dodge": {
+    "offset": [
+      -0.07999999821186066,
+      -0.029999999329447746,
+      -0.03999999910593033
+    ],
+    "times_s": [
+      0.18,
+      0.3,
+      0.48,
+      0.7
+    ]
+  },
+  "grip_tighten_m": 0.00413
+}

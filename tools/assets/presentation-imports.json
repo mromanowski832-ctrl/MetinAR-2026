@@ -1,0 +1,1836 @@
+{
+  "base_commit": "94af11bb10b7efd73add4ba161029c882516d9ad",
+  "note": "Existing project assets copied unchanged by blob SHA. Spider PR #30 and final-combo PR #106 are not included.",
+  "imports": [
+    {
+      "path": "art-source/FppHandsSword/fpp_anim.py",
+      "git_blob_sha": "b2b8f085d103e0092bf8bf58777a5d591ee4253c",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "art-source/FppHandsSword/fpp_build.py",
+      "git_blob_sha": "f33b21161a34213b4773426833d51b62b03ac31a",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "art-source/FppHandsSword/fpp_contract.py",
+      "git_blob_sha": "ac785ceadbc5af2a6ea42f81300ae718ccb1da11",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "art-source/FppHandsSword/fpp_mesh.py",
+      "git_blob_sha": "ccd2fe3649ab309bd0994a08497daabe53cc0b1a",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "art-source/FppHandsSword/fpp_model.py",
+      "git_blob_sha": "6987a24a7da1bd8c64f6d08a56f79629fd3d06bc",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "art-source/FppHandsSword/fpp_render.py",
+      "git_blob_sha": "b1ec2be11bdabdc4773d4045769b079db4b1a9bb",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "art-source/FppHandsSword/fpp_texture.py",
+      "git_blob_sha": "468cffc688d8dbc686e34ad044555c5793013fa4",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player.meta",
+      "git_blob_sha": "fcc48ce0dbd9598e27f52755ff98ffda58590fec",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms.meta",
+      "git_blob_sha": "d2c0f14be11700bb0b3a1501724218a06da6e0f5",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/ASSET_SOURCE.txt",
+      "git_blob_sha": "7e624924ffa411f3f9bcf10f991d05f563004f6a",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/ASSET_SOURCE.txt.meta",
+      "git_blob_sha": "256eb4725199530ef4564fe338c7824131b0b422",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Animations.meta",
+      "git_blob_sha": "ae115cd8efe3c3ada1b99f07286c66502e1cc995",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Animations/AC_FppArms.controller",
+      "git_blob_sha": "aa459522e15d1f21decd78485b9220bc61b3acc2",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Animations/AC_FppArms.controller.meta",
+      "git_blob_sha": "38d7ff33d827cc3f469f84c0d4522d2aa5725636",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Animations/A_FppArms_Attack.fbx",
+      "git_blob_sha": "330a1364969b46b11f3751418faa6755a638520e",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Animations/A_FppArms_Attack.fbx.meta",
+      "git_blob_sha": "aae25a47397c64ae376488358339fc9f6ed51ea2",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Animations/A_FppArms_AuraActivate.fbx",
+      "git_blob_sha": "bf0e036edf8e63b0da641e2436dc2465facc7925",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Animations/A_FppArms_AuraActivate.fbx.meta",
+      "git_blob_sha": "4f7f24d40ffe96fcc03a41233e90341a5c25edf1",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Animations/A_FppArms_Idle.fbx",
+      "git_blob_sha": "43ce04ec0b349b183de9d6279b8dfed0fd8de63f",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Animations/A_FppArms_Idle.fbx.meta",
+      "git_blob_sha": "9a4ee4cffb6b5d13fc39ad5d3e9b02a05c7d86e5",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Materials.meta",
+      "git_blob_sha": "555ed2149adc698666367917582c54bf52d625d9",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Materials/M_FppArms.mat",
+      "git_blob_sha": "76294494cf37041007b14aa544622ac5a1920181",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Materials/M_FppArms.mat.meta",
+      "git_blob_sha": "93df28e0880b854c2ee160a463d27dea9a25b53b",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Models.meta",
+      "git_blob_sha": "5255e45e92c11eb5575ad20acbd084cab1b146f7",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Models/SK_Player_FppArms.fbx",
+      "git_blob_sha": "db2aeb7451beddff56e0b62ce0c31f39ae6fbd99",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Models/SK_Player_FppArms.fbx.meta",
+      "git_blob_sha": "1e64c15884f5a141617f788e9f56d483ff69ac0c",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Prefabs.meta",
+      "git_blob_sha": "bfcb27f6916af317dc7c7d0f04382ea7232968a6",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Prefabs/PF_Player_FppArms.prefab",
+      "git_blob_sha": "99a4f5bb5a14c7faa8e64c326dbe4348f24c8902",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Prefabs/PF_Player_FppArms.prefab.meta",
+      "git_blob_sha": "9f3048cf5c0ddc78f7e3e787461277d2a2d85288",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Textures.meta",
+      "git_blob_sha": "6bb64552d350b82a180492e0830b94fb33188ec0",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Textures/T_FppArms_BC.png",
+      "git_blob_sha": "b79c788ff575a5f930af4fb2a9439fb42cb73954",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Textures/T_FppArms_BC.png.meta",
+      "git_blob_sha": "1ad9a2c71f19cebbcd41688560204a00301a6126",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Textures/T_FppArms_MS.png",
+      "git_blob_sha": "773543f3ae9eec14f3d8d39c3961ea38bdd8c0e8",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Textures/T_FppArms_MS.png.meta",
+      "git_blob_sha": "9eb81ed530b796f3b8a6677b90c23b282bceb771",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Textures/T_FppArms_N.png",
+      "git_blob_sha": "33b0f73a3ced97bbc284b01541e565cba5974d54",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/Player/FppArms/Textures/T_FppArms_N.png.meta",
+      "git_blob_sha": "1b20a911ba4d3c8ef3172d5d5956648b11919645",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/FppArt.meta",
+      "git_blob_sha": "02ffe16ce453634f2b8622b666a2f1488d5229df",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/FppArt/FppArtAssetBuilder.cs",
+      "git_blob_sha": "0a8b664225b2e9584f6c2c2b40166eafb8dfd8b9",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/FppArt/FppArtAssetBuilder.cs.meta",
+      "git_blob_sha": "a74dda5791d12cd570056c0b3dcb3a8a27c9f99b",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/FppArt/FppArtAssetCheck.cs",
+      "git_blob_sha": "b770bf6ef6b46f99ff96db901b36ceddabb0d0e6",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/FppArt/FppArtAssetCheck.cs.meta",
+      "git_blob_sha": "f9178aea7f7d44733aacf34e2d1e6477e4dc58b4",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword.meta",
+      "git_blob_sha": "42f912e4da3bbe6f0a961f04fb9dce337864b3fa",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/ASSET_SOURCE.txt",
+      "git_blob_sha": "b506db8b92f1a2346cc4bf6ff4bba9c3a4d32225",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/ASSET_SOURCE.txt.meta",
+      "git_blob_sha": "69b4d676fa8bb0864e08aebb1e94b426de3a1db1",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Materials.meta",
+      "git_blob_sha": "94f8fab7c04d6f9133e48cb8869d9be61f5595b1",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Materials/M_FppSword.mat",
+      "git_blob_sha": "f9139930c21e68a7065ef341d1a49f5561887ed1",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Materials/M_FppSword.mat.meta",
+      "git_blob_sha": "033cc7e992d6ab57451aa5711738bde896360684",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Models.meta",
+      "git_blob_sha": "45ad12d61d447be1ed89c63b488315ec75b3bbf2",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Models/SM_Weapon_FppSword.fbx",
+      "git_blob_sha": "ebf0dd9391f2318b7c03cb5acfb891417173f263",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Models/SM_Weapon_FppSword.fbx.meta",
+      "git_blob_sha": "acb336d86b0ea6c98d8abfe11b691b214ff45fd7",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Prefabs.meta",
+      "git_blob_sha": "39d6ff6ebe3d2abc071fd99955c675d9c098eb19",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Prefabs/PF_Weapon_FppSword.prefab",
+      "git_blob_sha": "2a916a8db9707523235e596973e2d0bc6841e2b2",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Prefabs/PF_Weapon_FppSword.prefab.meta",
+      "git_blob_sha": "e1706dec2e53f4b501f5f6ae18b954f112893059",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Textures.meta",
+      "git_blob_sha": "52cb0011722343b42c536f4a809855e3d97dfa3a",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Textures/T_FppSword_BC.png",
+      "git_blob_sha": "6f4fad10e7240df339ae88dc31a37a610ef55881",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Textures/T_FppSword_BC.png.meta",
+      "git_blob_sha": "126a7372876ca73caab84ce10a7cfd3a4f227687",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Textures/T_FppSword_E.png",
+      "git_blob_sha": "b57ad30f1fab2ec5a723b595c6ec831545c90202",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Textures/T_FppSword_E.png.meta",
+      "git_blob_sha": "1dda046177d8c231e56a7c9a09d4e6f27f9a0f76",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Textures/T_FppSword_MS.png",
+      "git_blob_sha": "fd909e490fd959edd73db36f679c80a39dab434e",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Textures/T_FppSword_MS.png.meta",
+      "git_blob_sha": "7ef71af1f5bf013e21e897fdd38b8b0f6426c4cc",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Textures/T_FppSword_N.png",
+      "git_blob_sha": "eee61bab1b5006405db5ae39f9aa79ac4aa9a9e3",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/FppSword/Textures/T_FppSword_N.png.meta",
+      "git_blob_sha": "a7f380fe263726a7e5b447e568d9ecb54e5c5a6e",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001.md",
+      "git_blob_sha": "5defd1b0aab3aa03579ff1fa75530b410f08c6c2",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/blender_build_report.json",
+      "git_blob_sha": "e461a125b132af5df02dd38b55a4fcfbc0ad82e1",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/checkpoint-01-fpp-landscape.jpg",
+      "git_blob_sha": "1116b94b444a032bb527e9b8f708e77846c085d2",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/checkpoint-01-fpp-portrait.jpg",
+      "git_blob_sha": "20813f11ed503a0e4c762dc775cd3f11aead58a2",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/checkpoint-01-side-grip.jpg",
+      "git_blob_sha": "5a2b3b4103c5f23ffe131b7d8618dd7858dc125b",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/checkpoint-03-unity-fpp-portrait.jpg",
+      "git_blob_sha": "3eb677bb49606b9ad8ba7aba087296ce5b910dae",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/checkpoint-03-unity-side-grip.jpg",
+      "git_blob_sha": "9c3c8e80844e201a0f604b51ba59f1dd99adb30a",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_landscape_Attack_f018.jpg",
+      "git_blob_sha": "494f323f8f0b0bb094ad830685508877f08a0a0f",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_landscape_Attack_f030.jpg",
+      "git_blob_sha": "6c42966e8fbc1693b5d3fc71e88df47ba3e259ff",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_landscape_Attack_f042.jpg",
+      "git_blob_sha": "8b1ba41726a99d52215ddd3fa979d58f9bf65599",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_landscape_Attack_f060.jpg",
+      "git_blob_sha": "2187ca59e436b1c103c16a09c1618b13c46e0567",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_landscape_AuraActivate_f039.jpg",
+      "git_blob_sha": "f9742d285af8e3a656e13d1451a8bcbdf2f8ab14",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_landscape_AuraActivate_f065.jpg",
+      "git_blob_sha": "f9742d285af8e3a656e13d1451a8bcbdf2f8ab14",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_landscape_AuraActivate_f100.jpg",
+      "git_blob_sha": "dff83cd0330242f19285b29b5294f222aaa2b386",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_landscape_Idle_f000.jpg",
+      "git_blob_sha": "d5b35680da23b38363f3a36c0cfdc7cd85c60876",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_portrait_Attack_f018.jpg",
+      "git_blob_sha": "9d9a1e49cc01d4eb2c741b0a2e96d0b960d63c92",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_portrait_Attack_f030.jpg",
+      "git_blob_sha": "62412e344a24776039cfba56ff6aea333a6e9d82",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_portrait_Attack_f042.jpg",
+      "git_blob_sha": "21678a5738c463594e277d8c5ca757bad7b6e744",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_portrait_Attack_f060.jpg",
+      "git_blob_sha": "6c723c323bce9847c488082bf963c38c2ecce42d",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_portrait_AuraActivate_f039.jpg",
+      "git_blob_sha": "a878be4ad5463926a1a7faf85045dbab547e0bff",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_portrait_AuraActivate_f065.jpg",
+      "git_blob_sha": "a878be4ad5463926a1a7faf85045dbab547e0bff",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_portrait_AuraActivate_f100.jpg",
+      "git_blob_sha": "5a3d6fd83d62539d1bbf5f835a7ed8124a43bf19",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/fpp_portrait_Idle_f000.jpg",
+      "git_blob_sha": "00e10c5d0a27eff3e88128a83185a0447b5db40f",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/grip_AuraActivate_f065.jpg",
+      "git_blob_sha": "9f1b550baa4a9ce314136c636765763a6308564a",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/grip_Idle_f000.jpg",
+      "git_blob_sha": "84d3bf76a3787b1375fb62cdf3061b51c419517f",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/side_Attack_f018.jpg",
+      "git_blob_sha": "a6ce5bcf32d41d6e2c94c661c475d9434458f1f4",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/side_Attack_f030.jpg",
+      "git_blob_sha": "e1955c546ef3a0981768536476267a15e8d00008",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/side_Attack_f042.jpg",
+      "git_blob_sha": "e84a9259f7923ffc87deadd4df5e9ec516ad1d36",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/side_Attack_f060.jpg",
+      "git_blob_sha": "3823cea5993325d8685ceb069de639f965d1d05b",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/side_AuraActivate_f039.jpg",
+      "git_blob_sha": "66e0bbd87ff2d6c3846dfd5ecfab3608dff444ee",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/side_AuraActivate_f065.jpg",
+      "git_blob_sha": "66e0bbd87ff2d6c3846dfd5ecfab3608dff444ee",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/side_AuraActivate_f100.jpg",
+      "git_blob_sha": "4b9f4d35d55e46af8e71d3e1688a445d0b99d142",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/renders/side_Idle_f000.jpg",
+      "git_blob_sha": "4b7e4014b79ce4e45b7784cf00b50cfe54e26068",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity-asset-check.txt",
+      "git_blob_sha": "0d1ed644425e455cea5900e4c5574aa31e58f8d9",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity-asset-validation.txt",
+      "git_blob_sha": "f038cd89424fe44e7da4f965357184bbfe97fe26",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity-batch-summary.txt",
+      "git_blob_sha": "46db33ae12b1a3b5eebc4548dd87fa35d9ba0b08",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity-qa-checks.json",
+      "git_blob_sha": "9a31479b97ae832821c73f8eb0bab355565cc6db",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_landscape_Attack_018.jpg",
+      "git_blob_sha": "0bc1e5ac01e7db7cf24f4a13ebabc60b71742a27",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_landscape_Attack_030.jpg",
+      "git_blob_sha": "13dbf2872fc4671727b73d790ca4e84ef52b1a6f",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_landscape_Attack_042.jpg",
+      "git_blob_sha": "684423b2366bf1b2ad7bdeaedd8f9b6fbe6ad331",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_landscape_Attack_060.jpg",
+      "git_blob_sha": "5b9d1f7c108947d9d86f3fb1c9951238e6771b4e",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_landscape_AuraActivate_039.jpg",
+      "git_blob_sha": "9d038b5e27ff76badf5e4d61e40eff436ad8a4ab",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_landscape_AuraActivate_065.jpg",
+      "git_blob_sha": "1a18b24a36e8a5f63253ab0d6f0ba81e4a990d0e",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_landscape_AuraActivate_100.jpg",
+      "git_blob_sha": "878de2715da2def58b5a405267f5da5d6bedeccc",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_landscape_Idle_000.jpg",
+      "git_blob_sha": "ddd7f6b2cf5acd741ecde997852627b9224b3763",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_portrait_Attack_018.jpg",
+      "git_blob_sha": "3ee2d870cda3ec81043f9d59ca8db602ab784607",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_portrait_Attack_030.jpg",
+      "git_blob_sha": "2e97723088aa479232376fbd3f23f37f0ba87dc0",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_portrait_Attack_042.jpg",
+      "git_blob_sha": "d3e9d2d5f89564fdf4e8f6111b41fd35980e6863",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_portrait_Attack_060.jpg",
+      "git_blob_sha": "598fa0db4c8b2c0373cf6515d974faa21ffaadb8",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_portrait_AuraActivate_039.jpg",
+      "git_blob_sha": "0161226a9cc72f597a5c8c4bdd77f9269ea3aa43",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_portrait_AuraActivate_065.jpg",
+      "git_blob_sha": "f6d6166cf2471fff4c986146afef7f1b9d8bb498",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_portrait_AuraActivate_100.jpg",
+      "git_blob_sha": "3867f49ddbee2b21c46bb505bb14ca655aa156be",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_fpp_portrait_Idle_000.jpg",
+      "git_blob_sha": "2f4133fd453525808ae2f37ad73cdb3e165783af",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_grip_AuraActivate_039.jpg",
+      "git_blob_sha": "10321afbd1d3647b0b1cde0728ffeb2296ccfa6c",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_grip_AuraActivate_065.jpg",
+      "git_blob_sha": "17603ed98a16291def9fdbc9b835cae2a9f67dee",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_grip_AuraActivate_100.jpg",
+      "git_blob_sha": "b1bf1da90fe2e1f761bd7fd3e7b2ce3847e00173",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_grip_Idle_000.jpg",
+      "git_blob_sha": "01e2e65076d66ac7e0d1dae27a8ffb8a9f0a8203",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_side_Attack_018.jpg",
+      "git_blob_sha": "cd550d3ad2a9e18e9b7bf628ba45de0e2f6c50cd",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_side_Attack_030.jpg",
+      "git_blob_sha": "a5a4a55ef2fbb4d06691d6f74e556be58c16441c",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_side_Attack_042.jpg",
+      "git_blob_sha": "7fc3fb8a32ddf877c77160908a9f755f52e64acd",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_side_Attack_060.jpg",
+      "git_blob_sha": "c631ef8065625bd9a5d98f0eb2b7fcbf2923534c",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_side_AuraActivate_039.jpg",
+      "git_blob_sha": "e429d2f464ee681925095f17547592de71053652",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_side_AuraActivate_065.jpg",
+      "git_blob_sha": "76f297281ef34139452de216a167532ee01d3e08",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_side_AuraActivate_100.jpg",
+      "git_blob_sha": "14afaa9f3b447da8b6a87fe76600940c68923ae2",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "docs/METINAR-FPP-ART-001/unity/unity_side_Idle_000.jpg",
+      "git_blob_sha": "b562682c87eda626682747c461e362698d9a74f2",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "tests/AssetPipeline.Tests/FppArtContractTests.cs",
+      "git_blob_sha": "e67fca60e427d7250a205eb6f2be825950b098d3",
+      "source_pr": 36,
+      "source_commit": "e377a75de46d02261bce3ceb9adbb399505d9328"
+    },
+    {
+      "path": "art-source/WanderingMerchant/merchant_anim.py",
+      "git_blob_sha": "e0ce5e50dcfba64cd02fc61acda3cf7c1c0ea91d",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "art-source/WanderingMerchant/merchant_build.py",
+      "git_blob_sha": "c0dce5fea6279dbe33316901c3ef481edd434789",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "art-source/WanderingMerchant/merchant_model.py",
+      "git_blob_sha": "d53fb06e7d9b43cad6d4b4a4c6be26910f3c2c50",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "art-source/WanderingMerchant/merchant_texture.py",
+      "git_blob_sha": "255958ec0762d7c728b81b0757154a29f5979800",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "art-source/WanderingMerchant/render_util.py",
+      "git_blob_sha": "33d50b9e80c7cbfc11ea414c7489767590ad9829",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant.meta",
+      "git_blob_sha": "4d591c4a03a501e504cddb18c54a7d9b7bdb2493",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/ASSET_SOURCE.txt",
+      "git_blob_sha": "4fccd1f9d4ac84866779231f94a52bd4349b99f3",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/ASSET_SOURCE.txt.meta",
+      "git_blob_sha": "a6c7627bd11079ad3dd7bf95608a0af4767dae99",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations.meta",
+      "git_blob_sha": "176fdbd28059a4dacfd43e1bf4ec4ca3a7e5d99b",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/AC_WanderingMerchant.controller",
+      "git_blob_sha": "05486dd4d7c0b0031d41b73a9a8011d819962d8e",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/AC_WanderingMerchant.controller.meta",
+      "git_blob_sha": "ed0387f69a4aeb169996a36a61ffac7b08ae2838",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/A_WanderingMerchant_Idle.fbx",
+      "git_blob_sha": "13c0cec19b842e62cfa09a9ec9932f623b0b7912",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/A_WanderingMerchant_Idle.fbx.meta",
+      "git_blob_sha": "3b5dc11f09c10c6a820c2e62a064eebc201a3acd",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/A_WanderingMerchant_Interact.fbx",
+      "git_blob_sha": "8ca8ce0e7d02cf852906a741329f27ea22841351",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/A_WanderingMerchant_Interact.fbx.meta",
+      "git_blob_sha": "556c823b81f94c6f81a1977bc23d83939d75c74b",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/A_WanderingMerchant_Talk.fbx",
+      "git_blob_sha": "e912a52ff7b5430a6e05c86ce1f17b7c97c5f4ee",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/A_WanderingMerchant_Talk.fbx.meta",
+      "git_blob_sha": "01e91769785cea3080cc6c3ebe87392c6852fe5e",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/A_WanderingMerchant_TurnLeft.fbx",
+      "git_blob_sha": "9ae21fe7030db1e4140299b98173e6a8fca417e8",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/A_WanderingMerchant_TurnLeft.fbx.meta",
+      "git_blob_sha": "6f8afc7e8613f7ca09013d859c233bdc471acdb6",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/A_WanderingMerchant_TurnRight.fbx",
+      "git_blob_sha": "42dbe270151cf6fb910cbf23b53a53382f5c6598",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/A_WanderingMerchant_TurnRight.fbx.meta",
+      "git_blob_sha": "e7c3efb93984723325c6d0ec9b0bc4ae3b629634",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/A_WanderingMerchant_Walk.fbx",
+      "git_blob_sha": "8ee758a5e45966c5732ac2f7135d1d26d9e0cab9",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Animations/A_WanderingMerchant_Walk.fbx.meta",
+      "git_blob_sha": "a737f35f14aaca2c1cae407e1489ece9cad37a6e",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Materials.meta",
+      "git_blob_sha": "3a03dec9253c94a25f97671008d64342282d0f11",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Materials/M_WanderingMerchant.mat",
+      "git_blob_sha": "65a64aab6c4225e699d9438ee7d79d1d5d550233",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Materials/M_WanderingMerchant.mat.meta",
+      "git_blob_sha": "c30c1f7c0d97c77c879d033bb32fab561a952994",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Models.meta",
+      "git_blob_sha": "0fbab4a8de6eb61725c5066b7a8d3839ac3375c2",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Models/SK_Npc_WanderingMerchant.fbx",
+      "git_blob_sha": "b8c8bfabe0800f34d2db34226589f2724ed654c5",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Models/SK_Npc_WanderingMerchant.fbx.meta",
+      "git_blob_sha": "1b1ab51ccc778ad834cdc27afd281a37f5b6276d",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Prefabs.meta",
+      "git_blob_sha": "dfbb657680814463955f6da2eea2bd7706243670",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Prefabs/PF_Npc_WanderingMerchant.prefab",
+      "git_blob_sha": "bceba43e599a64548bff78707f92ff0562b757b2",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Prefabs/PF_Npc_WanderingMerchant.prefab.meta",
+      "git_blob_sha": "572cf4f081abd34b0ea52066ad6b9d0ef5c82e52",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Textures.meta",
+      "git_blob_sha": "4250ab231f33a67d213c8043f9892be3c7275ba1",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Textures/T_WanderingMerchant_BC.png",
+      "git_blob_sha": "b1b5b9027b7bc2f489a9e3edd4b8a43901db8e0c",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Textures/T_WanderingMerchant_BC.png.meta",
+      "git_blob_sha": "388eb649d801e9198d1906630cd36ff49e25a073",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Textures/T_WanderingMerchant_E.png",
+      "git_blob_sha": "8f03c44defee97458a7dd0ad7a11acb45f45d33a",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Textures/T_WanderingMerchant_E.png.meta",
+      "git_blob_sha": "162614d73c4299f1312edf1a187e35c0baabce8b",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Textures/T_WanderingMerchant_MS.png",
+      "git_blob_sha": "a60281adbea9c51c9a1c4052f101046fe1da6ea0",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Textures/T_WanderingMerchant_MS.png.meta",
+      "git_blob_sha": "34cf40ce91c997065a41b275e208e002f1b655af",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Textures/T_WanderingMerchant_N.png",
+      "git_blob_sha": "f2f4a5f5b0f046e03404c76ba9d429d051f13b8e",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Characters/NPC/WanderingMerchant/Textures/T_WanderingMerchant_N.png.meta",
+      "git_blob_sha": "75459775731670d0f5f302452ae4a9e7971463c7",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/WanderingMerchant.meta",
+      "git_blob_sha": "2828aa52d5071ae12fde1f9b0c04c351eb8b5741",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/WanderingMerchant/WanderingMerchantAssetBuilder.cs",
+      "git_blob_sha": "e765a64490defdf4fb9c0771925f00f9045bd257",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/WanderingMerchant/WanderingMerchantAssetBuilder.cs.meta",
+      "git_blob_sha": "fd6399564aebe04667d692a684f30e9d63119b96",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/WanderingMerchant/WanderingMerchantAssetCheck.cs",
+      "git_blob_sha": "4ff61044d8d57f1f1fc2524e700b068a2cfe4b89",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/WanderingMerchant/WanderingMerchantAssetCheck.cs.meta",
+      "git_blob_sha": "ab3e0109fb299d59f3460f0b509dcb4ddc215d9c",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016-WANDERING-MERCHANT.md",
+      "git_blob_sha": "cd33401a15694d6e20121a7b94bee3d21ddc92f1",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/blender_build_report.json",
+      "git_blob_sha": "a9a63495f2a17c9522713b8912e7a43a6e20a369",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/back_34.jpg",
+      "git_blob_sha": "fa63354b3f26958147a607a53358a962bd537903",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/face.jpg",
+      "git_blob_sha": "a4ddfa85c4a8b6c7887f556ab8f535528137f06d",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/front.jpg",
+      "git_blob_sha": "14cccfcbbff0cd806688567552d2e81f00e99d22",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/hero_34.jpg",
+      "git_blob_sha": "b85a863c0f1db339d4c346baf40ec6c784af025e",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/lods.jpg",
+      "git_blob_sha": "9ce0aeb715c2b49c61db0e5a73660dca42e637d5",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/pose_Idle_f23.jpg",
+      "git_blob_sha": "99d73f844e3e1e562cd844f0e07e30cd0127f056",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/pose_Interact_f30.jpg",
+      "git_blob_sha": "a2736871637480b25219c229b958cd89063692bd",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/pose_Talk_f09.jpg",
+      "git_blob_sha": "31ddee8d55eac4fa4ce41127b310191314611648",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/pose_Talk_f24.jpg",
+      "git_blob_sha": "088ae541e4fb2e9ae01ca9c9e99d7bd3961279cd",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/pose_TurnLeft_f16.jpg",
+      "git_blob_sha": "fc584efdb7a1beed1fbb6167123089e03e9238df",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/pose_TurnRight_f31.jpg",
+      "git_blob_sha": "772536f2d56d6a189392e51a041e311f7bd611db",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/pose_Walk_f01.jpg",
+      "git_blob_sha": "6368e829ae6016f400a9bf54ba31034bcc367a06",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/pose_Walk_f10.jpg",
+      "git_blob_sha": "789f6c2f2dd5f512bd56633c1aa3865dc8b64a54",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/rest_front.jpg",
+      "git_blob_sha": "1b42e05aa3130db35da01c63ec73669998c3e9d5",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/renders/side.jpg",
+      "git_blob_sha": "4be5f952143b39849ce8a595e28a405357106e4e",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/metinar-009-asset-validation.txt",
+      "git_blob_sha": "64598f972ffd4b5ee10469f26f278585ef27c380",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity-asset-check.txt",
+      "git_blob_sha": "fae85840872aedb9c44bba16a2b5c7bee4077360",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity_back_34.jpg",
+      "git_blob_sha": "21ba7439884ca182a7a6518cf0c62b7236cf07ca",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity_front.jpg",
+      "git_blob_sha": "3503d6b781bb09ed6ec843ac995ff8b94607255e",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity_hero_34.jpg",
+      "git_blob_sha": "f72bc3a0a5dc118b677eab54c425395ebbaeb876",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity_lod0.jpg",
+      "git_blob_sha": "f72bc3a0a5dc118b677eab54c425395ebbaeb876",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity_lod1.jpg",
+      "git_blob_sha": "fd274c123c8c7761835f77ca4225cfd20ff5015d",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity_lod2.jpg",
+      "git_blob_sha": "557171d056776170ffd4128b32b4884c8bb50a2e",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity_pose_Interact_29.jpg",
+      "git_blob_sha": "c93eeece0ac9bc879aebff1f36ee5794ecf596b5",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity_pose_Talk_08.jpg",
+      "git_blob_sha": "4eae8657962a963b2a2143aaf15732cbde02bbfc",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity_pose_Talk_23.jpg",
+      "git_blob_sha": "4fa5ed65afcb29ed298c3191aed3a963a714bab3",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity_pose_TurnLeft_15.jpg",
+      "git_blob_sha": "ae0294bb692c3249160c5a1d67ec9257f5324895",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity_pose_TurnRight_30.jpg",
+      "git_blob_sha": "cea7d31396b0cff23450fc887b789e4cdf1b2bc6",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity_pose_Walk_00.jpg",
+      "git_blob_sha": "acdd03ea13720721e9b056d9b6045e54ddcfd633",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "docs/METINAR-016/unity/unity_pose_Walk_09.jpg",
+      "git_blob_sha": "745a069eca6f35d04136897503e5fc595fc0c068",
+      "source_pr": 45,
+      "source_commit": "d33c716e2b70875f5f9c110b29a6d3df5f091ee7"
+    },
+    {
+      "path": "art-source/StarterBuckler/buckler_build.py",
+      "git_blob_sha": "797fce5002b02506f2257e971b430b49c2085b43",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "art-source/StarterBuckler/buckler_model.py",
+      "git_blob_sha": "fe3ecbad857f00f15a074c0da883b6c8f600b564",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "art-source/StarterBuckler/buckler_texture.py",
+      "git_blob_sha": "f37d1e10ee467e495bd2f6e58ccca1fb5504766e",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/StarterBuckler.meta",
+      "git_blob_sha": "61b57a121e42ba6f6670379bffd5ece82bc6d1a6",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/StarterBuckler/StarterBucklerAssetBuilder.cs",
+      "git_blob_sha": "475573b3668319aa937d9a33094008ca52f893e7",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/StarterBuckler/StarterBucklerAssetBuilder.cs.meta",
+      "git_blob_sha": "8a3506dc55fd19fd925a4d356436a133f6900c94",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/StarterBuckler/StarterBucklerAssetCheck.cs",
+      "git_blob_sha": "a615f11e4c873581491e61daa13bc66adbd63234",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/StarterBuckler/StarterBucklerAssetCheck.cs.meta",
+      "git_blob_sha": "3b9341d2a7a263b76882eef7d6be21c5ae044f2e",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler.meta",
+      "git_blob_sha": "f5620fa09a84594896ab11aa20d528a2573a6a89",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/ASSET_SOURCE.txt",
+      "git_blob_sha": "be560655719fbb61f11c9e6b16df7b45d5ecde72",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/ASSET_SOURCE.txt.meta",
+      "git_blob_sha": "710befbf7c2403b7bdc50368fe1a474dd6d7eb67",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Materials.meta",
+      "git_blob_sha": "0e984a6a64dd00f5a2db7f63dab9535a5ff75c31",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Materials/M_StarterBuckler.mat",
+      "git_blob_sha": "80415bd1be1eb224c63dd4cb6519bfa0c87f0de4",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Materials/M_StarterBuckler.mat.meta",
+      "git_blob_sha": "dd8be44398e9afd5084880ce696493c118d9eb11",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Models.meta",
+      "git_blob_sha": "ee64fc29092a97e12bfdddd2d93d847703fad0d2",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Models/SM_Weapon_StarterBuckler.fbx",
+      "git_blob_sha": "2becbbd9b2bb74274f3475f639f1a114f5aa967c",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Models/SM_Weapon_StarterBuckler.fbx.meta",
+      "git_blob_sha": "76b223cd70d40402838df24bd8aec45517a6939b",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Prefabs.meta",
+      "git_blob_sha": "fe216fb7b14144240c6be59fed7b731c9706192b",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Prefabs/PF_Weapon_StarterBuckler.prefab",
+      "git_blob_sha": "1569ba1a1eda83eef943061ada5a5182d12a610d",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Prefabs/PF_Weapon_StarterBuckler.prefab.meta",
+      "git_blob_sha": "7c7f378281eb6c837d4ef44308a7994737e73ca0",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Textures.meta",
+      "git_blob_sha": "5dba0fd2a18a107031e0aaadcc9919e40e14e5e1",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Textures/T_StarterBuckler_BC.png",
+      "git_blob_sha": "523777cced1e0f23431cf7532cdcdeff7704e97f",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Textures/T_StarterBuckler_BC.png.meta",
+      "git_blob_sha": "cbec982865972738fc3386accf8629cd0cbb202f",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Textures/T_StarterBuckler_MS.png",
+      "git_blob_sha": "161032e3a68f82d76c5d076642c7cfa92f119235",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Textures/T_StarterBuckler_MS.png.meta",
+      "git_blob_sha": "c2ed9035950540118b02dc033e8b78da70d7213e",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Textures/T_StarterBuckler_N.png",
+      "git_blob_sha": "2cd094c16c82f18c690665e250dfab7931c3e248",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "client/Assets/MetinAR/Weapons/StarterBuckler/Textures/T_StarterBuckler_N.png.meta",
+      "git_blob_sha": "3ce16bb3b7192c22dc7ede2d2c671ee810660961",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "docs/METINAR-032-STARTER-BUCKLER.md",
+      "git_blob_sha": "2eb4617bbdc54cd5c653d2165a2413020675f21f",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "docs/METINAR-032/blender_build_report.json",
+      "git_blob_sha": "2d7b0b405cba0d7aa5a0b39ce746b296fe73f4bc",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "docs/METINAR-032/renders/back_34.jpg",
+      "git_blob_sha": "832941efc805d79b61d13e26c53f7cda238b748f",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "docs/METINAR-032/renders/front.jpg",
+      "git_blob_sha": "8b1dee3edd7b9716dd8cf47bcc836454f77c7459",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "docs/METINAR-032/renders/hero_34.jpg",
+      "git_blob_sha": "6cef6a59252c37091c2b2b17cf47d84f957ddd65",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "docs/METINAR-032/renders/side.jpg",
+      "git_blob_sha": "f5691331196ddc8adf879b8e7bd3f8c39e6f7ea8",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "docs/METINAR-032/unity-asset-check.txt",
+      "git_blob_sha": "6dca1080733cfedaaf1b6010ab9c69ef0869d972",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "docs/METINAR-032/unity/unity_back_34.jpg",
+      "git_blob_sha": "53622c02a6c36f4a2cc6f25027b77db1605b4d3d",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "docs/METINAR-032/unity/unity_front.jpg",
+      "git_blob_sha": "da9d28d20e239c5419c94897744bd32aff2a0284",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "docs/METINAR-032/unity/unity_hero_34.jpg",
+      "git_blob_sha": "e0648e6637cd8f520c4ec1aeccfad415e456b5f3",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "docs/METINAR-032/unity/unity_side.jpg",
+      "git_blob_sha": "adb175828661daba8df18950371c29bc4589066f",
+      "source_pr": 63,
+      "source_commit": "1dd895a36877f454d3619aaa4805ebbc4be63e77"
+    },
+    {
+      "path": "art-source/ItemIcons/check_icons.py",
+      "git_blob_sha": "7076c82a07be1e613f68e506e3fe370d6d3a7747",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "art-source/ItemIcons/icon_lib.py",
+      "git_blob_sha": "f1bf51c456527b44e84af9464d24e114028565a2",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "art-source/ItemIcons/make_icons.py",
+      "git_blob_sha": "f7d0829603778feabcc030ba248fd58b070e8eb6",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/ItemIcons.meta",
+      "git_blob_sha": "b9f3558ae70b7bebcdf165e66a99e88b322e3097",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/ItemIcons/ItemIconImportPostprocessor.cs",
+      "git_blob_sha": "9789ee1b38c0d8c75aee1e5f2cea3b60cd75b11d",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/ItemIcons/ItemIconImportPostprocessor.cs.meta",
+      "git_blob_sha": "6c9fee0f25434791b5441e9e3a2d2a6e3709ff07",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/ItemIcons/ItemIconsCheck.cs",
+      "git_blob_sha": "6adb11d19041a0b4085094693c2fe00ec1b7b3f8",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Editor/ItemIcons/ItemIconsCheck.cs.meta",
+      "git_blob_sha": "90858f16ba0d1f29ae7e239a0d3c898d49a028fb",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons.meta",
+      "git_blob_sha": "daeecab61f4030b19aa1d65d4dc886d057a743e1",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/ASSET_SOURCE.txt",
+      "git_blob_sha": "c036f688432689a22fcc4fca78259a484c98b084",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/ASSET_SOURCE.txt.meta",
+      "git_blob_sha": "12d09f3f4aa970d5b91366925e5eb765e0e7aba3",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_AmberEarring_BC.png",
+      "git_blob_sha": "e32099c88bf97945ffca74068c5eb3c891ef0be2",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_AmberEarring_BC.png.meta",
+      "git_blob_sha": "1e417f3aaa0c577c17de956d3bc72e58737ec413",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_Antidote_BC.png",
+      "git_blob_sha": "38c718bdc9fdc2642d305f4545434cb4c1da4531",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_Antidote_BC.png.meta",
+      "git_blob_sha": "da6a8905b231b30c9daf24c5dc877f4d0a839fe4",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_BagExpansion_BC.png",
+      "git_blob_sha": "501a8e95ea2b180b3b65dd4a0d173b2826e68300",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_BagExpansion_BC.png.meta",
+      "git_blob_sha": "2d041af08081ae7d566216f813c77f032edc8259",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_ForgetDraught_BC.png",
+      "git_blob_sha": "f328a94fd09909119b106e07f188129cfcff8a6c",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_ForgetDraught_BC.png.meta",
+      "git_blob_sha": "90c44c923a1c05cc62f5f7c1d11d1a26c8152c13",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_OreShard_BC.png",
+      "git_blob_sha": "5111bee49946910b58ed483278b5b72ac47d5d32",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_OreShard_BC.png.meta",
+      "git_blob_sha": "6fba897d960ca2629323a19d287f8510dfe1558b",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_PotionHpM_BC.png",
+      "git_blob_sha": "7752aead877b30a14df27e8ca1193d875cd721ce",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_PotionHpM_BC.png.meta",
+      "git_blob_sha": "88dc0c1b6cec756e9fee30af520610cfa625ef55",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_PotionHpS_BC.png",
+      "git_blob_sha": "ad1342a2cb4b6d9551f2ffe2ab01331cd8d38270",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_PotionHpS_BC.png.meta",
+      "git_blob_sha": "772f859be2bbb3ed1c1865570f1da418d0f7ea7c",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_PotionMpS_BC.png",
+      "git_blob_sha": "d87c075be84c53128811dafe089cce03dc781a7d",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_PotionMpS_BC.png.meta",
+      "git_blob_sha": "37cc0df67429f99390eeddd4895bc07953463107",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_SealApex_BC.png",
+      "git_blob_sha": "6e478ba3b6a5640205bd7f711ded1e06cbdafc11",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_SealApex_BC.png.meta",
+      "git_blob_sha": "6e223e34fded1f6f673cfca57f9ae0f0549b7f24",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_SmithOil_BC.png",
+      "git_blob_sha": "2205b00299812934b4f3591056b579f8191c4dca",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_SmithOil_BC.png.meta",
+      "git_blob_sha": "e2c021f960ee16f00a8329e3fb284fedc19c1b72",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_SparkArtistry_BC.png",
+      "git_blob_sha": "ed0112799f0f5c0b9214d5e1a4decf73cc9fc03f",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_SparkArtistry_BC.png.meta",
+      "git_blob_sha": "70e23fdea7d3eca770e1ed934988b75fba66b868",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_SpiderSilk_BC.png",
+      "git_blob_sha": "220bf6089bc44e6a4c6e93b2df80df7413f91fc8",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_SpiderSilk_BC.png.meta",
+      "git_blob_sha": "40b476b416709bdff3e64340bd14b57979f2077e",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterBoots_BC.png",
+      "git_blob_sha": "60cc471bba0701c63f689c38da7414d22ecca89c",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterBoots_BC.png.meta",
+      "git_blob_sha": "01dd215545b611d00b0618f6b1d34d53cc9681ef",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterBuckler_BC.png",
+      "git_blob_sha": "2172c9cf9545ef0e95acc2a6c9ae5bd7f9272049",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterBuckler_BC.png.meta",
+      "git_blob_sha": "5467c0025db5b988ef80c749976bd087baceb912",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterGloves_BC.png",
+      "git_blob_sha": "12e5278c2b984902afaf69a84686649195673c3b",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterGloves_BC.png.meta",
+      "git_blob_sha": "6989ee67e17465f9dd5a5649ea0e47270787770d",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterJerkin_BC.png",
+      "git_blob_sha": "6e0280c99c28310ecf4ee05696db2834dfdb0a5e",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterJerkin_BC.png.meta",
+      "git_blob_sha": "9f22887125530c10f77c6fc3bd778d3674901e68",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterSword_BC.png",
+      "git_blob_sha": "e54d7e5666c3ff2f157bc026de6b215f07b3095b",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterSword_BC.png.meta",
+      "git_blob_sha": "0e1c4170af3be6b30b1253af22507fdb4284cb40",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_TreatiseProficiencyNinja_BC.png",
+      "git_blob_sha": "6218bf034563e9d4745117dd698f7c5b27a35804",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_TreatiseProficiencyNinja_BC.png.meta",
+      "git_blob_sha": "b67a002b55dbb72cad26bd2ca46c33c2e9c1664f",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_TreatiseProficiencyShaman_BC.png",
+      "git_blob_sha": "b78d60f9222e98a4bd7e15cf3a5407de9c8292f0",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_TreatiseProficiencyShaman_BC.png.meta",
+      "git_blob_sha": "40a15ed64ef1ba52171beb188ece27980104dc68",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_TreatiseProficiencySlajter_BC.png",
+      "git_blob_sha": "b8eff3a1ba63c2c3fb98564908bf395cf912de20",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_TreatiseProficiencySlajter_BC.png.meta",
+      "git_blob_sha": "0e2e82d05c7536bfa3bb1c9625be1d226e170516",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_TreatiseProficiencyWarrior_BC.png",
+      "git_blob_sha": "a07a6231828626a446494c40a2ba108355483ba1",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "client/Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_TreatiseProficiencyWarrior_BC.png.meta",
+      "git_blob_sha": "cf0a66d21fe0408e802ffc36e7f1c217f7bc4808",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "docs/METINAR-032-ITEM-ICONS.md",
+      "git_blob_sha": "c7cdfb57833789f9cd80a2abebb703ec153e9507",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "docs/METINAR-032/ICON_LICENSES.md",
+      "git_blob_sha": "1ae52d0d5327351640f4dca8083f21105192a109",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "docs/METINAR-032/contact_sheet.png",
+      "git_blob_sha": "3ef87526792e18d1f6c0759581fb2ff8b0b01b2b",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "docs/METINAR-032/contact_sheet_batch2.png",
+      "git_blob_sha": "c2b069c86ed1ddcd138b49a35fc2362989b47e8d",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "docs/METINAR-032/unity/metinar-009-asset-validation.txt",
+      "git_blob_sha": "084d8b12d2e1658b34b3b52fa72ab5d3553a5b22",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "docs/METINAR-032/unity/unity-icon-check.txt",
+      "git_blob_sha": "96f1ec3247bee8e56e17eb9ab4af375a5bdbeedc",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "docs/METINAR-032/unity/unity_icons_grid.png",
+      "git_blob_sha": "44e17127412a1908c4b3ec3de6cf11c80aefa528",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    },
+    {
+      "path": "docs/METINAR-032/unity/unity_icons_small.png",
+      "git_blob_sha": "57214af87da16123c3b3bc09c21a166331a1e587",
+      "source_pr": 69,
+      "source_commit": "586c16d9661062eec0dca890d1147580b919acfa"
+    }
+  ]
+}

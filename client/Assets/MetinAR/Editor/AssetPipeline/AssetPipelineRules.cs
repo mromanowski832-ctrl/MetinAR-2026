@@ -18,6 +18,8 @@ namespace MetinAR.Editor.AssetPipeline
         public const string BossesFolder = Root + "/Characters/Bosses";
         public const string NpcFolder = Root + "/Characters/NPC";
         public const string WeaponsFolder = Root + "/Weapons";
+        /// <summary>METINAR-FPP-ART-001: first-person player body parts (hands/forearms rig) shown on the AR camera.</summary>
+        public const string PlayerFolder = Root + "/Characters/Player";
         public const string SharedAnimationsFolder = Root + "/Animations";
         public const string SharedMaterialsFolder = Root + "/Materials";
         public const string SharedTexturesFolder = Root + "/Textures";
@@ -27,7 +29,7 @@ namespace MetinAR.Editor.AssetPipeline
         /// <summary>Folders the pipeline owns. Nothing outside them (e.g. Art/ArEncounter, Prefabs, Scenes) is touched.</summary>
         public static readonly string[] PipelineFolders =
         {
-            MobsFolder, BossesFolder, NpcFolder, WeaponsFolder,
+            MobsFolder, BossesFolder, NpcFolder, WeaponsFolder, PlayerFolder,
             SharedAnimationsFolder, SharedMaterialsFolder, SharedTexturesFolder,
         };
 
@@ -41,6 +43,8 @@ namespace MetinAR.Editor.AssetPipeline
         public static readonly string[] MobOptionalStates = { "Run", "Spawn", "Aggro", "Attack02", "Stun" };
         public static readonly string[] NpcRequiredStates = { "Idle", "Walk", "TurnLeft", "TurnRight", "Talk", "Interact" };
         public static readonly string[] NpcOptionalStates = { "Gesture", "Hit", "Death" };
+        /// <summary>METINAR-FPP-ART-001: states of the first-person arms (PR #32 FppCombatController actions).</summary>
+        public static readonly string[] PlayerRequiredStates = { "Idle", "Attack", "AuraActivate" };
 
         /// <summary>Clip states that loop by default.</summary>
         public static readonly string[] LoopingStates = { "Idle", "Walk", "Run", "Hammering", "Talk" };
@@ -48,11 +52,11 @@ namespace MetinAR.Editor.AssetPipeline
         private const string IdPattern = "[A-Z][A-Za-z0-9]*";
         private static readonly Regex IdRegex = new Regex("^" + IdPattern + "$");
         private static readonly Regex StateRegex = new Regex("^[A-Z][A-Za-z0-9]*$");
-        private static readonly Regex ModelRegex = new Regex("^(SK|SM)_(Mob|Boss|Npc|Weapon)_(" + IdPattern + ")(?:_(" + IdPattern + "))?\\.fbx$");
+        private static readonly Regex ModelRegex = new Regex("^(SK|SM)_(Mob|Boss|Npc|Weapon|Player)_(" + IdPattern + ")(?:_(" + IdPattern + "))?\\.fbx$");
         private static readonly Regex AnimationRegex = new Regex("^A_(" + IdPattern + ")_(" + IdPattern + ")(?:_(\\d{2}))?\\.fbx$");
         private static readonly Regex TextureRegex = new Regex("^T_(" + IdPattern + ")(?:_(" + IdPattern + "))?_(BC|N|MS|AO|E|M)\\.(png|tga)$");
         private static readonly Regex MaterialRegex = new Regex("^M_(" + IdPattern + ")(?:_(" + IdPattern + "))?\\.mat$");
-        private static readonly Regex PrefabRegex = new Regex("^PF_(Mob|Boss|Npc|Weapon)_(" + IdPattern + ")(?:_(" + IdPattern + "))?\\.prefab$");
+        private static readonly Regex PrefabRegex = new Regex("^PF_(Mob|Boss|Npc|Weapon|Player)_(" + IdPattern + ")(?:_(" + IdPattern + "))?\\.prefab$");
         private static readonly Regex ControllerRegex = new Regex("^AC_(" + IdPattern + ")\\.controller$");
         private static readonly Regex MaskRegex = new Regex("^AM_(" + IdPattern + ")(?:_(" + IdPattern + "))?\\.mask$");
 
@@ -68,6 +72,10 @@ namespace MetinAR.Editor.AssetPipeline
                     return new AssetBudget(category, maxTrianglesLod0: 20000, maxBones: 75, maxMaterials: 3, maxTextureSize: 2048, maxTextureSizeJustified: 2048, requiredLods: 3);
                 case AssetCategory.Weapon:
                     return new AssetBudget(category, maxTrianglesLod0: 3000, maxBones: 0, maxMaterials: 1, maxTextureSize: 1024, maxTextureSizeJustified: 2048, requiredLods: 1);
+                case AssetCategory.Player:
+                    // FPP arms: always on screen at a fixed distance from the camera, never more than one instance,
+                    // no LOD switching (constant screen size). PROPOSAL until measured on the A31 (METINAR-FPP-ART-001 §5).
+                    return new AssetBudget(category, maxTrianglesLod0: 10000, maxBones: 40, maxMaterials: 2, maxTextureSize: 1024, maxTextureSizeJustified: 2048, requiredLods: 1);
                 default:
                     return new AssetBudget(category, maxTrianglesLod0: 0, maxBones: 0, maxMaterials: 0, maxTextureSize: 2048, maxTextureSizeJustified: 2048, requiredLods: 0);
             }
@@ -96,7 +104,7 @@ namespace MetinAR.Editor.AssetPipeline
             return false;
         }
 
-        /// <summary>Category from the folder: Characters/Mobs → Mob, Characters/Bosses → Boss, Characters/NPC → Npc, Weapons → Weapon.</summary>
+        /// <summary>Category from the folder: Characters/Mobs → Mob, Characters/Bosses → Boss, Characters/NPC → Npc, Weapons → Weapon, Characters/Player → Player.</summary>
         public static AssetCategory ClassifyPath(string assetPath)
         {
             string p = Normalize(assetPath);
@@ -104,6 +112,7 @@ namespace MetinAR.Editor.AssetPipeline
             if (Under(p, BossesFolder)) return AssetCategory.Boss;
             if (Under(p, NpcFolder)) return AssetCategory.Npc;
             if (Under(p, WeaponsFolder)) return AssetCategory.Weapon;
+            if (Under(p, PlayerFolder)) return AssetCategory.Player;
             if (Under(p, SharedAnimationsFolder)) return AssetCategory.SharedAnimation;
             if (Under(p, SharedMaterialsFolder)) return AssetCategory.SharedMaterial;
             if (Under(p, SharedTexturesFolder)) return AssetCategory.SharedTexture;
@@ -112,7 +121,7 @@ namespace MetinAR.Editor.AssetPipeline
 
         public static bool IsPerAssetCategory(AssetCategory c)
         {
-            return c == AssetCategory.Mob || c == AssetCategory.Boss || c == AssetCategory.Npc || c == AssetCategory.Weapon;
+            return c == AssetCategory.Mob || c == AssetCategory.Boss || c == AssetCategory.Npc || c == AssetCategory.Weapon || c == AssetCategory.Player;
         }
 
         public static string CategoryToken(AssetCategory c)
@@ -123,6 +132,7 @@ namespace MetinAR.Editor.AssetPipeline
                 case AssetCategory.Boss: return "Boss";
                 case AssetCategory.Npc: return "Npc";
                 case AssetCategory.Weapon: return "Weapon";
+                case AssetCategory.Player: return "Player";
                 default: return null;
             }
         }
@@ -135,6 +145,7 @@ namespace MetinAR.Editor.AssetPipeline
                 case AssetCategory.Boss: return BossesFolder;
                 case AssetCategory.Npc: return NpcFolder;
                 case AssetCategory.Weapon: return WeaponsFolder;
+                case AssetCategory.Player: return PlayerFolder;
                 case AssetCategory.SharedAnimation: return SharedAnimationsFolder;
                 case AssetCategory.SharedMaterial: return SharedMaterialsFolder;
                 case AssetCategory.SharedTexture: return SharedTexturesFolder;
@@ -550,6 +561,7 @@ namespace MetinAR.Editor.AssetPipeline
         {
             string[] required = category == AssetCategory.Npc ? NpcRequiredStates
                 : (category == AssetCategory.Mob || category == AssetCategory.Boss) ? MobRequiredStates
+                : category == AssetCategory.Player ? PlayerRequiredStates
                 : new string[0];
             var present = new HashSet<string>(presentStates ?? new string[0]);
             var missing = new List<string>();
@@ -604,6 +616,7 @@ namespace MetinAR.Editor.AssetPipeline
         SharedAnimation,
         SharedMaterial,
         SharedTexture,
+        Player,
     }
 
     public enum AssetKind
@@ -680,3 +693,4 @@ namespace MetinAR.Editor.AssetPipeline
         public override string ToString() => Severity.ToString().ToUpperInvariant() + " " + Path + ": " + Message;
     }
 }
+

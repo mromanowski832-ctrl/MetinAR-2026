@@ -1,0 +1,63 @@
+[METINAR-032] Item icon check: checks=57 failures=0
+INFO Unity 6000.6.4f1, colour space Linear
+PASS C01 starter_jerkin: T_ItemIcons_StarterJerkin_BC.png imported as texture — Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterJerkin_BC.png
+PASS C02 starter_jerkin: source 256x256 PNG with alpha — 256x256 alpha=True
+PASS C03 starter_jerkin: Sprite (Single), sRGB, alpha is transparency, Read/Write off — Sprite/Single sRGB=True aIsT=True rw=False
+PASS C04 starter_jerkin: max 256, ASTC overrides on Android and iOS, clamp — Android=ASTC_4x4@256, iPhone=ASTC_4x4@256
+PASS C05 starter_jerkin: Sprite asset loads — (x:0.00, y:0.00, width:256.00, height:256.00)
+PASS C06 starter_jerkin: transparent background and margin, readable silhouette (15-75 % coverage) — coverage 33,6 %
+PASS C01 starter_boots: T_ItemIcons_StarterBoots_BC.png imported as texture — Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterBoots_BC.png
+PASS C02 starter_boots: source 256x256 PNG with alpha — 256x256 alpha=True
+PASS C03 starter_boots: Sprite (Single), sRGB, alpha is transparency, Read/Write off — Sprite/Single sRGB=True aIsT=True rw=False
+PASS C04 starter_boots: max 256, ASTC overrides on Android and iOS, clamp — Android=ASTC_4x4@256, iPhone=ASTC_4x4@256
+PASS C05 starter_boots: Sprite asset loads — (x:0.00, y:0.00, width:256.00, height:256.00)
+PASS C06 starter_boots: transparent background and margin, readable silhouette (15-75 % coverage) — coverage 32,5 %
+PASS C01 starter_buckler: T_ItemIcons_StarterBuckler_BC.png imported as texture — Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterBuckler_BC.png
+PASS C02 starter_buckler: source 256x256 PNG with alpha — 256x256 alpha=True
+PASS C03 starter_buckler: Sprite (Single), sRGB, alpha is transparency, Read/Write off — Sprite/Single sRGB=True aIsT=True rw=False
+PASS C04 starter_buckler: max 256, ASTC overrides on Android and iOS, clamp — Android=ASTC_4x4@256, iPhone=ASTC_4x4@256
+PASS C05 starter_buckler: Sprite asset loads — (x:0.00, y:0.00, width:256.00, height:256.00)
+PASS C06 starter_buckler: transparent background and margin, readable silhouette (15-75 % coverage) — coverage 50,8 %
+PASS C01 amber_earring: T_ItemIcons_AmberEarring_BC.png imported as texture — Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_AmberEarring_BC.png
+PASS C02 amber_earring: source 256x256 PNG with alpha — 256x256 alpha=True
+PASS C03 amber_earring: Sprite (Single), sRGB, alpha is transparency, Read/Write off — Sprite/Single sRGB=True aIsT=True rw=False
+PASS C04 amber_earring: max 256, ASTC overrides on Android and iOS, clamp — Android=ASTC_4x4@256, iPhone=ASTC_4x4@256
+PASS C05 amber_earring: Sprite asset loads — (x:0.00, y:0.00, width:256.00, height:256.00)
+PASS C06 amber_earring: transparent background and margin, readable silhouette (15-75 % coverage) — coverage 15,8 %
+PASS C01 starter_gloves: T_ItemIcons_StarterGloves_BC.png imported as texture — Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterGloves_BC.png
+PASS C02 starter_gloves: source 256x256 PNG with alpha — 256x256 alpha=True
+PASS C03 starter_gloves: Sprite (Single), sRGB, alpha is transparency, Read/Write off — Sprite/Single sRGB=True aIsT=True rw=False
+PASS C04 starter_gloves: max 256, ASTC overrides on Android and iOS, clamp — Android=ASTC_4x4@256, iPhone=ASTC_4x4@256
+PASS C05 starter_gloves: Sprite asset loads — (x:0.00, y:0.00, width:256.00, height:256.00)
+PASS C06 starter_gloves: transparent background and margin, readable silhouette (15-75 % coverage) — coverage 31,1 %
+PASS C01 starter_sword: T_ItemIcons_StarterSword_BC.png imported as texture — Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_StarterSword_BC.png
+PASS C02 starter_sword: source 256x256 PNG with alpha — 256x256 alpha=True
+PASS C03 starter_sword: Sprite (Single), sRGB, alpha is transparency, Read/Write off — Sprite/Single sRGB=True aIsT=True rw=False
+PASS C04 starter_sword: max 256, ASTC overrides on Android and iOS, clamp — Android=ASTC_4x4@256, iPhone=ASTC_4x4@256
+PASS C05 starter_sword: Sprite asset loads — (x:0.00, y:0.00, width:256.00, height:256.00)
+PASS C06 starter_sword: transparent background and margin, readable silhouette (15-75 % coverage) — coverage 16,2 %
+PASS C01 potion_hp_s: T_ItemIcons_PotionHpS_BC.png imported as texture — Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_PotionHpS_BC.png
+PASS C02 potion_hp_s: source 256x256 PNG with alpha — 256x256 alpha=True
+PASS C03 potion_hp_s: Sprite (Single), sRGB, alpha is transparency, Read/Write off — Sprite/Single sRGB=True aIsT=True rw=False
+PASS C04 potion_hp_s: max 256, ASTC overrides on Android and iOS, clamp — Android=ASTC_4x4@256, iPhone=ASTC_4x4@256
+PASS C05 potion_hp_s: Sprite asset loads — (x:0.00, y:0.00, width:256.00, height:256.00)
+PASS C06 potion_hp_s: transparent background and margin, readable silhouette (15-75 % coverage) — coverage 24,6 %
+PASS C01 antidote: T_ItemIcons_Antidote_BC.png imported as texture — Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_Antidote_BC.png
+PASS C02 antidote: source 256x256 PNG with alpha — 256x256 alpha=True
+PASS C03 antidote: Sprite (Single), sRGB, alpha is transparency, Read/Write off — Sprite/Single sRGB=True aIsT=True rw=False
+PASS C04 antidote: max 256, ASTC overrides on Android and iOS, clamp — Android=ASTC_4x4@256, iPhone=ASTC_4x4@256
+PASS C05 antidote: Sprite asset loads — (x:0.00, y:0.00, width:256.00, height:256.00)
+PASS C06 antidote: transparent background and margin, readable silhouette (15-75 % coverage) — coverage 23,5 %
+PASS C01 ore_shard: T_ItemIcons_OreShard_BC.png imported as texture — Assets/MetinAR/Textures/ItemIcons/T_ItemIcons_OreShard_BC.png
+PASS C02 ore_shard: source 256x256 PNG with alpha — 256x256 alpha=True
+PASS C03 ore_shard: Sprite (Single), sRGB, alpha is transparency, Read/Write off — Sprite/Single sRGB=True aIsT=True rw=False
+PASS C04 ore_shard: max 256, ASTC overrides on Android and iOS, clamp — Android=ASTC_4x4@256, iPhone=ASTC_4x4@256
+PASS C05 ore_shard: Sprite asset loads — (x:0.00, y:0.00, width:256.00, height:256.00)
+PASS C06 ore_shard: transparent background and margin, readable silhouette (15-75 % coverage) — coverage 23,4 %
+PASS C07 ASSET_SOURCE.txt present (origin original, MetinAR-Owned) — Assets/MetinAR/Textures/ItemIcons/ASSET_SOURCE.txt
+PASS C08 METINAR-009 asset validator on Textures/ItemIcons: 0 errors, 0 warnings — 10 files, 0 issues
+INFO preview shader Universal Render Pipeline/Unlit
+INFO preview unity_icons_grid.png 1200x1200
+INFO preview shader Universal Render Pipeline/Unlit
+INFO preview unity_icons_small.png 420x420
+PASS C09 preview rendered from the imported sprites — Builds/metinar-032
