@@ -1,0 +1,15 @@
+# Reviewed false positives only, 2026-10-23.
+# These exact historical fingerprints match:
+# - literal private-key detection regex in our own static QA scanner,
+# - Unity Editor SessionState test fixture identifiers (NOT authentication keys).
+# Gitleaks must continue to flag NEW findings even in these same paths.
+# Never add broad paths, regexes or fingerprints without verifying the match.
+
+390f1912016b65cd50a898f88eb7fec186701a98:tools/qa/Test-RepoHygiene.ps1:private-key:110
+e1bdf800f87d25f98d9363fb9fe45248fad822aa:client/Assets/MetinAR/Editor/ArDamageSimulatedHitTest.cs:generic-api-key:29
+777bdc1d21066240fdd4212730b15d29e1685046:client/Assets/MetinAR/Editor/ArDamageSimulatedHitTest.cs:generic-api-key:29
+b57e711fb414473e5452ff6dcba7fb299ca89a61:client/Assets/MetinAR/Editor/OsmMapPocSmokeTest.cs:generic-api-key:27
+8557a3e66624bcfcafdf97ef6b5ffc3e635005f7:client/Assets/MetinAR/Editor/ArEncounterSmokeTest.cs:generic-api-key:34
+0a4f153a7afa62a463dfb1d089fa19e4ec603181:client/Assets/MetinAR/Editor/ArEncounterSmokeTest.cs:generic-api-key:34
+e4b370a31a4768a4052897bdab6cab431266c342:client/Assets/MetinAR/Editor/WorldMapPrototypeSmokeTest.cs:generic-api-key:25
+2aa3c3048ec9690f0422622a5809ca857b48c60e:client/Assets/MetinAR/Editor/WorldMapPrototypeSmokeTest.cs:generic-api-key:25
