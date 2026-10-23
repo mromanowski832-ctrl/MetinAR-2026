@@ -87,7 +87,7 @@ For a physical Android phone, use [the device smoke-test procedure](docs/METINAR
 1. Read the [project brief](docs/PROJECT_BRIEF.md) for intended gameplay and safety rules.
 2. Inspect [combat logic](client/Assets/MetinAR/Scripts/Gameplay/DamageResolver.cs) and [deterministic unit tests](tests/MetinAR.Gameplay.Tests/DamageResolverTests.cs).
 3. Explore the [ASP.NET backend](server/src/MetinAR.Server/) and its integration test suite.
-4. Check [Actions runs](../../actions) and verify the exact commit, job and result — status may change over time.
+4. Check [Actions runs](https://github.com/mromanowski832-ctrl/MetinAR-2026/actions) and verify the exact commit, job and result — status may change over time.
 5. Review [APK QA documentation](docs/METINAR-037-QA-APK-ADB.md) before interpreting a mobile demo as production-ready.
 
 **Demo video / public beta:** not provided until recorded from a verified device build.
