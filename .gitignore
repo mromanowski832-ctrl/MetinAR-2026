@@ -138,3 +138,23 @@ tests/**/obj/
 
 # METINAR-011 QA runner output (reports, Unity logs, redacted logcat) stays local.
 /[Bb]uilds/qa/
+
+# Security: local credentials and signing keys must never be committed.
+# Template files may be tracked only after removing real values.
+.env
+.env.*
+!.env.example
+!.env.template
+!.env.sample
+*.env
+*.env.*
+!*.env.example
+!*.env.template
+!*.env.sample
+*.pem
+*.p8
+*.p12
+*.jks
+*.keystore
+*.mobileprovision
+*.key
