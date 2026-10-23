@@ -1,0 +1,71 @@
+name: server-tests
+
+# METINAR-012 / PR #27: compile and test the server workspace (server/) only.
+# Scope approved by the controller in #33: no secrets, no deployment, no production
+# databases, no write permissions, no paid services. Tests run in-process against
+# temporary SQLite files and need no network beyond restoring NuGet packages.
+
+on:
+  push:
+    paths:
+      - 'server/**'
+      - '.github/workflows/server-tests.yml'
+  pull_request:
+    paths:
+      - 'server/**'
+      - '.github/workflows/server-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: server build + tests (Release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: server
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Show SDK and commit
+        run: |
+          dotnet --version
+          echo "commit ${GITHUB_SHA}"
+
+      - name: Restore
+        run: dotnet restore MetinAR.Server.sln
+
+      - name: Build (Release, warnings as errors via Directory.Build.props)
+        run: dotnet build MetinAR.Server.sln --configuration Release --no-restore
+
+      - name: Test (Release) - any failing test fails the job
+        run: >-
+          dotnet test tests/MetinAR.Server.Tests/MetinAR.Server.Tests.csproj
+          --configuration Release --no-build
+          --logger "console;verbosity=normal"
+          --logger "trx;LogFileName=server-tests.trx"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-test-results
+          path: server/TestResults/*.trx
+          if-no-files-found: warn
+          retention-days: 14

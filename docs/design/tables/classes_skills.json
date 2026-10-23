@@ -1,13 +1,23 @@
 {
   "status": "PROPOSAL — METINAR-017 (#40), proponowane wartości startowe do balansowania, nie finalny balans",
   "rankRules": {
-    "maxRank": 10,
-    "coefPerRank": 0.08,
-    "mpCostPerRank": 0.06,
-    "cooldownReductionPerRank": 0.02,
-    "durationPerRank": 0.03,
+    "system": "stopnie umiejętności (decyzja właściciela 2026-10-21 10:13: mechanika jak w gatunku, nazwy i liczby własne MetinAR)",
+    "tiers": [
+      {"id": "practice", "namePl": "Wprawa", "ranks": [1, 14], "raisedBy": "skill_point"},
+      {"id": "proficiency", "namePl": "Biegłość", "ranks": [1, 8], "raisedBy": "rank I: automatyczny awans po 15. punkcie; II–VIII: treatise_proficiency_<classId>"},
+      {"id": "artistry", "namePl": "Kunszt", "ranks": [1, 6], "raisedBy": "spark_artistry"},
+      {"id": "apex", "namePl": "Szczyt", "ranks": [1, 1], "raisedBy": "seal_apex"}
+    ],
+    "maxRankIndex": 29,
+    "skillPointsPerSkillToProficiency": 15,
     "skillPointsPerLevelFromLevel2": 1,
-    "trainingFeeFormula": "round5(8 * unlockLevel * rank^1.4)"
+    "maxCharacterLevel": 99,
+    "totalSkillPointsAtMaxLevel": 98,
+    "rankTable": "skill_tiers.csv",
+    "tierItemsTable": "skill_tier_items.csv",
+    "failedAttempt": "przedmiot i koszt EXP przepadają, stopień nigdy nie spada",
+    "attemptCooldownAuthority": "server",
+    "trainingFeeFormula": "round5(8 * unlockLevel * rank^1.4), tylko za punkty (Wprawa 1–14 i awans do Biegłości I, rank = 1–15)"
   },
   "classes": [
     {

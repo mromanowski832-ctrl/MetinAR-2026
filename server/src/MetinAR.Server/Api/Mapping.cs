@@ -28,6 +28,7 @@ internal static class Mapping
         e.IsActiveAt(now),
         e.SpawnedAt,
         e.DespawnAt,
+        e.ActiveUntil(now) is { } until && until != DateTimeOffset.MaxValue ? until : null,
         Math.Round(distanceMeters, 1));
 
     public static EncounterSessionDto ToDto(this EncounterSession s) => new(
@@ -35,6 +36,13 @@ internal static class Mapping
         s.PlayerId,
         s.WorldEntityId,
         s.StartedAt,
+        s.ExpiresAt,
         s.CompletedAt,
-        s.Status == EncounterStatus.Completed ? "completed" : "in_progress");
+        s.ExpiredAt,
+        s.Status switch
+        {
+            EncounterStatus.Completed => "completed",
+            EncounterStatus.Expired => "expired",
+            _ => "in_progress",
+        });
 }

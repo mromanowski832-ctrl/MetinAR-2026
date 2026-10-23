@@ -14,7 +14,23 @@
       "maxFrameSpikesPerWindow": 3,
       "maxMainP95Ms": 33,
       "maxTotalUsedMB": 450,
-      "maxPssMB": 600
+      "maxPssMB": 600,
+      "latencyMetrics": [
+        {
+          "metric": "map.tile.decode",
+          "maxAvgMs": 30,
+          "maxP95Ms": 80,
+          "required": false,
+          "note": "METINAR-008B tile decode; skipped until the build reports it"
+        },
+        {
+          "metric": "map.tile.mesh",
+          "maxAvgMs": 20,
+          "maxP95Ms": 50,
+          "required": false,
+          "note": "METINAR-008B tile mesh build; skipped until the build reports it"
+        }
+      ]
     },
     "ArEncounterPrototype": {
       "description": "AR encounter (camera + ARCore + one mob)",
@@ -26,23 +42,35 @@
       "maxPssMB": 850
     },
     "HandTracking": {
-      "description": "Hand-tracking inference (METINAR-007); reported via MetinARPerfProbe.RecordLatency(\"hand.inference\", ms)",
-      "latencyMetric": "lat.hand.inference",
-      "maxLatencyAvgMs": 45,
-      "maxLatencyP95Ms": 70
+      "description": "Hand-tracking inference (METINAR-007); reported via MetinARPerfProbe.Measure(MetinARPerfProbe.Metrics.HandInference)",
+      "latencyMetrics": [
+        {
+          "metric": "hand.inference",
+          "maxAvgMs": 45,
+          "maxP95Ms": 70,
+          "required": false
+        }
+      ],
+      "anyScene": true
     },
     "CombinedArHandSword": {
       "description": "AR + hand tracking + sword (METINAR-007 combined scene; scene name to be confirmed when it lands)",
-      "sceneNames": [ "ArHandSwordPrototype" ],
+      "sceneNames": [
+        "ArHandSwordPrototype"
+      ],
       "minFpsAvg": 20,
       "maxFrameP95Ms": 66,
       "maxFrameSpikesPerWindow": 6,
       "maxMainP95Ms": 50,
       "maxTotalUsedMB": 800,
       "maxPssMB": 1000,
-      "latencyMetric": "lat.hand.inference",
-      "maxLatencyAvgMs": 50,
-      "maxLatencyP95Ms": 80
+      "latencyMetrics": [
+        {
+          "metric": "hand.inference",
+          "maxAvgMs": 50,
+          "maxP95Ms": 80
+        }
+      ]
     }
   },
   "device": {
@@ -51,5 +79,6 @@
     "failThermalStatus": 4,
     "warnBatteryTempC": 40,
     "failBatteryTempC": 45
-  }
+  },
+  "schemaNotes": "latencyMetrics[]: {metric, maxAvgMs, maxP95Ms, required(default true)}; legacy latencyMetric/maxLatencyAvgMs/maxLatencyP95Ms still accepted; anyScene=true evaluates the budget over samples from every scene"
 }

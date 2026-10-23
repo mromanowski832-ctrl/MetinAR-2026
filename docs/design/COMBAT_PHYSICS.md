@@ -1,6 +1,6 @@
 # METINAR-017 — Walka i fizyka
 
-> **Status: PROPOZYCJA do akceptacji właściciela (#40). Bez implementacji.**
+> **Status: ZAAKCEPTOWANE przez właściciela 2026-10-21 (#40; maks. poziom 99, pozostałe propozycje domyślne). Bez implementacji.**
 > Liczby to **proponowane wartości startowe do balansowania**. Czasy FPP pochodzą z prototypu #31 (wartości techniczne,
 > nie balans). Indeks: [README.md](README.md).
 
@@ -24,7 +24,9 @@ Kolejność rozstrzygania jednego trafienia (`DamageResolver`, czysty C# bez zal
 9. **Minimum 1**, zaokrąglenie do liczby całkowitej.
 
 Sprawdzenie skali (wojownik, sprzęt bez rzadkości do poz. 10): mob na tym samym poziomie pada po
-**4–6 trafieniach na poz. 1–10** i **8–10 na poz. 30–60** ([tables/sanity_warrior_ttk.csv](tables/sanity_warrior_ttk.csv)).
+**4–6 trafieniach na poz. 1–10**, **8–10 na poz. 30–60** i **11–12 na poz. 70–99** (12,3 na poz. 99, ok. 9 s przy
+zamachu 0,72 s; [tables/sanity_warrior_ttk.csv](tables/sanity_warrior_ttk.csv)). Do poprawy przy balansie (S12) przez
+rzadkość i hartowanie sprzętu, bez zmiany formuł.
 Cel czasu walki: zwykły 6–10 s, elitarny 20–30 s, strażnik 60–90 s, żeby nie męczyć ręki trzymającej telefon.
 
 Trucizna i inne DoT: tik co 1 s, bez krytyków, bez rzutu na trafienie, ten sam typ nie sumuje się (odświeża czas).
