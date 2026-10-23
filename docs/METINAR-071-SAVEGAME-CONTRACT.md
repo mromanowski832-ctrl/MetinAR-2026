@@ -141,7 +141,7 @@ Requires `If-Match: "<revision>"` (strong ETag from the last GET/PUT/reward). Th
 4. Validates every rule in the schema plus cross-field rules (unique slots/ids, level = curve(totalExp), `local-` ids
    only in local mode, catalog membership, per-item stack limits, capacity 24–56 in steps of 8, ≤8 stash entries)
    → `400 VALIDATION_FAILED` with `errors`.
-5. `mode: "local"` → `422 SAVEGAME_LOCAL_MODE_NOT_SYNCABLE` (local import is #39, an owner decision).
+5. `mode: "local"` → `422 SAVEGAME_LOCAL_MODE_NOT_SYNCABLE` (brak importu w v1 (§11.1); ewentualny import później = #39).
 6. Compares with the stored revision → `412 SAVEGAME_REVISION_CONFLICT` with `currentRevision`. A missing If-Match
    → `428 SAVEGAME_PRECONDITION_REQUIRED`.
 7. Only with `LootStash:AfterExpiry = Expire`: drops expired stash entries from both the stored and the incoming
@@ -244,7 +244,7 @@ The examples were also checked against the schema with Python `jsonschema` in a 
 
 - No authentication: anyone reaching the port can read and write any `playerId` save and claim rewards for
   encounters they started. This is acceptable **only** because the server binds to `localhost` (`AllowedHosts` and `Urls`
-  unchanged). Identity, tokens and HTTPS are **#39**; hosting is out of scope.
+  unchanged). Identity and tokens are **#39**; hosting/HTTPS: S14 (ETAP V), niezrealizowane.
 - The reward claim is client-proposed (§5.3). Caps limit damage, but they are not a cheat defence.
 - Logs carry ids and revisions only, never payloads or coordinates.
 
