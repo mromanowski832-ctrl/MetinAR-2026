@@ -33,18 +33,26 @@ namespace MetinAR.Map
 
     /// <summary>
     /// METINAR-042 (#87) for #50: fixed ("stała") position of a shop NPC such as the Wędrowny Handlarz.
-    /// Spec §2A: "NPC mogą mieć stałe lokalizacje". No coordinates are stored in the repo: the world is split
-    /// into square-ish cells of <see cref="CellSizeMeters"/>, and each cell gets one deterministic site from a
-    /// stable hash of (npc id, cell), so the NPC stands in the same place every session and on every device.
-    /// When an <see cref="EncounterSitePolicy"/> is given, the site is moved (deterministically, same map data)
-    /// to the nearest safe spot, or the cell has no NPC. Optional local overrides (e.g. an owner-chosen place
-    /// stored only on the device) take precedence. Cell size is a prototype value awaiting owner decision.
+    /// Spec §2A: "NPC mogą mieć stałe lokalizacje". Manager decision 2026-10-23 04:12: cell 500 m, and the repo
+    /// holds NO real player coordinates or specific places — the site is computed at runtime only:
+    /// <list type="number">
+    /// <item>the world is split into square-ish cells of <see cref="CellSizeMeters"/> (default 500 m);</item>
+    /// <item>the player's cell and its 8 neighbours each get one nominal site from a stable hash of
+    /// (<see cref="WorldSeed"/>, npc id, cell) — same place every session, on every device;</item>
+    /// <item>every candidate goes through the <see cref="EncounterSitePolicy"/> filter (roads, rail, water,
+    /// buildings, private/industrial land, missing map data) and is moved to the nearest safe spot or skipped.
+    /// Without a policy nothing is placed (default-deny).</item>
+    /// </list>
+    /// Optional local overrides are runtime/device-only data (never committed) and pass the same filter.
     /// </summary>
     public sealed class FixedNpcPlacement
     {
         private readonly List<GeoCoordinate> _overrides = new List<GeoCoordinate>();
 
-        public FixedNpcPlacement(string npcId, double cellSizeMeters = 500.0, double safeSearchRadiusMeters = 60.0)
+        /// <summary>Default world seed (a constant game value, not derived from any place).</summary>
+        public const string DefaultWorldSeed = "metinar-npc-v1";
+
+        public FixedNpcPlacement(string npcId, double cellSizeMeters = 500.0, double safeSearchRadiusMeters = 60.0, string worldSeed = DefaultWorldSeed)
         {
             if (string.IsNullOrWhiteSpace(npcId))
             {
@@ -57,11 +65,15 @@ namespace MetinAR.Map
             }
 
             NpcId = npcId;
+            WorldSeed = string.IsNullOrEmpty(worldSeed) ? DefaultWorldSeed : worldSeed;
             CellSizeMeters = cellSizeMeters;
             SafeSearchRadiusMeters = Math.Max(0, safeSearchRadiusMeters);
         }
 
         public string NpcId { get; }
+
+        /// <summary>Seed mixed into the cell hash; changing it reshuffles every NPC site (e.g. per season).</summary>
+        public string WorldSeed { get; }
 
         public double CellSizeMeters { get; }
 
@@ -70,7 +82,7 @@ namespace MetinAR.Map
         /// <summary>Fraction of the cell kept free at each edge so neighbouring sites are never adjacent.</summary>
         public double EdgeMarginFraction { get; set; } = 0.2;
 
-        /// <summary>Adds a device-local override site (never committed to the repo).</summary>
+        /// <summary>Adds a device-local override site (runtime data only, never committed; still filtered by the policy).</summary>
         public void AddLocalOverride(GeoCoordinate site)
         {
             _overrides.Add(site);
@@ -94,7 +106,7 @@ namespace MetinAR.Map
         {
             double cellLat = CellSizeMeters / GeoMath.MetersPerDegreeLatitude;
             double cellLon = CellLonDegrees(row, cellLat);
-            ulong h = Hash(NpcId + "|" + row + "|" + column);
+            ulong h = Hash(WorldSeed + "|" + NpcId + "|" + row + "|" + column);
             double m = Math.Min(0.45, Math.Max(0, EdgeMarginFraction));
             double fy = m + (1 - 2 * m) * ((h & 0xFFFFFFFFUL) / 4294967296.0);
             double fx = m + (1 - 2 * m) * ((h >> 32) / 4294967296.0);
@@ -107,17 +119,29 @@ namespace MetinAR.Map
         }
 
         /// <summary>
-        /// Nearest NPC site to <paramref name="player"/> among overrides and the player's cell plus its
-        /// 8 neighbours. With a policy, unsafe grid sites are moved to the nearest safe spot or skipped.
+        /// Nearest safe NPC site to <paramref name="player"/> among local overrides and the player's cell plus its
+        /// 8 neighbours. Every candidate must pass <paramref name="policy"/>; grid sites are moved to the nearest
+        /// safe spot or skipped, unsafe overrides are skipped. Returns false when <paramref name="policy"/> is null
+        /// (default-deny: no filter, no NPC) or no candidate is safe.
         /// </summary>
         public bool TryResolveNearest(GeoCoordinate player, EncounterSitePolicy policy, out FixedNpcSite site)
         {
             site = default;
+            if (policy == null)
+            {
+                return false;
+            }
+
             bool found = false;
             double best = double.PositiveInfinity;
 
             foreach (GeoCoordinate o in _overrides)
             {
+                if (!policy.EvaluateSite(o).Allowed)
+                {
+                    continue;
+                }
+
                 double d = GeoMath.DistanceMeters(player, o);
                 if (d < best)
                 {
@@ -132,15 +156,10 @@ namespace MetinAR.Map
             {
                 for (long dc = -1; dc <= 1; dc++)
                 {
-                    GeoCoordinate c = NominalSite(row + dr, col + dc);
-                    if (policy != null)
+                    GeoCoordinate nominal = NominalSite(row + dr, col + dc);
+                    if (!policy.TryPlace(nominal, SafeSearchRadiusMeters, out GeoCoordinate c, out _))
                     {
-                        if (!policy.TryPlace(c, SafeSearchRadiusMeters, out GeoCoordinate safe, out _))
-                        {
-                            continue;
-                        }
-
-                        c = safe;
+                        continue;
                     }
 
                     double d = GeoMath.DistanceMeters(player, c);

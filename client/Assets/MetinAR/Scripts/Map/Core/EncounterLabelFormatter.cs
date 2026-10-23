@@ -63,17 +63,25 @@ namespace MetinAR.Map
                    + "\n" + FormatDistance(distanceMeters);
         }
 
+        /// <summary>
+        /// Binding rule (manager 2026-10-23 04:12): the player moves only on the GPS map with the camera off;
+        /// no walking during AR combat. Shown next to the "Walcz" button and suitable for the AR intro.
+        /// </summary>
+        public const string ArStayInPlaceRule = "Do potworów podchodzisz na mapie. Walka AR odbywa się w miejscu \u2014 nie chodź z włączoną kamerą.";
+
         /// <summary>Short status line under the marker / on the "Walcz" button area.</summary>
         public static string FormatAvailability(EncounterAvailability availability, double distanceToEnterMeters)
         {
             switch (availability)
             {
                 case EncounterAvailability.Available:
-                    return "Spotkanie AR dostępne \u2014 Walcz";
+                    return "W zasięgu \u2014 zatrzymaj się i włącz AR (Walcz)";
                 case EncounterAvailability.TooFar:
-                    return "Podejdź bliżej" + (distanceToEnterMeters > 0 ? " (" + FormatDistance(distanceToEnterMeters) + ")" : string.Empty);
+                    return "Podejdź bliżej na mapie" + (distanceToEnterMeters > 0 ? " (" + FormatDistance(distanceToEnterMeters) + ")" : string.Empty);
                 case EncounterAvailability.PoorAccuracy:
-                    return "Słaby sygnał GPS \u2014 poczekaj";
+                    return "Słaby GPS \u2014 podejdź bliżej / poczekaj";
+                case EncounterAvailability.Moving:
+                    return "Zatrzymaj się przed włączeniem AR";
                 case EncounterAvailability.StaleFix:
                     return "Brak aktualnej pozycji GPS";
                 case EncounterAvailability.UnsafeSite:

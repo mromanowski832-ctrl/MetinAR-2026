@@ -22,7 +22,9 @@ namespace MetinAR.Map
         StaleFix = 3,
         /// <summary>The encounter site failed the safety policy (should not normally reach the map).</summary>
         UnsafeSite = 4,
-        Available = 5
+        Available = 5,
+        /// <summary>In range, but the player is still walking. Rule: stop on the map first, then turn the camera on.</summary>
+        Moving = 6
     }
 
     /// <summary>
@@ -32,8 +34,11 @@ namespace MetinAR.Map
     /// </summary>
     public sealed class EncounterEligibilitySettings
     {
-        /// <summary>Encounter radius (m) around the mob site inside which "Walcz" is offered.</summary>
-        public double EncounterRadiusMeters = 25.0;
+        /// <summary>Default AR entry radius (manager decision 2026-10-23 04:12: 25 m, configurable).</summary>
+        public const double DefaultEncounterRadiusMeters = 25.0;
+
+        /// <summary>Encounter radius (m) around the mob site inside which "Walcz" is offered. Configurable.</summary>
+        public double EncounterRadiusMeters = DefaultEncounterRadiusMeters;
 
         /// <summary>Fixes worse than this accuracy (m) never enable the action.</summary>
         public double MaxHorizontalAccuracyMeters = 10.0;
@@ -49,6 +54,35 @@ namespace MetinAR.Map
 
         /// <summary>A fix older than this (s, compared with the caller's clock) disables the action.</summary>
         public double MaxFixAgeSeconds = 10.0;
+
+        /// <summary>
+        /// Rule "approach on the map, stop, then AR": AR entry needs the player to be (almost) still. Above this
+        /// speed (m/s, noise-reduced estimate from <see cref="MovementSpeedEstimator"/>) the state is
+        /// <see cref="EncounterAvailability.Moving"/>. Prototype value.
+        /// </summary>
+        public double MaxEntrySpeedMetersPerSecond = 0.7;
+
+        /// <summary>
+        /// Worst fix accuracy that can still enable AR: the stricter of <see cref="MaxHorizontalAccuracyMeters"/>
+        /// and the radius itself (accuracy × margin must fit inside the radius). Worse ⇒ "Słaby GPS".
+        /// </summary>
+        public double UsableAccuracyLimitMeters =>
+            Math.Min(MaxHorizontalAccuracyMeters, EncounterRadiusMeters / Math.Max(1.0, AccuracyMarginFactor));
+
+        /// <summary>Throws when values are unusable (non-positive radius, NaN, …).</summary>
+        public void Validate()
+        {
+            if (!(EncounterRadiusMeters > 0) || double.IsInfinity(EncounterRadiusMeters))
+            {
+                throw new ArgumentOutOfRangeException(nameof(EncounterRadiusMeters), EncounterRadiusMeters, "Radius must be > 0 m.");
+            }
+
+            if (!(MaxHorizontalAccuracyMeters > 0) || !(AccuracyMarginFactor >= 1.0) || !(MaxFixAgeSeconds > 0)
+                || !(MaxEntrySpeedMetersPerSecond > 0) || ExitHysteresisMeters < 0 || double.IsNaN(ExitHysteresisMeters))
+            {
+                throw new ArgumentOutOfRangeException(nameof(EncounterEligibilitySettings), "Invalid eligibility settings.");
+            }
+        }
     }
 
     /// <summary>
@@ -116,6 +150,7 @@ namespace MetinAR.Map
         public EncounterEligibility(EncounterEligibilitySettings settings = null)
         {
             _s = settings ?? new EncounterEligibilitySettings();
+            _s.Validate();
         }
 
         public EncounterEligibilitySettings Settings => _s;
@@ -139,7 +174,9 @@ namespace MetinAR.Map
         /// <param name="fixTimestampSeconds">Fix timestamp.</param>
         /// <param name="nowSeconds">Current time on the same clock as the fix timestamp.</param>
         /// <param name="siteIsSafe">Result of the encounter-site policy for this mob.</param>
-        public EncounterAvailability Update(double distanceMeters, double accuracyMeters, double fixTimestampSeconds, double nowSeconds, bool siteIsSafe)
+        /// <param name="playerSpeedMetersPerSecond">Noise-reduced walking speed; NaN = unknown (does not block).</param>
+        public EncounterAvailability Update(double distanceMeters, double accuracyMeters, double fixTimestampSeconds, double nowSeconds, bool siteIsSafe,
+            double playerSpeedMetersPerSecond = double.NaN)
         {
             if (!Finite(distanceMeters) || !Finite(accuracyMeters) || !Finite(fixTimestampSeconds) || !Finite(nowSeconds)
                 || distanceMeters < 0 || accuracyMeters < 0)
@@ -175,11 +212,14 @@ namespace MetinAR.Map
                 return State = EncounterAvailability.StaleFix;
             }
 
-            if (accuracyMeters > _s.MaxHorizontalAccuracyMeters)
+            // Accuracy worse than the radius (or the 10 m cap): AR entry is never offered, show "Słaby GPS".
+            if (accuracyMeters > _s.UsableAccuracyLimitMeters)
             {
                 _insideCount = 0;
                 return State = EncounterAvailability.PoorAccuracy;
             }
+
+            bool moving = Finite(playerSpeedMetersPerSecond) && playerSpeedMetersPerSecond > _s.MaxEntrySpeedMetersPerSecond;
 
             if (State == EncounterAvailability.Available)
             {
@@ -187,6 +227,12 @@ namespace MetinAR.Map
                 {
                     _insideCount = 0;
                     return State = EncounterAvailability.TooFar;
+                }
+
+                if (moving)
+                {
+                    _insideCount = 0;
+                    return State = EncounterAvailability.Moving;
                 }
 
                 return State;
@@ -198,6 +244,12 @@ namespace MetinAR.Map
                 return State = EncounterAvailability.TooFar;
             }
 
+            if (moving)
+            {
+                _insideCount = 0;
+                return State = EncounterAvailability.Moving;
+            }
+
             if (newFix)
             {
                 _insideCount++;
@@ -205,7 +257,7 @@ namespace MetinAR.Map
 
             return State = _insideCount >= Math.Max(1, _s.RequiredStableFixes)
                 ? EncounterAvailability.Available
-                : EncounterAvailability.TooFar;
+                : (State == EncounterAvailability.Moving ? EncounterAvailability.Moving : EncounterAvailability.TooFar);
         }
 
         /// <summary>Builds the AR hand-off ticket; returns false unless the action is currently available.</summary>

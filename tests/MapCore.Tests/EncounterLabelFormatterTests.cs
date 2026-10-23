@@ -42,8 +42,39 @@ public class EncounterLabelFormatterTests
     public void Availability_Texts()
     {
         Assert.Contains("Walcz", EncounterLabelFormatter.FormatAvailability(EncounterAvailability.Available, 0));
-        Assert.Equal("Podejdź bliżej (35 m)", EncounterLabelFormatter.FormatAvailability(EncounterAvailability.TooFar, 33));
-        Assert.Contains("GPS", EncounterLabelFormatter.FormatAvailability(EncounterAvailability.PoorAccuracy, 0));
+        Assert.Equal("Podejdź bliżej na mapie (35 m)", EncounterLabelFormatter.FormatAvailability(EncounterAvailability.TooFar, 33));
+        Assert.Equal("Słaby GPS \u2014 podejdź bliżej / poczekaj", EncounterLabelFormatter.FormatAvailability(EncounterAvailability.PoorAccuracy, 0));
+        Assert.Equal("Zatrzymaj się przed włączeniem AR", EncounterLabelFormatter.FormatAvailability(EncounterAvailability.Moving, 0));
         Assert.Equal("", EncounterLabelFormatter.FormatAvailability(EncounterAvailability.None, 0));
+    }
+
+    [Fact]
+    public void AvailableText_TellsToStopBeforeAr()
+    {
+        string t = EncounterLabelFormatter.FormatAvailability(EncounterAvailability.Available, 0);
+        Assert.Contains("zatrzymaj się", t);
+        Assert.Contains("AR", t);
+    }
+
+    /// <summary>Rule: movement happens only on the map with the camera off. No player-facing text may suggest walking in AR.</summary>
+    [Fact]
+    public void NoText_SuggestsWalkingWithArActive()
+    {
+        var texts = new List<string> { EncounterLabelFormatter.ArStayInPlaceRule };
+        foreach (EncounterAvailability a in Enum.GetValues(typeof(EncounterAvailability)))
+        {
+            texts.Add(EncounterLabelFormatter.FormatAvailability(a, 12));
+        }
+
+        foreach (string t in texts)
+        {
+            string lower = t.ToLowerInvariant();
+            bool mentionsAr = lower.Contains("ar") || lower.Contains("kamer");
+            bool mentionsMove = lower.Contains("podejdź") || lower.Contains("idź") || lower.Contains("biegnij");
+            Assert.False(mentionsAr && mentionsMove && !lower.Contains("na mapie") && !lower.Contains("nie chodź"), t);
+        }
+
+        Assert.Contains("na mapie", EncounterLabelFormatter.ArStayInPlaceRule);
+        Assert.Contains("nie chodź", EncounterLabelFormatter.ArStayInPlaceRule);
     }
 }
