@@ -13,7 +13,7 @@ development builds, not final product promises. Nothing here changes gameplay, A
 | `tools/qa/Invoke-MetinARQa.ps1` | Unified local runner (Windows PowerShell 5.1+ / pwsh 7). PASS/FAIL per gate, Markdown + JSON report. |
 | `tools/qa/Invoke-MetinARDeviceSmoke.ps1` | Physical Android smoke + performance harness over ADB, redacted logs. |
 | `tools/qa/Invoke-MetinARDeviceSession.ps1` | #90: evidence session on one device (manifest with APK SHA-256 / game commit / QA tool SHA / hashed serial, filtered + full redacted logcat, periodic gfxinfo/SurfaceFlinger/meminfo/thermal/battery samples, optional screenrecord, summary with every device result UNVERIFIED until a human reviews the video). |
-| `tools/qa/etap1-steps.json` | #90: the 22 steps of the owner spec section 18 (criterion, evidence, log hint, dependency, fix owner). |
+| `tools/qa/etap1-steps.json` | #90: the 22 steps of the owner spec section 18 plus the mandatory step A97 from #97 (combat without walking, criterion quoted verbatim), with criterion, evidence, log hint, dependency, fix owner; `requiredStepIds` feeds the ETAP I closing verdict (`Get-MetinARStageClosure`: 22/22 + A97 PASS). |
 | `tools/qa/Test-RepoHygiene.ps1` | Unity-free static repo checks (local + CI). |
 | `tools/qa/Test-DocLinks.ps1` | Offline check of relative Markdown links. |
 | `tools/qa/Test-PrMetadata.ps1` | Lightweight PR title/body/branch check (CI, warnings only except hard errors). |

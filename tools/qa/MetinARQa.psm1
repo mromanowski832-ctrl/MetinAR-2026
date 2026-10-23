@@ -1224,13 +1224,56 @@ function Get-MetinARStepLogEvidence {
         $pat = [string](Get-MetinARProp $s 'logPattern')
         $count = $null; $firstTs = $null
         if ($pat) {
-            $hits = @($Lines | Where-Object { $_ -match $pat })
+            $hits = @($Lines | Where-Object { $_ -cmatch $pat })
             $count = $hits.Count
             if ($hits.Count) { $firstTs = Get-MetinARLogcatTime $hits[0] }
         }
         $out.Add([pscustomobject]@{ id = $s.id; logPattern = $(if ($pat) { $pat } else { $null }); logLines = $count; firstStamp = $firstTs })
     }
     return , $out.ToArray()
+}
+
+function Get-MetinARStageClosure {
+    <#
+      Closing verdict of ETAP I (#90, lead decision 2026-10-23 04:43): CLOSED only when every required step has
+      verdict PASS with a reviewer and a videoRef (recording of the successful attempt). The 22 steps of spec
+      section 18 and the mandatory step A97 (#97, combat without walking) are a hard minimum: a step definition
+      file cannot drop them (extra requiredStepIds are added on top). A97 is never a manual side entry.
+      Results come from session-summary.json -> steps after human review; at collection time all are UNVERIFIED.
+    #>
+    param([AllowEmptyCollection()][object[]]$StepResults = @(), [Parameter(Mandatory = $true)][object]$Definition)
+    $required = New-Object System.Collections.Generic.List[string]
+    foreach ($i in 1..22) { $required.Add([string]$i) }
+    $required.Add('A97')
+    foreach ($c in @(Get-MetinARProp $Definition 'requiredStepIds')) { if ($null -ne $c -and -not $required.Contains([string]$c)) { $required.Add([string]$c) } }
+    $defIds = @(@(Get-MetinARProp $Definition 'steps') | ForEach-Object { [string]$_.id })
+    $missingDef = @($required | Where-Object { $defIds -notcontains $_ })
+    $byId = @{}
+    foreach ($r in @($StepResults)) { if ($null -ne $r) { $byId[[string]$r.id] = $r } }
+    $passed = New-Object System.Collections.Generic.List[string]
+    $failed = New-Object System.Collections.Generic.List[string]
+    $open = New-Object System.Collections.Generic.List[string]
+    $reasons = New-Object System.Collections.Generic.List[string]
+    foreach ($id in $required) {
+        $r = $byId[$id]
+        if ($null -eq $r) { $open.Add($id); $reasons.Add("${id}: no result"); continue }
+        $v = [string](Get-MetinARProp $r 'verdict')
+        if ($v -ceq 'PASS') {
+            if (-not [string](Get-MetinARProp $r 'videoRef')) { $open.Add($id); $reasons.Add("${id}: PASS without videoRef (recording of the successful attempt)") }
+            elseif (-not [string](Get-MetinARProp $r 'reviewer')) { $open.Add($id); $reasons.Add("${id}: PASS without reviewer") }
+            else { $passed.Add($id) }
+        } elseif ($v -ceq 'FAIL') { $failed.Add($id); $reasons.Add("${id}: FAIL") }
+        else { $open.Add($id); $reasons.Add(("{0}: {1}" -f $id, $(if ($v) { $v } else { 'no verdict' }))) }
+    }
+    $closed = ($missingDef.Count -eq 0) -and ($passed.Count -eq $required.Count)
+    $a97 = if ($passed.Contains('A97')) { 'PASS' } elseif ($failed.Contains('A97')) { 'FAIL' } else { 'UNVERIFIED' }
+    return [pscustomobject][ordered]@{
+        verdict = $(if ($missingDef.Count) { 'INVALID DEFINITION' } elseif ($closed) { 'CLOSED' } else { 'NOT CLOSED' })
+        closed = $closed; required = $required.ToArray(); requiredCount = $required.Count
+        passed = $passed.Count; failed = $failed.ToArray(); open = $open.ToArray(); missingDefinition = $missingDef
+        a97 = $a97; reasons = $reasons.ToArray()
+        rule = 'ETAP I closes only with PASS (reviewer + videoRef) of all 22 steps of spec section 18 AND the mandatory step A97 (#97) on one APK'
+    }
 }
 
 Export-ModuleMember -Function *-MetinAR*

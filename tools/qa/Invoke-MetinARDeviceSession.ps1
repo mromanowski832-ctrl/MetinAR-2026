@@ -19,7 +19,8 @@
                             camera feed - stays local, never upload to GitHub
     session-summary.json/.md   measurements against tools/qa/perf-budgets.json (productTargets.<TargetName> for the
                             combat FPS, scenes{} prototype gates as regression) and the 22 steps of owner spec section 18
-                            (tools/qa/etap1-steps.json) with log hints.
+                            plus the mandatory step A97 (#97) from tools/qa/etap1-steps.json with log hints, and
+                            stageClosure: ETAP I closes only with PASS of all 22 steps AND A97 (Get-MetinARStageClosure).
 
   VERDICT RULE (#90): every item has `measured` (PASS / FAIL / WARN / NO DATA) from the tool and `verdict` =
   UNVERIFIED with reviewRequired=true. Only a human who has watched the video of the same time range may change a
@@ -499,15 +500,19 @@ if ($deviceOk) {
     Add-SessionItem 'FramesDisplay' $(if ($fd.Count) { 'PASS' } else { 'NO DATA' }) ((($fd -join '; ') + ' (informational: the 30 FPS verdict uses [MetinARPerf] combat windows)').Trim()) $null
 }
 
-# 22 steps of owner spec section 18 - always UNVERIFIED, log lines are hints only
+# 22 steps of owner spec section 18 + mandatory A97 (#97, lead decision 04:43) - always UNVERIFIED, log lines are hints only
 $hints = Get-MetinARStepLogEvidence -Steps @($stepsDef.steps) -Lines $all
-$steps22 = @()
+$stepsAll = @()
 foreach ($s in @($stepsDef.steps)) {
-    $h = $hints | Where-Object { $_.id -eq $s.id } | Select-Object -First 1
-    $steps22 += [pscustomobject][ordered]@{ id = $s.id; step = $s.step; criterion = $s.criterion; evidence = $s.evidence; dependsOn = $s.dependsOn; fixOwner = $s.fixOwner
+    $h = $hints | Where-Object { [string]$_.id -eq [string]$s.id } | Select-Object -First 1
+    $stepsAll += [pscustomobject][ordered]@{ id = $s.id; mandatory = $true; step = $s.step; criterion = $s.criterion; evidence = $s.evidence; dependsOn = $s.dependsOn; fixOwner = $s.fixOwner
         logHint = $(if ($null -eq $h.logLines) { 'no log signal defined - video only' } elseif ($h.logLines -gt 0) { "{0} log line(s), first {1}" -f $h.logLines, $h.firstStamp } else { 'no matching log line' })
-        verdict = 'UNVERIFIED'; reviewer = $null; videoRef = $null; problem = $null }
+        verdict = 'UNVERIFIED'; reviewer = $null; videoRef = $null; attempts = @(); problem = $null }
 }
+$steps22 = @($stepsAll | Where-Object { [string]$_.id -match '^\d+$' })
+$stepA97 = $stepsAll | Where-Object { [string]$_.id -ceq 'A97' } | Select-Object -First 1
+$stageClosure = Get-MetinARStageClosure -StepResults $stepsAll -Definition $stepsDef
+if ($null -eq $stepA97) { $notes.Add('step A97 (#97) missing from etap1-steps.json: stage closure INVALID DEFINITION') }
 
 $measuredAll = @($items | ForEach-Object { $_.measured })
 $measuredOverall = if ($exitCode -eq 2) { 'NO DATA' } elseif ($measuredAll -contains 'FAIL' -or $exitCode -eq 3) { 'FAIL' } elseif ($measuredAll -contains 'WARN') { 'WARN' } elseif ($measuredAll -contains 'NO DATA' -or $measuredAll.Count -eq 0) { 'NO DATA' } else { 'PASS' }
@@ -529,11 +534,11 @@ $deviceCleanup = @($videos | ForEach-Object {
                    else { 'DO NOT DELETE: no local copy' }) } })
 $manifest.deviceCleanup = $deviceCleanup
 $summary = [ordered]@{
-    schema = 1; sessionId = $SessionId; verdict = 'UNVERIFIED'; measuredOverall = $measuredOverall; exitCode = $exitCode
+    schema = 1; sessionId = $SessionId; verdict = 'UNVERIFIED'; measuredOverall = $measuredOverall; exitCode = $exitCode; stageClosure = $stageClosure
     rule = 'measured = automatic measurement; verdict stays UNVERIFIED until a human reviews the video and fills reviewer. Never declare 30 FPS from simulation or unit tests.'
     build = [ordered]@{ apk = $manifest.apk.name; apkSha256 = $manifest.apk.sha256; gameCommit = $manifest.gameCommit.sha; qaToolCommit = $manifest.qaTool.gitHead }
     device = [ordered]@{ model = $manifest.device.model; android = $manifest.device.android; serialSha256 = $manifest.device.serialSha256 }
-    items = $items.ToArray(); steps22 = $steps22; deviceCleanup = $deviceCleanup; adbGaps = $adbGaps.ToArray(); notes = $notes.ToArray()
+    items = $items.ToArray(); steps = $stepsAll; steps22 = $steps22; stepA97 = $stepA97; deviceCleanup = $deviceCleanup; adbGaps = $adbGaps.ToArray(); notes = $notes.ToArray()
 }
 Write-Json $summary 'session-summary.json'
 
@@ -553,9 +558,14 @@ $md.Add('## Pomiary'); $md.Add('')
 $md.Add('| Pozycja | Pomiar | Werdykt | Szczegoly |'); $md.Add('|---|---|---|---|')
 foreach ($i in $items) { $md.Add(("| {0} | {1} | {2} | {3} |" -f $i.name, $i.measured, $i.verdict, ($i.detail -replace '\|', '/'))) }
 $md.Add('')
-$md.Add('## 22 kroki (spec section 18) - do uzupelnienia po przegladzie nagrania'); $md.Add('')
+$md.Add('## Zamkniecie ETAPU I'); $md.Add('')
+$md.Add(('**{0}**: PASS {1}/{2} wymaganych krokow (22 kroki spec section 18 + obowiazkowy A97 z #97). A97: {3}.' -f $stageClosure.verdict, $stageClosure.passed, $stageClosure.requiredCount, $stageClosure.a97))
+$md.Add('ETAP I jest zamkniety tylko przy PASS (recenzent + nagranie udanej proby) wszystkich 22 krokow i A97 na jednym APK. A97 nie jest wpisem recznym.')
+$md.Add('')
+$md.Add('## 22 kroki (spec section 18) + A97 (#97, obowiazkowy) - do uzupelnienia po przegladzie nagrania'); $md.Add('')
 $md.Add('| # | Krok | Werdykt | Wskazowka z logu | Zalezy od | Wlasciciel poprawki |'); $md.Add('|---|---|---|---|---|---|')
-foreach ($s in $steps22) { $md.Add(("| {0} | {1} | {2} | {3} | {4} | {5} |" -f $s.id, $s.step, $s.verdict, ($s.logHint -replace '\|', '/'), (@($s.dependsOn) -join ', '), $s.fixOwner)) }
+foreach ($s in $stepsAll) { $md.Add(("| {0} | {1} | {2} | {3} | {4} | {5} |" -f $s.id, $s.step, $s.verdict, ($s.logHint -replace '\|', '/'), (@($s.dependsOn) -join ', '), $s.fixOwner)) }
+if ($stepA97) { $md.Add(''); $md.Add('**A97 - kryterium z #97 (doslownie):** ' + $stepA97.criterion); $md.Add(''); $md.Add('Dowod: ' + $stepA97.evidence) }
 if ($videos.Count) { $md.Add(''); $md.Add('## Nagrania (lokalnie, nie wysylac na GitHub)'); $md.Add(''); foreach ($v in $videos) { $md.Add(("- seg {0}: {1} -> {2}, {3} B, sha256 {4} {5}" -f $v.index, $v.startedAt, $v.file, $v.bytes, $v.sha256, $v.note)) } }
 if ($deviceCleanup.Count) {
     $md.Add(''); $md.Add('## Pliki do recznego usuniecia z telefonu (po weryfikacji SHA-256)'); $md.Add('')

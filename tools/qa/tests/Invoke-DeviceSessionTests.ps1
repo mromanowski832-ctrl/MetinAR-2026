@@ -24,8 +24,17 @@ $collectorText = Get-Content -Raw (Join-Path $PSScriptRoot '..\Invoke-MetinARDev
 Assert 'collector.scene-not-hardcoded' ($collectorText -notmatch "'ArEncounterPrototype'" -and $collectorText -match '\[string\[\]\]\$CombatScene')
 Assert 'budgets.scenes-unchanged' ($budgets.scenes.ArEncounterPrototype.minFpsAvg -eq 24 -and $budgets.scenes.ArEncounterPrototype.maxFrameP95Ms -eq 55)
 
-$steps = (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot '..\etap1-steps.json') | ConvertFrom-Json).steps
-Assert 'steps.22' (@($steps).Count -eq 22 -and (@($steps | ForEach-Object { $_.id }) -join ',') -eq ((1..22) -join ','))
+$stepsDef = Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot '..\etap1-steps.json') | ConvertFrom-Json
+$steps = $stepsDef.steps
+Assert 'steps.22+A97' (@($steps).Count -eq 23 -and (@($steps | ForEach-Object { $_.id }) -join ',') -eq (((1..22) -join ',') + ',A97'))
+# A97 (#97, lead decision 04:43): mandatory step, criterion copied word for word from #97 (same text as PR #102 section 3.1).
+# The expected value is the SHA-256 of the UTF-8 quote (this file must stay ASCII, so the text itself is not repeated here).
+$a97 = $steps | Where-Object { [string]$_.id -ceq 'A97' } | Select-Object -First 1
+$a97Hash = $null
+if ($a97) { $sha = [System.Security.Cryptography.SHA256]::Create(); try { $a97Hash = (($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes([string]$a97.criterion)) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $sha.Dispose() } }
+Assert 'steps.A97-verbatim-criterion' ($a97Hash -ceq 'c9c7ba1bb9be5226b1b83041e1bfdd9952bcb808ae23afdd3b7b1d7f4458fefc') "sha=$a97Hash"
+Assert 'steps.A97-mandatory' ($a97.mandatory -eq $true -and (@($a97.dependsOn) -contains '#97') -and ((@($a97.relatedSteps) -join ',') -eq '8,10,11') -and $a97.evidence -match 'A31' -and $a97.evidence -match 'UNVERIFIED')
+Assert 'steps.requiredStepIds' ((@($stepsDef.requiredStepIds | ForEach-Object { [string]$_ }) -join ',') -eq (((1..22) -join ',') + ',A97'))
 Assert 'steps.fields' (@($steps | Where-Object { -not $_.step -or -not $_.criterion -or -not $_.evidence -or -not $_.fixOwner }).Count -eq 0)
 Assert 'steps.patterns-compile' (@($steps | Where-Object { $_.logPattern } | Where-Object { try { [void][regex]::new($_.logPattern); $false } catch { $true } }).Count -eq 0)
 
@@ -117,7 +126,36 @@ Assert 'pss.peak-fail' ($m3.Measured -eq 'FAIL' -and $m3.Reason -match 'peak')
 Assert 'pss.too-few-no-data' ($m4.Measured -eq 'NO DATA')
 
 $ev = Get-MetinARStepLogEvidence -Steps @($steps) -Lines $tl
-Assert 'steps.hints' ($ev.Count -eq 22 -and ($ev | Where-Object { $_.id -eq 11 }).logLines -eq 18 -and $null -eq ($ev | Where-Object { $_.id -eq 2 }).logLines -and ($ev | Where-Object { $_.id -eq 14 }).logLines -eq 0)
+Assert 'steps.hint-A97' (($ev | Where-Object { [string]$_.id -ceq 'A97' }).logLines -eq 36)
+Assert 'steps.hints' ($ev.Count -eq 23 -and ($ev | Where-Object { $_.id -eq 11 }).logLines -eq 18 -and $null -eq ($ev | Where-Object { $_.id -eq 2 }).logLines -and ($ev | Where-Object { $_.id -eq 14 }).logLines -eq 0)
+
+# ETAP I closing verdict: 22 steps AND A97 required (lead decision 04:43, no manual side entry)
+function New-StepResults([string]$verdict = 'UNVERIFIED', [string]$a97Verdict = $verdict, [switch]$NoA97Video, [switch]$DropA97) {
+    $o = @()
+    foreach ($st in $steps) {
+        $isA = ([string]$st.id -ceq 'A97')
+        if ($isA -and $DropA97) { continue }
+        $v = if ($isA) { $a97Verdict } else { $verdict }
+        $o += [pscustomobject]@{ id = $st.id; verdict = $v; reviewer = 'QA'; videoRef = $(if ($isA -and $NoA97Video) { $null } else { 'vid-01.mp4 01:00' }) }
+    }
+    return , $o
+}
+$c0 = Get-MetinARStageClosure -StepResults (New-StepResults) -Definition $stepsDef
+Assert 'closure.unverified-not-closed' ($c0.verdict -eq 'NOT CLOSED' -and -not $c0.closed -and $c0.requiredCount -eq 23 -and @($c0.open).Count -eq 23 -and $c0.a97 -eq 'UNVERIFIED')
+$c1 = Get-MetinARStageClosure -StepResults (New-StepResults 'PASS' 'UNVERIFIED') -Definition $stepsDef
+Assert 'closure.22-pass-without-A97-not-closed' ($c1.verdict -eq 'NOT CLOSED' -and $c1.passed -eq 22 -and (@($c1.open) -join ',') -eq 'A97') "v=$($c1.verdict) open=$(@($c1.open) -join ',')"
+$c2 = Get-MetinARStageClosure -StepResults (New-StepResults 'PASS') -Definition $stepsDef
+Assert 'closure.22+A97-pass-closed' ($c2.verdict -eq 'CLOSED' -and $c2.closed -and $c2.passed -eq 23 -and $c2.a97 -eq 'PASS')
+$c3 = Get-MetinARStageClosure -StepResults (New-StepResults 'PASS' -NoA97Video) -Definition $stepsDef
+Assert 'closure.A97-pass-needs-video' (-not $c3.closed -and (@($c3.open) -join ',') -eq 'A97' -and (@($c3.reasons) -join ';') -match 'videoRef')
+$c4 = Get-MetinARStageClosure -StepResults (New-StepResults 'PASS' 'FAIL') -Definition $stepsDef
+Assert 'closure.A97-fail' (-not $c4.closed -and (@($c4.failed) -join ',') -eq 'A97' -and $c4.a97 -eq 'FAIL')
+$c5 = Get-MetinARStageClosure -StepResults (New-StepResults 'PASS' -DropA97) -Definition $stepsDef
+Assert 'closure.A97-result-missing' (-not $c5.closed -and (@($c5.open) -join ',') -eq 'A97')
+$defNoA97 = ($stepsDef | ConvertTo-Json -Depth 8 | ConvertFrom-Json)
+$defNoA97.steps = @($defNoA97.steps | Where-Object { [string]$_.id -cne 'A97' }); $defNoA97.requiredStepIds = @(1..22)
+$c6 = Get-MetinARStageClosure -StepResults (New-StepResults 'PASS') -Definition $defNoA97
+Assert 'closure.definition-cannot-drop-A97' ($c6.verdict -eq 'INVALID DEFINITION' -and -not $c6.closed -and (@($c6.missingDefinition) -join ',') -eq 'A97' -and $c6.requiredCount -eq 23)
 
 # --- Part 2: collector against fake adb (Linux/macOS only) -----------------------------------------------------------
 $isWin = ($PSVersionTable.PSEdition -ne 'Core') -or $IsWindows
@@ -148,11 +186,15 @@ if ($isWin) {
         param($d)
         $m = J $d 'session-manifest.json'; $s = J $d 'session-summary.json'; $all = AllText $d
         $fps = ItemOf $s 'CombatFps30'
+        $md = Get-Content -Raw -Encoding UTF8 (Join-Path $d 'session-summary.md')
         $okManifest = ($m.sessionId -eq 'SIM-session') -and ($m.device.model -eq 'FakePhone') -and ($m.device.manufacturer -eq 'FakeVendor') -and ($m.device.android -eq '12') -and
             ($m.device.serialSha256 -match '^[0-9a-f]{12}$') -and ((Get-Content -Raw (Join-Path $d 'session-manifest.json')) -match '"started":\s*"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}[+-]\d\d:\d\d"') -and ($m.host.os -notmatch '<') -and ($m.qaTool.gitHead -match '^[0-9a-f]{40}$') -and
             ($m.adb.checks -ge 4) -and ($m.adb.killServer -eq 'never') -and (@($m.files | Where-Object { $_.path -eq 'logcat-filtered.txt' -and $_.sha256 -match '^[0-9a-f]{64}$' }).Count -eq 1)
         $okSummary = ($s.verdict -eq 'UNVERIFIED') -and ($s.measuredOverall -ne 'FAIL') -and (@($s.items | Where-Object { $_.verdict -ne 'UNVERIFIED' -or $_.reviewRequired -ne $true }).Count -eq 0) -and
-            ($fps.measured -eq 'PASS') -and ($fps.data.Windows -eq 18) -and (@($s.steps22).Count -eq 22) -and (@($s.steps22 | Where-Object { $_.verdict -ne 'UNVERIFIED' }).Count -eq 0) -and
+            ($fps.measured -eq 'PASS') -and ($fps.data.Windows -eq 18) -and (@($s.steps22).Count -eq 22) -and (@($s.steps).Count -eq 23) -and (@($s.steps | Where-Object { $_.verdict -ne 'UNVERIFIED' }).Count -eq 0) -and
+            ([string]$s.stepA97.id -ceq 'A97') -and ($s.stepA97.criterion -ceq $a97.criterion) -and ($s.stepA97.mandatory -eq $true) -and ($s.stepA97.logHint -match '^38 log line') -and
+            ($s.stageClosure.verdict -eq 'NOT CLOSED') -and ($s.stageClosure.requiredCount -eq 23) -and (@($s.stageClosure.required) -contains 'A97') -and ($s.stageClosure.a97 -eq 'UNVERIFIED') -and
+            ($md -match 'Zamkniecie ETAPU I') -and ($md -match '\| A97 \|') -and ($md -match 'NOT CLOSED') -and ($md.Contains([string]$a97.criterion)) -and
             ((ItemOf $s 'Crash').measured -eq 'PASS') -and ((ItemOf $s 'ColdLaunch').detail -match 'TotalTime=2345')
         $filtered = Get-Content -Raw (Join-Path $d 'logcat-filtered.txt')
         $okLog = ([regex]::Matches($filtered, 'scene=ArEncounterPrototype').Count -eq 30) -and ($filtered -match '\[Combo\] step=') -and (Test-Path (Join-Path $d 'logcat-full-redacted.txt')) -and (@(Get-Content (Join-Path $d 'samples.jsonl')).Count -eq 1)
