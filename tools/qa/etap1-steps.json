@@ -103,7 +103,7 @@
       "step": "Wykonuję trzyciosowe combo",
       "criterion": "3 kolejne tapnięcia ATAK = cios 1, 2, 3 (finisher); log [Combo] step=1/2/3",
       "evidence": "LOG [Combo] + VID",
-      "logPattern": "\\[Combo\\] step=3",
+      "logPattern": "\\[Combo\\] step=3(?=\\s|$)",
       "dependsOn": [
         "#82"
       ],

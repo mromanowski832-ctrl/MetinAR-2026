@@ -6,6 +6,8 @@
 # [MetinARPerf] 5 s windows, combat ([ArDamage] swing=) and combo ([Combo] step=) lines after the 60 s warm-up; the first
 # `logcat -d` returns the first 75 s, later dumps the whole timeline (exercises the de-duplicating merge).
 # sessionlow = 24 fps / p95 60 ms in combat; sessionnocombo = no [Combo] lines.
+# Pulled videos contain 'fake-mp4'; `shell stat -c %s` / `shell sha256sum` of /sdcard files report that content
+# (FAKE_ADB_VIDEO_SHA_BAD=1: a different SHA-256, i.e. the copy does not match the phone).
 # adblost: `adb devices` lists the phone for the first FAKE_ADB_LOST_AFTER calls (default 3), then never again.
 # adbblip: the phone is missing from `adb devices` exactly once (call number FAKE_ADB_LOST_AFTER + 1), then back.
 mode="${FAKE_ADB_MODE:-ok}"
@@ -93,6 +95,8 @@ case "$1" in
         for i in 0 1 2 3; do v=$((1000000000 + i*33333333)); echo "0,$v,$v,0,0,0,0,0,0,0,0,0,0,$((v + 30000000 + i*1000000)),"; done; echo "1,5,5,0,0,0,0,0,0,0,0,0,0,999999999,"; echo "---PROFILEDATA---";;
       "dumpsys gfxinfo $pkg reset") ;;
       screenrecord*) sleep 1;;
+      stat\ -c\ %s\ /sdcard/*) echo "8";;
+      sha256sum\ /sdcard/*) if [ "${FAKE_ADB_VIDEO_SHA_BAD:-0}" = 1 ]; then h=$(printf 'other' | sha256sum | cut -d' ' -f1); else h=$(printf 'fake-mp4' | sha256sum | cut -d' ' -f1); fi; echo "$h  $2";;
       "getprop ro.build.version.release") echo "12";;
       "getprop ro.build.version.sdk") echo "31";;
       "getprop ro.product.cpu.abi") echo "arm64-v8a";;

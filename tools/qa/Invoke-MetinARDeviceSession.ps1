@@ -30,7 +30,11 @@
   On LuzMen this needs an ACQUIRED slot in #33; starting or closing Unity kills the adb server.
   Install uses the same guards as Invoke-MetinARDeviceSmoke.ps1 (protected packages, player data, ARCore
   registrations), never -g (permissions are not auto-granted). Nothing is deleted on the device: screenrecord files
-  stay in /sdcard (listed in the manifest) and the owner may remove them by hand.
+  stay in /sdcard and the report lists them (device path, size, SHA-256 of the pulled copy, device-side SHA-256 check)
+  for manual removal by the owner or the A31 slot holder after SHA verification (#90 decision 6).
+  The combat scene comes from perf-budgets.json productTargets.<TargetName>.sceneNames (default ArEncounterPrototype)
+  or -CombatScene; it is never hardcoded (#90 decision 2). Combo lines must be exactly `[Combo] step=N` (decision 3).
+  The device serial is written only as serialSha256 = first 12 hex of SHA-256 (decision 4).
   Raw logcat is never written to disk; only the redacted copies.
 
   Exit codes: 0 = no measured FAIL (verdict still UNVERIFIED), 1 = at least one measured FAIL,
@@ -60,8 +64,9 @@ param(
     [ValidateRange(5, 180)][int]$ScreenRecordSeconds = 170,
     [int]$AdbReconnectSeconds = 20,
     [string]$TargetName = 'ArCombatA31',
-    [string]$CombatPattern = '\[ArDamage\] swing=|\[Combo\] step=',
-    [string]$ComboPattern = '\[Combo\] step=',
+    [string[]]$CombatScene,
+    [string]$CombatPattern = '\[ArDamage\] swing=|\[Combo\] step=[1-9][0-9]*(?=\s|$)',
+    [string]$ComboPattern = '\[Combo\] step=[1-9][0-9]*(?=\s|$)',
     [switch]$SkipInstall,
     [switch]$SkipLaunch,
     [switch]$AllowReplaceInstalled
@@ -167,7 +172,8 @@ function Start-NextRecording {
     $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
     $proc = [System.Diagnostics.Process]::Start($psi)
     $script:rec = [pscustomobject]@{ Proc = $proc; Remote = $remote; Index = $script:recIndex; StartedAt = (Get-IsoNow); Started = (Get-Date) }
-    $videos.Add([pscustomobject]@{ index = $script:recIndex; remote = $remote; startedAt = $script:rec.StartedAt; endedAt = $null; file = $null; bytes = $null; sha256 = $null; pulled = $false; note = '' })
+    $videos.Add([pscustomobject]@{ index = $script:recIndex; remote = $remote; startedAt = $script:rec.StartedAt; endedAt = $null; file = $null; bytes = $null; sha256 = $null; pulled = $false
+            deviceBytes = $null; deviceSha256 = $null; copyVerified = $false; note = '' })
     Write-Host ("[video] segment {0} started ({1} s max)" -f $script:recIndex, $ScreenRecordSeconds)
 }
 function Complete-Recording([switch]$Wait) {
@@ -206,7 +212,7 @@ $manifest = [ordered]@{
         screenRecordSegments = $ScreenRecordSegments; screenRecordSeconds = $ScreenRecordSeconds; adbReconnectSeconds = $AdbReconnectSeconds; target = $TargetName
         combatPattern = $CombatPattern; comboPattern = $ComboPattern; skipInstall = [bool]$SkipInstall; skipLaunch = [bool]$SkipLaunch }
     adb = [ordered]@{ checks = 0; gaps = @(); lost = $null; killServer = 'never' }
-    install = $null; launch = $null; steps = @(); videos = @(); files = @(); notes = @()
+    install = $null; launch = $null; steps = @(); videos = @(); deviceCleanup = @(); files = @(); notes = @()
 }
 
 # --- build identity (before touching the device) ---------------------------------------------------------------
@@ -358,9 +364,15 @@ try {
                 $out = Adb pull $v.remote $dest
                 if ($script:AdbExit -eq 0 -and (Test-Path $dest)) {
                     $v.file = 'video/' + [IO.Path]::GetFileName($dest); $v.bytes = (Get-Item $dest).Length; $v.sha256 = Get-FileSha256 $dest; $v.pulled = $true
+                    # read-only check of the copy against the file on the phone (size + SHA-256); nothing is deleted here
+                    $sz = @(Adb shell stat -c '%s' $v.remote) | Where-Object { $_ -match '^\s*\d+\s*$' } | Select-Object -First 1
+                    if ($sz) { $v.deviceBytes = [long]$sz.Trim() }
+                    $dh = @(Adb shell sha256sum $v.remote) | Where-Object { $_ -match '^\s*([0-9a-fA-F]{64})\b' } | Select-Object -First 1
+                    if ($dh -and $dh -match '^\s*([0-9a-fA-F]{64})\b') { $v.deviceSha256 = $Matches[1].ToLowerInvariant() }
+                    $v.copyVerified = ($null -ne $v.deviceSha256) -and ($v.deviceSha256 -eq $v.sha256) -and ($null -eq $v.deviceBytes -or $v.deviceBytes -eq $v.bytes)
                 } else { $v.note = ('pull failed: ' + (($out | Select-Object -Last 1))).Trim() }
             }
-            Note ("screenrecord files stay on the phone in /sdcard (metinar-{0}-NN.mp4); the harness deletes nothing - remove them by hand after review" -f $SessionId)
+            Note ("screenrecord files stay on the phone in /sdcard (metinar-{0}-NN.mp4); the harness deletes nothing - see 'deviceCleanup' for the manual removal list" -f $SessionId)
             Step 'Video' 'OK' ("{0}/{1} segment(s) pulled" -f @($videos | Where-Object { $_.pulled }).Count, $videos.Count)
         }
         # final logcat dump
@@ -398,6 +410,18 @@ function Add-SessionItem([string]$Name, [string]$Measured, [string]$Detail, $Dat
 }
 $target = $null
 if ($budgets.PSObject.Properties['productTargets']) { $target = Get-MetinARProp $budgets.productTargets $TargetName }
+if ($target -and $CombatScene) {
+    # #90 decision 2: the combat scene comes from configuration; -CombatScene overrides productTargets.<TargetName>.sceneNames
+    $target = ($target | ConvertTo-Json -Depth 6 | ConvertFrom-Json)
+    $target.sceneNames = @($CombatScene)
+}
+$combatScenes = @(); if ($target) { $combatScenes = @(Get-MetinARProp $target 'sceneNames') }
+$manifest.settings['combatScenes'] = $combatScenes
+function Get-SceneBudget([string]$Scene) {
+    $b = Get-MetinARProp $budgets.scenes $Scene
+    if ($null -eq $b) { foreach ($prop in $budgets.scenes.PSObject.Properties) { $names = Get-MetinARProp $prop.Value 'sceneNames'; if ($names -and @($names) -contains $Scene) { $b = $prop.Value } } }
+    return $b
+}
 
 if ($deviceOk) {
     # Crash / ANR / exceptions
@@ -433,8 +457,7 @@ if ($deviceOk) {
     # Prototype regression gates (scenes{})
     $samples = Get-MetinARPerfSamples -Lines $all
     foreach ($sc in @($samples | ForEach-Object { $_.scene } | Select-Object -Unique)) {
-        $b = Get-MetinARProp $budgets.scenes $sc
-        if ($null -eq $b) { foreach ($prop in $budgets.scenes.PSObject.Properties) { $names = Get-MetinARProp $prop.Value 'sceneNames'; if ($names -and @($names) -contains $sc) { $b = $prop.Value } } }
+        $b = Get-SceneBudget $sc
         if ($null -eq $b) { continue }
         $r = Test-MetinARPerfBudget -Samples @($samples | Where-Object { $_.scene -eq $sc }) -Budget $b -BudgetName $sc
         $m = if ($r.Status -eq 'UNVERIFIED') { 'NO DATA' } else { $r.Status }
@@ -444,7 +467,8 @@ if ($deviceOk) {
 
     # Memory
     $pssVals = [double[]]@($sampleRows | ForEach-Object { $_.pssMB } | Where-Object { $null -ne $_ })
-    $maxPss = $null; $arBudget = Get-MetinARProp $budgets.scenes 'ArEncounterPrototype'; if ($arBudget) { $maxPss = Get-MetinARProp $arBudget 'maxPssMB' }
+    $maxPss = $null
+    foreach ($cs in $combatScenes) { $arBudget = Get-SceneBudget $cs; if ($arBudget -and $null -ne (Get-MetinARProp $arBudget 'maxPssMB')) { $maxPss = Get-MetinARProp $arBudget 'maxPssMB'; break } }
     $growth = 10; if ($target -and $null -ne (Get-MetinARProp $target 'maxPssGrowthPercent')) { $growth = [double](Get-MetinARProp $target 'maxPssGrowthPercent') }
     $memR = Test-MetinARPssTrend -SamplesMB $pssVals -MaxPssMB $maxPss -MaxGrowthPercent $growth
     Add-SessionItem 'Memory' $memR.Measured ("PSS first={0} last={1} peak={2} MB (budget {3} MB), growth {4}% (limit < {5}%), {6} sample(s){7}" -f $memR.FirstMB, $memR.LastMB, $memR.PeakMB, $maxPss, $memR.GrowthPercent, $growth, $memR.Samples, $(if ($memR.Reason) { ' - ' + $memR.Reason } else { '' })) $memR
@@ -496,12 +520,20 @@ $manifest.install = $script:install; $manifest.launch = $script:launch
 $manifest.steps = $stepLog.ToArray(); $manifest.videos = $videos.ToArray()
 $manifest.notes = $notes.ToArray()
 
+# #90 decision 6: files left on the phone, for manual removal by the owner / A31 slot holder after SHA verification
+$deviceCleanup = @($videos | ForEach-Object {
+    [ordered]@{ devicePath = $_.remote; bytes = $_.bytes; sha256 = $_.sha256; localCopy = $_.file; deviceBytes = $_.deviceBytes; deviceSha256 = $_.deviceSha256
+        copyVerified = [bool]$_.copyVerified
+        action = $(if ($_.copyVerified) { 'may be deleted by hand after review (copy verified: SHA-256 on the phone = pulled copy)' }
+                   elseif ($_.pulled) { 'DO NOT DELETE yet: the SHA-256 of the copy was not confirmed on the phone - verify by hand first' }
+                   else { 'DO NOT DELETE: no local copy' }) } })
+$manifest.deviceCleanup = $deviceCleanup
 $summary = [ordered]@{
     schema = 1; sessionId = $SessionId; verdict = 'UNVERIFIED'; measuredOverall = $measuredOverall; exitCode = $exitCode
     rule = 'measured = automatic measurement; verdict stays UNVERIFIED until a human reviews the video and fills reviewer. Never declare 30 FPS from simulation or unit tests.'
     build = [ordered]@{ apk = $manifest.apk.name; apkSha256 = $manifest.apk.sha256; gameCommit = $manifest.gameCommit.sha; qaToolCommit = $manifest.qaTool.gitHead }
     device = [ordered]@{ model = $manifest.device.model; android = $manifest.device.android; serialSha256 = $manifest.device.serialSha256 }
-    items = $items.ToArray(); steps22 = $steps22; adbGaps = $adbGaps.ToArray(); notes = $notes.ToArray()
+    items = $items.ToArray(); steps22 = $steps22; deviceCleanup = $deviceCleanup; adbGaps = $adbGaps.ToArray(); notes = $notes.ToArray()
 }
 Write-Json $summary 'session-summary.json'
 
@@ -525,6 +557,12 @@ $md.Add('## 22 kroki (spec section 18) - do uzupelnienia po przegladzie nagrania
 $md.Add('| # | Krok | Werdykt | Wskazowka z logu | Zalezy od | Wlasciciel poprawki |'); $md.Add('|---|---|---|---|---|---|')
 foreach ($s in $steps22) { $md.Add(("| {0} | {1} | {2} | {3} | {4} | {5} |" -f $s.id, $s.step, $s.verdict, ($s.logHint -replace '\|', '/'), (@($s.dependsOn) -join ', '), $s.fixOwner)) }
 if ($videos.Count) { $md.Add(''); $md.Add('## Nagrania (lokalnie, nie wysylac na GitHub)'); $md.Add(''); foreach ($v in $videos) { $md.Add(("- seg {0}: {1} -> {2}, {3} B, sha256 {4} {5}" -f $v.index, $v.startedAt, $v.file, $v.bytes, $v.sha256, $v.note)) } }
+if ($deviceCleanup.Count) {
+    $md.Add(''); $md.Add('## Pliki do recznego usuniecia z telefonu (po weryfikacji SHA-256)'); $md.Add('')
+    $md.Add('Skrypt niczego nie usuwa. Usuwa wlasciciel albo osoba trzymajaca slot A31 (#33), dopiero gdy SHA-256 kopii jest potwierdzony.'); $md.Add('')
+    $md.Add('| Sciezka na telefonie | Rozmiar kopii (B) | SHA-256 kopii | SHA-256 na telefonie | Kopia zweryfikowana | Dzialanie |'); $md.Add('|---|---|---|---|---|---|')
+    foreach ($c in $deviceCleanup) { $md.Add(("| {0} | {1} | {2} | {3} | {4} | {5} |" -f $c.devicePath, $c.bytes, $c.sha256, $c.deviceSha256, $(if ($c.copyVerified) { 'tak' } else { 'NIE' }), $c.action)) }
+}
 if ($adbGaps.Count -or $notes.Count) { $md.Add(''); $md.Add('## Luki i uwagi'); $md.Add(''); foreach ($g in $adbGaps) { $md.Add("- $g") }; foreach ($nt in $notes) { $md.Add("- $nt") } }
 $mdText = (ConvertTo-MetinARRedactedText -Lines $md.ToArray() -Secrets $secrets -KeepHex)
 Set-Content -Path (Join-Path $sessionDir 'session-summary.md') -Value $mdText -Encoding UTF8

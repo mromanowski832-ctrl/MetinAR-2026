@@ -18,6 +18,10 @@ $target = $budgets.productTargets.ArCombatA31
 
 # --- Part 1: pure helpers -------------------------------------------------------------------------------------------
 Assert 'budgets.productTarget-present' ($null -ne $target -and $target.requireCombo -eq $true -and [double]$target.minFpsMedian -gt [double]$budgets.scenes.ArEncounterPrototype.minFpsAvg)
+Assert 'budgets.decision1-thresholds' ([double]$target.minFpsMedian -eq 29.5 -and [double]$target.minFpsP5 -eq 27 -and [double]$target.maxFrameP50MedianMs -eq 34.5 -and [double]$target.maxFrameP95Ms -eq 40 -and [int]$target.maxFrameSpikesPerWindow -eq 2 -and [double]$target.maxMainP95Ms -eq 40 -and [int]$target.warmupSeconds -eq 60)
+Assert 'budgets.decision2-scene-from-config' ((@($target.sceneNames) -join ',') -eq 'ArEncounterPrototype')
+$collectorText = Get-Content -Raw (Join-Path $PSScriptRoot '..\Invoke-MetinARDeviceSession.ps1')
+Assert 'collector.scene-not-hardcoded' ($collectorText -notmatch "'ArEncounterPrototype'" -and $collectorText -match '\[string\[\]\]\$CombatScene')
 Assert 'budgets.scenes-unchanged' ($budgets.scenes.ArEncounterPrototype.minFpsAvg -eq 24 -and $budgets.scenes.ArEncounterPrototype.maxFrameP95Ms -eq 55)
 
 $steps = (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot '..\etap1-steps.json') | ConvertFrom-Json).steps
@@ -52,15 +56,18 @@ Assert 'pct.empty' ($null -eq (Get-MetinARPercentile -Values @() -Percent 50))
 Assert 'commit.from-name' ((Get-MetinARApkCommitFromName 'C:\b\MetinAR-v0c2-ee48cb9-dev.apk') -eq 'ee48cb9' -and $null -eq (Get-MetinARApkCommitFromName 'x/MetinAR-ar-encounter-qa.apk'))
 $h = Get-MetinARSerialHash 'FAKESERIAL123'
 Assert 'serial.hash' ($h -match '^[0-9a-f]{12}$' -and $h -ne 'FAKESERIAL123' -and $h -eq (Get-MetinARSerialHash 'FAKESERIAL123'))
+# decision 4: first 12 hex of SHA-256 over the UTF-8 serial (reference value from `printf FAKESERIAL123 | sha256sum`)
+Assert 'serial.hash-known-value' ($h -ceq '3b9bbb471cfd') "h=$h"
+Assert 'serial.hash-empty-null' ($null -eq (Get-MetinARSerialHash '') -and $null -eq (Get-MetinARSerialHash $null))
 
 # synthetic combat timeline: 30 windows of 5 s from 04:30:00; combat (+combo) lines in every window after 04:31:00
-function New-Timeline([double]$fps = 29.6, [double]$p95 = 35, [switch]$NoCombo, [switch]$NoCombat) {
+function New-Timeline([double]$fps = 29.6, [double]$p95 = 35, [switch]$NoCombo, [switch]$NoCombat, [string]$ComboText = '[Combo] step=1 weapon=1H hit=yes') {
     $l = New-Object System.Collections.Generic.List[string]
     for ($s = 5; $s -le 150; $s += 5) {
         $t = ([datetime]'2000-10-20 04:30:00').AddSeconds($s)
         if (-not $NoCombat -and $s -gt 60) {
             $l.Add(('{0:MM-dd HH:mm:ss}.500  4242  4260 I Unity   : [ArDamage] swing={1} outcome=Hit' -f $t.AddSeconds(-3), $s))
-            if (-not $NoCombo) { $l.Add(('{0:MM-dd HH:mm:ss}.600  4242  4260 I Unity   : [Combo] step=1 weapon=1H hit=yes swing={1}' -f $t.AddSeconds(-3), $s)) }
+            if (-not $NoCombo) { $l.Add(('{0:MM-dd HH:mm:ss}.600  4242  4260 I Unity   : {2} swing={1}' -f $t.AddSeconds(-3), $s, $ComboText)) }
         }
         $f = if ($s -gt 60) { $fps } else { 29.6 }; $q = if ($s -gt 60) { $p95 } else { 35 }
         $l.Add(('{0:MM-dd HH:mm:ss}.000  4242  4260 I Unity   : [MetinARPerf] v=1 scene=ArEncounterPrototype windowS=5 frames=148 fpsAvg={1} frameP50Ms=33.3 frameP95Ms={2} frameSpikes=0 mainP95Ms=30 totalUsedMB=420' -f $t, $f, $q))
@@ -72,6 +79,21 @@ $ts = Get-MetinARTimedPerfSamples -Lines $tl
 Assert 'timed.samples' ($ts.Count -eq 30 -and $ts[0].ts -eq '10-20 04:30:05.000' -and ($ts[1].t - $ts[0].t) -eq 5)
 $r = Test-MetinARCombatFps -Lines $tl -Target $target
 Assert 'combat.pass' ($r.Measured -eq 'PASS' -and $r.Windows -eq 18 -and $r.FpsMedian -eq 29.6 -and $r.FpsP5 -eq 29.6) "m=$($r.Measured) w=$($r.Windows) $($r.Reason)"
+# decision 1: median >= 29.5 (29.4 fails on the median alone, 29.5 passes)
+$r294 = Test-MetinARCombatFps -Lines (New-Timeline -fps 29.4) -Target $target
+Assert 'combat.median-29.4-fails' ($r294.Measured -eq 'FAIL' -and @($r294.Checks | Where-Object { $_.Status -eq 'FAIL' }).Count -eq 1) "m=$($r294.Measured)"
+Assert 'combat.median-29.5-passes' ((Test-MetinARCombatFps -Lines (New-Timeline -fps 29.5) -Target $target).Measured -eq 'PASS')
+# decision 3: exactly `[Combo] step=N` (N >= 1, case-sensitive); anything else is not combo evidence
+foreach ($bad in @('[Combo] step=', '[Combo] step=x', '[combo] step=1', '[Combo] stepped=1', '[Combo]step=1', '[Combo] step=0', '[COMBO] step=2')) {
+    $rb = Test-MetinARCombatFps -Lines (New-Timeline -ComboText $bad) -Target $target
+    Assert ("combo.format-rejects '{0}'" -f $bad) ($rb.Measured -eq 'NO DATA' -and $rb.ComboLines -eq 0) "m=$($rb.Measured) combo=$($rb.ComboLines)"
+}
+Assert 'combo.format-accepts-step=12' ((Test-MetinARCombatFps -Lines (New-Timeline -ComboText '[Combo] step=12') -Target $target).Windows -eq 18)
+Assert 'steps.combo-pattern-exact' (('[Combo] step=3' -match $steps[9].logPattern) -and -not ('[Combo] step=30' -match $steps[9].logPattern))
+# decision 2: the scene list comes from the target configuration
+$tOther = ($target | ConvertTo-Json -Depth 6 | ConvertFrom-Json); $tOther.sceneNames = @('ArCombat')
+$ro = Test-MetinARCombatFps -Lines $tl -Target $tOther
+Assert 'scene.config-drives-selection' ($ro.Measured -eq 'NO DATA' -and $ro.SceneWindows -eq 0 -and $ro.Scenes -eq 'ArCombat')
 $rl = Test-MetinARCombatFps -Lines (New-Timeline -fps 24 -p95 60) -Target $target
 Assert 'combat.low-fails' ($rl.Measured -eq 'FAIL' -and @($rl.Checks | Where-Object { $_.Status -eq 'FAIL' }).Count -ge 2)
 $rn = Test-MetinARCombatFps -Lines (New-Timeline -NoCombo) -Target $target
@@ -142,6 +164,24 @@ if ($isWin) {
     RunSession 'sessionnocombo' 0 { param($d) $s = J $d 'session-summary.json'; $f = ItemOf $s 'CombatFps30'; ($f.measured -eq 'NO DATA') -and ($f.detail -match '#82') -and $s.measuredOverall -eq 'NO DATA' } | Out-Null
     RunSession 'adblost' 3 { param($d) $m = J $d 'session-manifest.json'; $s = J $d 'session-summary.json'; ($m.adb.lost -match "before 'Sample 1'") -and $s.verdict -eq 'UNVERIFIED' -and $s.measuredOverall -eq 'FAIL' -and ((AllText $d) -notmatch 'FAKESERIAL123') } | Out-Null
     RunSession 'session' 0 { param($d) $m = J $d 'session-manifest.json'; $v = @($m.videos); ($v.Count -eq 1) -and $v[0].pulled -and ($v[0].sha256 -match '^[0-9a-f]{64}$') -and (Test-Path (Join-Path $d 'video/metinar-SIM-video-01.mp4')) -and ((AllText $d) -match 'deletes nothing') } @('-SkipInstall', '-ScreenRecordSegments', '1', '-ScreenRecordSeconds', '5') 'video' | Out-Null
+    # decision 6: manual-removal list (device path, size, SHA-256 of the pulled copy, device-side SHA-256 check)
+    RunSession 'session' 0 {
+        param($d)
+        $s = J $d 'session-summary.json'; $m = J $d 'session-manifest.json'; $c = @($s.deviceCleanup)
+        $local = Join-Path $d 'video/metinar-SIM-cleanup-01.mp4'; $md = Get-Content -Raw -Encoding UTF8 (Join-Path $d 'session-summary.md')
+        $ok = ($c.Count -eq 1) -and ($c[0].devicePath -eq '/sdcard/metinar-SIM-cleanup-01.mp4') -and ($c[0].bytes -eq 8) -and ($c[0].sha256 -eq (Get-FileHash -Algorithm SHA256 $local).Hash.ToLowerInvariant()) -and
+            ($c[0].deviceSha256 -eq $c[0].sha256) -and ($c[0].deviceBytes -eq 8) -and ($c[0].copyVerified -eq $true) -and ($c[0].action -match 'by hand') -and (@($m.deviceCleanup).Count -eq 1) -and
+            ($md -match 'Pliki do recznego usuniecia') -and ($md -match '/sdcard/metinar-SIM-cleanup-01\.mp4') -and ($md -match $c[0].sha256)
+        if (-not $ok) { Write-Host ($c | ConvertTo-Json -Depth 4) }
+        $ok
+    } @('-SkipInstall', '-ScreenRecordSegments', '1', '-ScreenRecordSeconds', '5') 'cleanup' | Out-Null
+    $env:FAKE_ADB_VIDEO_SHA_BAD = '1'
+    RunSession 'session' 0 { param($d) $c = @((J $d 'session-summary.json').deviceCleanup); ($c.Count -eq 1) -and ($c[0].copyVerified -eq $false) -and ($c[0].action -match 'DO NOT DELETE') } @('-SkipInstall', '-ScreenRecordSegments', '1', '-ScreenRecordSeconds', '5') 'cleanupbad' | Out-Null
+    Remove-Item Env:\FAKE_ADB_VIDEO_SHA_BAD
+    # decision 2: -CombatScene overrides the configured scene list
+    RunSession 'session' 0 { param($d) $m = J $d 'session-manifest.json'; $f = ItemOf (J $d 'session-summary.json') 'CombatFps30'; ((@($m.settings.combatScenes) -join ',') -eq 'ArCombat') -and ($f.measured -eq 'NO DATA') -and ($f.detail -match 'ArCombat') } @('-SkipInstall', '-CombatScene', 'ArCombat') 'scene' | Out-Null
+    # decision 4: explicit -Serial - only the 12-hex hash is written, the raw serial nowhere
+    RunSession 'session' 0 { param($d) $m = J $d 'session-manifest.json'; ($m.device.serialSha256 -ceq '3b9bbb471cfd') -and ((AllText $d) -notmatch 'FAKESERIAL123') -and ((@($m.settings.combatScenes) -join ',') -eq 'ArEncounterPrototype') } @('-SkipInstall', '-Serial', 'FAKESERIAL123') 'serial' | Out-Null
 
     # an existing non-empty session folder is never overwritten
     $root = Join-Path ([IO.Path]::GetTempPath()) ('metinar-session-exists-' + [guid]::NewGuid().ToString('N').Substring(0, 6))

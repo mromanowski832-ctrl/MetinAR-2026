@@ -1107,8 +1107,8 @@ function Test-MetinARCombatFps {
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines,
         [Parameter(Mandatory = $true)]$Target,
-        [string]$CombatPattern = '\[ArDamage\] swing=|\[Combo\] step=',
-        [string]$ComboPattern = '\[Combo\] step=',
+        [string]$CombatPattern = '\[ArDamage\] swing=|\[Combo\] step=[1-9][0-9]*(?=\s|$)',
+        [string]$ComboPattern = '\[Combo\] step=[1-9][0-9]*(?=\s|$)',
         [AllowNull()][object]$WarmupSeconds = $null
     )
     $scenes = @(Get-MetinARProp $Target 'sceneNames')
@@ -1120,8 +1120,8 @@ function Test-MetinARCombatFps {
     foreach ($l in @($Lines)) {
         $ts = Get-MetinARLogcatTime $l
         if (-not $ts) { continue }
-        if ($l -match $CombatPattern) { $combatT.Add((ConvertTo-MetinARLogcatSeconds $ts)) }
-        if ($ComboPattern -and $l -match $ComboPattern) { $comboT.Add((ConvertTo-MetinARLogcatSeconds $ts)) }
+        if ($l -cmatch $CombatPattern) { $combatT.Add((ConvertTo-MetinARLogcatSeconds $ts)) }
+        if ($ComboPattern -and $l -cmatch $ComboPattern) { $comboT.Add((ConvertTo-MetinARLogcatSeconds $ts)) }
     }
     $result = [ordered]@{ Name = 'CombatFps'; Measured = 'NO DATA'; Scenes = ($scenes -join ','); SceneWindows = $sceneSamples.Count; WarmupSeconds = $warm
         CombatLines = $combatT.Count; ComboLines = $comboT.Count; Windows = 0; FpsMedian = $null; FpsP5 = $null; FrameP50MedianMs = $null; FrameP95WorstMs = $null
@@ -1201,7 +1201,11 @@ function Get-MetinARApkCommitFromName {
 }
 
 function Get-MetinARSerialHash {
-    <# Short SHA-256 of a device serial: identifies the same phone across sessions without writing the serial. #>
+    <#
+      Short SHA-256 of a device serial: identifies the same phone across sessions without writing the serial.
+      #90 decision 4: only this value (first 12 lowercase hex characters of SHA-256 over the UTF-8 serial) is ever
+      written; the raw serial never reaches a file.
+    #>
     param([string]$Serial)
     if (-not $Serial) { return $null }
     $sha = [System.Security.Cryptography.SHA256]::Create()

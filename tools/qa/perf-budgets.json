@@ -82,16 +82,16 @@
   },
   "productTargets": {
     "ArCombatA31": {
-      "label": "PRODUCT TARGET (owner spec section 15: stable 30 FPS on the A31 in typical combat) - PROPOSAL from #90, thresholds wait for the lead's approval; the scenes{} entries stay the prototype regression gate",
+      "label": "PRODUCT TARGET (owner spec section 15: stable 30 FPS on the A31 in typical combat) - thresholds APPROVED by the production lead 2026-10-23 04:28 (#90, decision 1); the scenes{} entries stay the prototype regression gate",
       "description": "Combat windows only: [MetinARPerf] windows of sceneNames after warmupSeconds that contain a combat log line and (requireCombo) a [Combo] step= line. Evaluated by Test-MetinARCombatFps from Invoke-MetinARDeviceSession.ps1; measured on the device only, never from simulation",
       "sceneNames": [
-        "ArEncounterPrototype",
-        "ArCombat"
+        "ArEncounterPrototype"
       ],
+      "sceneNamesNote": "#90 decision 2: ArEncounterPrototype until integration renames the combat scene; change it here or pass -CombatScene to Invoke-MetinARDeviceSession.ps1 (never hardcoded in the collector)",
       "requireCombo": true,
       "warmupSeconds": 60,
       "minWindows": 3,
-      "minFpsMedian": 29.0,
+      "minFpsMedian": 29.5,
       "minFpsP5": 27.0,
       "maxFrameP50MedianMs": 34.5,
       "maxFrameP95Ms": 40,
