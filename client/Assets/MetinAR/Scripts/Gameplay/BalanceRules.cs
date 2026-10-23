@@ -123,6 +123,16 @@ namespace MetinAR.Gameplay
         public double GuardianAtkMultiplier = 1.8;
         public double GuardianRewardMultiplier = 10;
 
+        // METINAR-020 (S2) decision, #41 (spec default proposals): the mob table has no Eva/Acc, so a mob uses the
+        // character formulas of CHARACTER_PROGRESSION.md §1.3 with 0 primary stats and no items:
+        // Eva = 5, Acc = 70 + m. With these values HitChance stays at the 99% cap for mobs up to the spec's +1 level,
+        // which matches the no-miss assumption of tables/sanity_warrior_ttk.csv.
+        /// <summary>Mob evasion = base Eva of the character formula (Finesse 0, no items).</summary>
+        public double Evasion = 5;
+        /// <summary>Mob accuracy = 70 + 1 × m (character formula with Finesse 0); used by mob attacks (S3).</summary>
+        public double AccuracyBase = 70;
+        public double AccuracyPerLevel = 1;
+
         public double HpMultiplier(MobRank rank)
         {
             switch (rank)
