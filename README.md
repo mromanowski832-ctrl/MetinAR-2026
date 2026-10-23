@@ -82,6 +82,11 @@ For a physical Android phone, use [the device smoke-test procedure](docs/METINAR
 - No paid services or production deployment without approval.
 - Document failures as failures. CI passing is scoped to the checks it actually runs.
 
+## Portfolio evidence
+
+- [Engineering case studies and trade-offs](docs/ENGINEERING_CASE_STUDIES.md)
+- [Physical Android demo checklist and evidence log](docs/RECRUITER_DEMO_CHECKLIST.md)
+
 ## Recruiter / reviewer guide
 
 1. Read the [project brief](docs/PROJECT_BRIEF.md) for intended gameplay and safety rules.
