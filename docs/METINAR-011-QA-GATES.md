@@ -48,6 +48,8 @@ powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARDeviceSmoke.ps1 
 powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARDeviceSession.ps1 -ApkPath <apk> -SessionId A31-20261023-01 -DurationSeconds 600 -ScreenRecordSegments 4
 ```
 
+The session collector does **not** clear the device log buffer by default: it reads the device clock before the launch and drops older lines on the host (`manifest.logcat`). `-ClearLogcat` runs `adb logcat -c` first; that wipes the whole device log buffer (all apps, including crash traces of earlier runs nobody has copied yet), so use it only when nothing earlier on the phone still needs its log.
+
 The QA runner builds the **QA variant** (`com.metinar.game.qa`, label "MetinAR QA", `MetinAR-ar-encounter-qa.apk`) so it installs next to the game; see [METINAR-037-QA-APK-ADB.md](METINAR-037-QA-APK-ADB.md).
 
 Options: `-UnityPath` (or env `METINAR_UNITY`), `-SkipUnity`, `-SkipAndroid`, `-StopOnFail`, `-OutputDir`,

@@ -29,11 +29,13 @@ case "$1" in
   install) echo "Performing Streamed Install"; echo "Success"; exit 0;;
   pull) printf 'fake-mp4' > "$3"; echo "$2: 1 file pulled. (fake)"; exit 0;;
   logcat)
-    if [ "$2" = "-c" ]; then exit 0; fi
+    if [ "$2" = "-c" ]; then touch "${state}.cleared"; exit 0; fi
     case "$mode" in session|sessionlow|sessionnocombo)
       lc=$(( $(cat "${state}.logcat" 2>/dev/null || echo 0) + 1 )); echo "$lc" > "${state}.logcat"
       last=150; [ "$lc" -eq 1 ] && last=75
       echo "--------- beginning of main"
+      # a crash of an EARLIER run, present until `logcat -c`; the collector must drop it by time when the buffer is kept
+      [ -f "${state}.cleared" ] || { echo "10-20 04:10:00.000  3999  3999 E AndroidRuntime: FATAL EXCEPTION: main"; echo "10-20 04:10:00.001  3999  3999 E AndroidRuntime: Process: $pkg, PID: 3999"; }
       echo "10-20 04:29:59.000  1500  1600 I ActivityManager: Start proc 4242:$pkg/u0a321 for top-activity"
       echo "10-20 04:30:00.100  4242  4242 I Unity   : [MetinARPerf] v=1 event=start mainThreadRecorder=1 device=FakePhone"
       echo "10-20 04:30:00.200  4242  4242 I Unity   : [WorldMapPrototype] AR ENCOUNTER REQUESTED (button)"
@@ -89,6 +91,7 @@ case "$1" in
     cmd="$*"
     case "$cmd" in
       "getprop ro.product.model") echo "FakePhone";;
+      "date +%m-%d_%H:%M:%S") echo "10-20_04:29:58";;
       "getprop ro.product.manufacturer") echo "FakeVendor";;
       "dumpsys gfxinfo $pkg framestats") echo "Total frames rendered: 120"; echo "Janky frames: 6 (5.00%)"; echo "50th percentile: 33ms"; echo "90th percentile: 34ms"; echo "95th percentile: 36ms"; echo "99th percentile: 50ms"
         echo "---PROFILEDATA---"; echo "Flags,IntendedVsync,Vsync,OldestInputEvent,NewestInputEvent,HandleInputStart,AnimationStart,PerformTraversalsStart,DrawStart,SyncQueued,SyncStart,IssueDrawCommandsStart,SwapBuffers,FrameCompleted,"

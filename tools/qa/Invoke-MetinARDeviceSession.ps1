@@ -38,6 +38,14 @@
   The device serial is written only as serialSha256 = first 12 hex of SHA-256 (decision 4).
   Raw logcat is never written to disk; only the redacted copies.
 
+  LOGCAT BUFFER (review #100 point 4): by default the device log buffer is NOT cleared. Before the launch the collector
+  reads the device clock (`adb shell date`) and keeps only lines stamped from that moment (Select-MetinARLogcatSince);
+  older lines are dropped on the host and counted in manifest.logcat.droppedOlderLines. If the device clock cannot be
+  read, nothing is filtered and the report says so (earlier runs may then show up in the crash check).
+  -ClearLogcat runs `adb logcat -c` before the launch, as before. RISK: it wipes the whole device log buffer
+  (main/system/crash/events of ALL apps), so crash traces or logs of an earlier run that nobody has copied yet are
+  lost for good. Use it only on the A31 slot when nothing earlier on the phone still needs its log.
+
   Exit codes: 0 = no measured FAIL (verdict still UNVERIFIED), 1 = at least one measured FAIL,
               2 = no authorized device (nothing collected), 3 = adb connection lost (partial session written),
               4 = logcat collection error (empty/failed dump or no line of the app).
@@ -70,7 +78,8 @@ param(
     [string]$ComboPattern = '\[Combo\] step=[1-9][0-9]*(?=\s|$)',
     [switch]$SkipInstall,
     [switch]$SkipLaunch,
-    [switch]$AllowReplaceInstalled
+    [switch]$AllowReplaceInstalled,
+    [switch]$ClearLogcat
 )
 $ErrorActionPreference = 'Continue'
 Import-Module (Join-Path $PSScriptRoot 'MetinARQa.psm1') -Force -DisableNameChecking
@@ -154,6 +163,11 @@ function Get-LogcatChunk {
     $lines = @(Adb logcat '-d' '-v' threadtime '-b' 'main,system,crash,events')
     $script:lastLogcatExit = $script:AdbExit
     if ($script:AdbExit -ne 0) { $script:logcatErrors++; Note ("logcat dump failed (exit {0}) - lines of this interval may be missing" -f $script:AdbExit); return 0 }
+    if ($manifest.logcat.sinceDeviceTime) {
+        $kept = Select-MetinARLogcatSince -Lines $lines -Since $manifest.logcat.sinceDeviceTime
+        $manifest.logcat.droppedOlderLines = [Math]::Max([int]$manifest.logcat.droppedOlderLines, $lines.Count - $kept.Count)
+        $lines = $kept
+    }
     return (Add-MetinARLogcatChunk -Collector $collector -Lines $lines)
 }
 function Get-FileSha256([string]$Path) { return (Get-FileHash -Algorithm SHA256 -Path $Path).Hash.ToLowerInvariant() }
@@ -211,7 +225,8 @@ $manifest = [ordered]@{
     timestamps = [ordered]@{ started = $startedAt; launched = $null; samplingStarted = $null; samplingEnded = $null; finished = $null }
     settings = [ordered]@{ durationSeconds = $DurationSeconds; sampleIntervalSeconds = $SampleIntervalSeconds; warmupSeconds = $WarmupSeconds; launchWaitSeconds = $LaunchWaitSeconds
         screenRecordSegments = $ScreenRecordSegments; screenRecordSeconds = $ScreenRecordSeconds; adbReconnectSeconds = $AdbReconnectSeconds; target = $TargetName
-        combatPattern = $CombatPattern; comboPattern = $ComboPattern; skipInstall = [bool]$SkipInstall; skipLaunch = [bool]$SkipLaunch }
+        combatPattern = $CombatPattern; comboPattern = $ComboPattern; skipInstall = [bool]$SkipInstall; skipLaunch = [bool]$SkipLaunch; clearLogcat = [bool]$ClearLogcat }
+    logcat = [ordered]@{ cleared = $false; sinceDeviceTime = $null; droppedOlderLines = 0; note = $null }
     adb = [ordered]@{ checks = 0; gaps = @(); lost = $null; killServer = 'never' }
     install = $null; launch = $null; steps = @(); videos = @(); deviceCleanup = @(); files = @(); notes = @()
 }
@@ -305,9 +320,19 @@ try {
         $script:launch.component = $component
         if ($SkipLaunch) {
             Step 'Launch' 'SKIP' 'app not restarted (-SkipLaunch); logcat is not cleared, earlier lines may be included'
+            $manifest.logcat.note = '-SkipLaunch: buffer not cleared and not filtered; earlier lines may be included'
         } else {
             Adb shell am force-stop $Package | Out-Null
-            Adb logcat '-c' | Out-Null
+            if ($ClearLogcat) {
+                # -ClearLogcat only: wipes the whole device log buffer (all apps) - see LOGCAT BUFFER in the help
+                Adb logcat '-c' | Out-Null
+                $manifest.logcat.cleared = $true
+                $manifest.logcat.note = '-ClearLogcat: device log buffer wiped with adb logcat -c before the launch'
+            } else {
+                $manifest.logcat.sinceDeviceTime = ConvertFrom-MetinARDeviceDate -Lines @(Adb shell date '+%m-%d_%H:%M:%S')
+                $manifest.logcat.note = if ($manifest.logcat.sinceDeviceTime) { 'buffer not cleared (default); lines before the launch dropped on the host' } else { 'buffer not cleared and device clock unreadable: earlier lines may be included' }
+                if (-not $manifest.logcat.sinceDeviceTime) { Note 'device clock not read: logcat lines from before the launch may be included (use -ClearLogcat only if the device log may be wiped)' }
+            }
             $manifest.timestamps.launched = Get-IsoNow
             $launchOut = if ($component) { Adb shell am start '-W' '-n' $component } else { Adb shell monkey '-p' $Package '-c' android.intent.category.LAUNCHER 1 }
             foreach ($l in $launchOut) { if ($l -match 'TotalTime:\s*(\d+)') { $script:launch.totalTimeMs = [int]$Matches[1] } }
@@ -553,6 +578,7 @@ $md.Add("| Commit gry | $($manifest.gameCommit.sha) ($($manifest.gameCommit.sour
 $md.Add("| Urzadzenie | $($manifest.device.manufacturer) $($manifest.device.model), Android $($manifest.device.android) (API $($manifest.device.sdk)), serialSha256 $($manifest.device.serialSha256) |")
 $md.Add("| Start / koniec | $($manifest.timestamps.started) / $($manifest.timestamps.finished) |")
 $md.Add("| Probki / adb checks / luki | $($sampleRows.Count) / $($script:adbChecks) / $($adbGaps.Count) |")
+$md.Add(("| Bufor logcat | {0}; od {1}; odrzucone starsze linie {2} |" -f $(if ($manifest.logcat.cleared) { "wyczyszczony (-ClearLogcat)" } else { "nie czyszczony (domyslnie)" }), $manifest.logcat.sinceDeviceTime, $manifest.logcat.droppedOlderLines))
 $md.Add('')
 $md.Add('## Pomiary'); $md.Add('')
 $md.Add('| Pozycja | Pomiar | Werdykt | Szczegoly |'); $md.Add('|---|---|---|---|')

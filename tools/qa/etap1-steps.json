@@ -104,11 +104,12 @@
     {
       "id": 8,
       "step": "Pająk stoi stabilnie na rzeczywistym podłożu",
-      "criterion": "jeden pająk na podłodze 1,5–3 m; S3-A1…A6 PASS (dryf ≤ 0,10 m, powrót ≤ 0,20 m)",
-      "evidence": "LOG [ArAnchor] + VID",
+      "criterion": "jeden pająk na podłodze, postawiony w 1,10–3,0 m; gdy jest poza zasięgiem ostrza, sam podchodzi i zatrzymuje się w d_stop ≈ 1,32 m (± 0,05 m), nigdy bliżej niż d_min 1,10 m – gracz nie podchodzi (#97); S3-A1…A6 PASS (dryf ≤ 0,10 m, powrót ≤ 0,20 m)",
+      "evidence": "LOG [ArAnchor] + VID (z boku albo z miarką: odległość zatrzymania); build dev z #97/PR #104: [ArReach] swing pitch=… dist=N.NN m",
       "logPattern": "\\[ArEncounter\\] spawned|\\[ArAnchor\\]",
       "dependsOn": [
-        "PR #80"
+        "PR #80",
+        "#97"
       ],
       "fixOwner": "#31 AR (PR #80)"
     },

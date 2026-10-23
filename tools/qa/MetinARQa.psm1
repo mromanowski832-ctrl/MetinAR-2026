@@ -1233,6 +1233,30 @@ function Get-MetinARStepLogEvidence {
     return , $out.ToArray()
 }
 
+function Select-MetinARLogcatSince {
+    <#
+      Keeps logcat lines stamped at or after -Since ('MM-dd HH:mm:ss.fff', device clock); lines without a threadtime
+      stamp ('--------- beginning of main') are kept. Used by Invoke-MetinARDeviceSession.ps1 when the device log buffer
+      is NOT cleared (default since review #100): lines of earlier runs are dropped on the host instead of wiping the
+      device buffer with `adb logcat -c`. Empty -Since returns the lines unchanged.
+    #>
+    param([AllowEmptyCollection()][string[]]$Lines = @(), [string]$Since)
+    if (-not $Since) { return , @($Lines) }
+    $out = New-Object System.Collections.Generic.List[string]
+    foreach ($l in @($Lines)) {
+        $t = Get-MetinARLogcatTime $l
+        if ($null -eq $t -or [string]::CompareOrdinal([string]$t, $Since) -ge 0) { $out.Add($l) }
+    }
+    return , $out.ToArray()
+}
+
+function ConvertFrom-MetinARDeviceDate {
+    # `adb shell date +%m-%d_%H:%M:%S` -> 'MM-dd HH:mm:ss.000' (null when the output is not in that format)
+    param([AllowEmptyCollection()][string[]]$Lines = @())
+    foreach ($l in @($Lines)) { if ("$l".Trim() -cmatch '^(\d\d-\d\d)_(\d\d:\d\d:\d\d)$') { return ('{0} {1}.000' -f $Matches[1], $Matches[2]) } }
+    return $null
+}
+
 function Get-MetinARStageClosure {
     <#
       Closing verdict of ETAP I (#90, lead decision 2026-10-23 04:43): CLOSED only when every required step has

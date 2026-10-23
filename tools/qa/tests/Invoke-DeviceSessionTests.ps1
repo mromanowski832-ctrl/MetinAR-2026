@@ -18,7 +18,7 @@ $target = $budgets.productTargets.ArCombatA31
 
 # --- Part 1: pure helpers -------------------------------------------------------------------------------------------
 Assert 'budgets.productTarget-present' ($null -ne $target -and $target.requireCombo -eq $true -and [double]$target.minFpsMedian -gt [double]$budgets.scenes.ArEncounterPrototype.minFpsAvg)
-Assert 'budgets.decision1-thresholds' ([double]$target.minFpsMedian -eq 29.5 -and [double]$target.minFpsP5 -eq 27 -and [double]$target.maxFrameP50MedianMs -eq 34.5 -and [double]$target.maxFrameP95Ms -eq 40 -and [int]$target.maxFrameSpikesPerWindow -eq 2 -and [double]$target.maxMainP95Ms -eq 40 -and [int]$target.warmupSeconds -eq 60)
+Assert 'budgets.decision1-thresholds' ([double]$target.minFpsMedian -eq 29.5 -and [double]$target.minFpsP5 -eq 27 -and [double]$target.maxFrameP50MedianMs -eq 33.9 -and [double]$target.maxFrameP95Ms -eq 40 -and [int]$target.maxFrameSpikesPerWindow -eq 2 -and [double]$target.maxMainP95Ms -eq 40 -and [int]$target.warmupSeconds -eq 60)
 Assert 'budgets.decision2-scene-from-config' ((@($target.sceneNames) -join ',') -eq 'ArEncounterPrototype')
 $collectorText = Get-Content -Raw (Join-Path $PSScriptRoot '..\Invoke-MetinARDeviceSession.ps1')
 Assert 'collector.scene-not-hardcoded' ($collectorText -notmatch "'ArEncounterPrototype'" -and $collectorText -match '\[string\[\]\]\$CombatScene')
@@ -34,6 +34,8 @@ $a97Hash = $null
 if ($a97) { $sha = [System.Security.Cryptography.SHA256]::Create(); try { $a97Hash = (($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes([string]$a97.criterion)) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $sha.Dispose() } }
 Assert 'steps.A97-verbatim-criterion' ($a97Hash -ceq 'c9c7ba1bb9be5226b1b83041e1bfdd9952bcb808ae23afdd3b7b1d7f4458fefc') "sha=$a97Hash"
 Assert 'steps.A97-mandatory' ($a97.mandatory -eq $true -and (@($a97.dependsOn) -contains '#97') -and ((@($a97.relatedSteps) -join ',') -eq '8,10,11') -and $a97.evidence -match 'A31' -and $a97.evidence -match 'UNVERIFIED')
+# review #100 point 5: step 8 follows #97 (spawn 1,10-3,0 m, mob approaches and stops at d_stop ~1,32 m, d_min 1,10 m)
+Assert 'steps.8-matches-97' ($steps[7].criterion -match '1,32 m' -and $steps[7].criterion -match 'd_min 1,10 m' -and $steps[7].criterion -notmatch '1,5' -and (@($steps[7].dependsOn) -contains '#97'))
 Assert 'steps.requiredStepIds' ((@($stepsDef.requiredStepIds | ForEach-Object { [string]$_ }) -join ',') -eq (((1..22) -join ',') + ',A97'))
 Assert 'steps.fields' (@($steps | Where-Object { -not $_.step -or -not $_.criterion -or -not $_.evidence -or -not $_.fixOwner }).Count -eq 0)
 Assert 'steps.patterns-compile' (@($steps | Where-Object { $_.logPattern } | Where-Object { try { [void][regex]::new($_.logPattern); $false } catch { $true } }).Count -eq 0)
@@ -92,6 +94,13 @@ Assert 'combat.pass' ($r.Measured -eq 'PASS' -and $r.Windows -eq 18 -and $r.FpsM
 $r294 = Test-MetinARCombatFps -Lines (New-Timeline -fps 29.4) -Target $target
 Assert 'combat.median-29.4-fails' ($r294.Measured -eq 'FAIL' -and @($r294.Checks | Where-Object { $_.Status -eq 'FAIL' }).Count -eq 1) "m=$($r294.Measured)"
 Assert 'combat.median-29.5-passes' ((Test-MetinARCombatFps -Lines (New-Timeline -fps 29.5) -Target $target).Measured -eq 'PASS')
+# review #100 point 3: frame p50 median <= 33.9 ms (1000/29.5); 34.0 and the old 34.5 fail on p50 alone
+foreach ($p50 in @('33.9', '34.0', '34.5')) {
+    $rp = Test-MetinARCombatFps -Lines @($tl | ForEach-Object { $_ -replace 'frameP50Ms=33\.3', ('frameP50Ms=' + $p50) }) -Target $target
+    $want = if ($p50 -eq '33.9') { 'PASS' } else { 'FAIL' }
+    Assert ("combat.p50-{0}-{1}" -f $p50, $want.ToLowerInvariant()) ($rp.Measured -eq $want -and @($rp.Checks | Where-Object { $_.Status -eq 'FAIL' }).Count -eq $(if ($want -eq 'FAIL') { 1 } else { 0 })) "m=$($rp.Measured)"
+}
+Assert 'budgets.p50-consistent-with-fps-median' ([Math]::Abs(1000 / [double]$target.minFpsMedian - [double]$target.maxFrameP50MedianMs) -lt 0.05)
 # decision 3: exactly `[Combo] step=N` (N >= 1, case-sensitive); anything else is not combo evidence
 foreach ($bad in @('[Combo] step=', '[Combo] step=x', '[combo] step=1', '[Combo] stepped=1', '[Combo]step=1', '[Combo] step=0', '[COMBO] step=2')) {
     $rb = Test-MetinARCombatFps -Lines (New-Timeline -ComboText $bad) -Target $target
@@ -128,6 +137,13 @@ Assert 'pss.too-few-no-data' ($m4.Measured -eq 'NO DATA')
 $ev = Get-MetinARStepLogEvidence -Steps @($steps) -Lines $tl
 Assert 'steps.hint-A97' (($ev | Where-Object { [string]$_.id -ceq 'A97' }).logLines -eq 36)
 Assert 'steps.hints' ($ev.Count -eq 23 -and ($ev | Where-Object { $_.id -eq 11 }).logLines -eq 18 -and $null -eq ($ev | Where-Object { $_.id -eq 2 }).logLines -and ($ev | Where-Object { $_.id -eq 14 }).logLines -eq 0)
+
+# review #100 point 4: logcat buffer kept by default, lines before the launch dropped on the host by device time
+Assert 'logcat.device-date' ((ConvertFrom-MetinARDeviceDate @('10-20_04:29:58')) -eq '10-20 04:29:58.000' -and $null -eq (ConvertFrom-MetinARDeviceDate @('date: bad format')) -and $null -eq (ConvertFrom-MetinARDeviceDate @()))
+$since = Select-MetinARLogcatSince -Lines @('--------- beginning of main', '10-20 04:10:00.000  3999  3999 E AndroidRuntime: FATAL EXCEPTION: main', '10-20 04:29:58.000  1 1 I x: at', '10-20 04:30:01.000  1 1 I x: after') -Since '10-20 04:29:58.000'
+Assert 'logcat.since-drops-older' ($since.Count -eq 3 -and ($since -join "`n") -notmatch '3999' -and $since[0] -match 'beginning')
+Assert 'logcat.since-empty-keeps-all' ((Select-MetinARLogcatSince -Lines @('10-20 04:10:00.000  1 1 I x: a', 'b') -Since '').Count -eq 2)
+Assert 'collector.logcat-clear-only-behind-switch' ($collectorText -match '\[switch\]\$ClearLogcat' -and ([regex]::Matches($collectorText, "logcat '-c'")).Count -eq 1 -and $collectorText -match "if \(\`$ClearLogcat\) \{\s*#[^\n]*\n\s*Adb logcat '-c'" -and $collectorText -match 'RISK: it wipes the whole device log buffer')
 
 # ETAP I closing verdict: 22 steps AND A97 required (lead decision 04:43, no manual side entry)
 function New-StepResults([string]$verdict = 'UNVERIFIED', [string]$a97Verdict = $verdict, [switch]$NoA97Video, [switch]$DropA97) {
@@ -194,14 +210,25 @@ if ($isWin) {
             ($fps.measured -eq 'PASS') -and ($fps.data.Windows -eq 18) -and (@($s.steps22).Count -eq 22) -and (@($s.steps).Count -eq 23) -and (@($s.steps | Where-Object { $_.verdict -ne 'UNVERIFIED' }).Count -eq 0) -and
             ([string]$s.stepA97.id -ceq 'A97') -and ($s.stepA97.criterion -ceq $a97.criterion) -and ($s.stepA97.mandatory -eq $true) -and ($s.stepA97.logHint -match '^38 log line') -and
             ($s.stageClosure.verdict -eq 'NOT CLOSED') -and ($s.stageClosure.requiredCount -eq 23) -and (@($s.stageClosure.required) -contains 'A97') -and ($s.stageClosure.a97 -eq 'UNVERIFIED') -and
-            ($md -match 'Zamkniecie ETAPU I') -and ($md -match '\| A97 \|') -and ($md -match 'NOT CLOSED') -and ($md.Contains([string]$a97.criterion)) -and
+            ($md -match 'Zamkniecie ETAPU I') -and ($md -match 'nie czyszczony \(domyslnie\)') -and ($md -match '\| A97 \|') -and ($md -match 'NOT CLOSED') -and ($md.Contains([string]$a97.criterion)) -and
             ((ItemOf $s 'Crash').measured -eq 'PASS') -and ((ItemOf $s 'ColdLaunch').detail -match 'TotalTime=2345')
         $filtered = Get-Content -Raw (Join-Path $d 'logcat-filtered.txt')
-        $okLog = ([regex]::Matches($filtered, 'scene=ArEncounterPrototype').Count -eq 30) -and ($filtered -match '\[Combo\] step=') -and (Test-Path (Join-Path $d 'logcat-full-redacted.txt')) -and (@(Get-Content (Join-Path $d 'samples.jsonl')).Count -eq 1)
+        $okLogcat = ($m.settings.clearLogcat -eq $false) -and ($m.logcat.cleared -eq $false) -and ($m.logcat.sinceDeviceTime -eq '10-20 04:29:58.000') -and ($m.logcat.droppedOlderLines -eq 2) -and
+            -not (Test-Path (Join-Path (Split-Path $d) 'state.cleared')) -and ((Get-Content -Raw (Join-Path $d 'logcat-full-redacted.txt')) -notmatch 'PID: 3999')
+        $okLog = $okLogcat -and ([regex]::Matches($filtered, 'scene=ArEncounterPrototype').Count -eq 30) -and ($filtered -match '\[Combo\] step=') -and (Test-Path (Join-Path $d 'logcat-full-redacted.txt')) -and (@(Get-Content (Join-Path $d 'samples.jsonl')).Count -eq 1)
         $okPrivacy = ($all -notmatch 'FAKESERIAL123') -and ($all -notmatch '52\.2297') -and ($all -notmatch '21\.0117')
         if (-not ($okManifest -and $okSummary -and $okLog -and $okPrivacy)) { Write-Host "manifest=$okManifest summary=$okSummary log=$okLog privacy=$okPrivacy fps=$($fps.measured)/$($fps.detail)" }
         $okManifest -and $okSummary -and $okLog -and $okPrivacy
     } | Out-Null
+    # -ClearLogcat: `adb logcat -c` is sent before the launch (fake records it), no time filter, the earlier crash is gone
+    RunSession 'session' 0 {
+        param($d)
+        $m = J $d 'session-manifest.json'; $s = J $d 'session-summary.json'
+        $md = Get-Content -Raw -Encoding UTF8 (Join-Path $d 'session-summary.md')
+        ($m.settings.clearLogcat -eq $true) -and ($m.logcat.cleared -eq $true) -and ($null -eq $m.logcat.sinceDeviceTime) -and ($m.logcat.droppedOlderLines -eq 0) -and
+            (Test-Path (Join-Path (Split-Path $d) 'state.cleared')) -and ((ItemOf $s 'Crash').measured -eq 'PASS') -and ($md -match 'wyczyszczony \(-ClearLogcat\)') -and
+            ((Get-Content -Raw (Join-Path $d 'logcat-full-redacted.txt')) -notmatch 'PID: 3999')
+    } @('-SkipInstall', '-ClearLogcat') 'session-clearlogcat' | Out-Null
     RunSession 'sessionlow' 1 { param($d) $s = J $d 'session-summary.json'; ((ItemOf $s 'CombatFps30').measured -eq 'FAIL') -and $s.verdict -eq 'UNVERIFIED' -and $s.measuredOverall -eq 'FAIL' } | Out-Null
     RunSession 'sessionnocombo' 0 { param($d) $s = J $d 'session-summary.json'; $f = ItemOf $s 'CombatFps30'; ($f.measured -eq 'NO DATA') -and ($f.detail -match '#82') -and $s.measuredOverall -eq 'NO DATA' } | Out-Null
     RunSession 'adblost' 3 { param($d) $m = J $d 'session-manifest.json'; $s = J $d 'session-summary.json'; ($m.adb.lost -match "before 'Sample 1'") -and $s.verdict -eq 'UNVERIFIED' -and $s.measuredOverall -eq 'FAIL' -and ((AllText $d) -notmatch 'FAKESERIAL123') } | Out-Null
