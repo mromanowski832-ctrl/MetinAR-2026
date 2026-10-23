@@ -128,10 +128,19 @@ public static class SaveGameRules
         return character.ClampVitals(initial);
     }
 
-    /// <summary>Drop loot-stash entries whose <c>expiresAtUtc</c> is at or before <paramref name="now"/> (expired loot is lost).</summary>
-    public static SaveGameDocument PruneExpiredStash(SaveGameDocument document, DateTimeOffset now)
+    /// <summary>
+    /// Apply the configured after-24 h behaviour. <see cref="LootStashAfterExpiry.Keep"/> (default) returns the document
+    /// unchanged; <see cref="LootStashAfterExpiry.Expire"/> drops entries whose <c>expiresAtUtc</c> is at or before
+    /// <paramref name="now"/>.
+    /// </summary>
+    public static SaveGameDocument PruneExpiredStash(SaveGameDocument document, DateTimeOffset now, LootStashAfterExpiry afterExpiry)
     {
         ArgumentNullException.ThrowIfNull(document);
+        if (afterExpiry != LootStashAfterExpiry.Expire)
+        {
+            return document;
+        }
+
         SaveLootStash stash = document.Inventory.LootStash;
         if (stash.Stacks.All(s => s.ExpiresAtUtc > now) && stash.Items.All(i => i.ExpiresAtUtc > now))
         {

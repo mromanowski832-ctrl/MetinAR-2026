@@ -85,7 +85,7 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["stacks", "items"],
-          "description": "Loot that did not fit the bag (ITEMS_COMBAT_SPEC §5 'skrytka łupu', 8 places, 24 h). stacks + items together hold at most 8 entries; each entry expires at expiresAtUtc and expired loot is lost. Only the server adds entries; a client may only take whole entries out (into the bag).",
+          "description": "Loot that did not fit the bag (ITEMS_COMBAT_SPEC §5 'skrytka łupu', 8 places, 24 h). stacks + items together hold at most 8 entries; each entry carries expiresAtUtc (+24 h); what happens after it is a server setting (LootStash:AfterExpiry keep|expire, default keep = the entry stays) while the owner decision is open (ITEMS_COMBAT_SPEC L116). Only the server adds entries; a client may only take whole entries out (into the bag).",
           "properties": {
             "stacks": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/stashStack" } },
             "items": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/stashItem" } }

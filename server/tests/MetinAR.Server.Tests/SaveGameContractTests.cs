@@ -100,6 +100,7 @@ public class SaveGameContractTests
         Assert.Equal(SaveGameRules.LootStashSlots, (int)stash["stacks"]!["maxItems"]!);
         Assert.Equal(SaveGameRules.LootStashSlots, (int)stash["items"]!["maxItems"]!);
         Assert.Equal(TimeSpan.FromHours(24), SaveGameRules.LootStashLifetime);
+        Assert.Equal(LootStashAfterExpiry.Keep, new LootStashOptions().AfterExpiry); // §11.7: OPEN, default never lost
     }
 
     /// <summary>CharacterRules.Classes is a hand copy of CHARACTER_PROGRESSION §1.2; fail when the markdown changes.</summary>
@@ -133,8 +134,13 @@ public class SaveGameContractTests
 
         Assert.Equal(SaveGameRules.ClassIds.Count, found);
         Assert.Contains(lines, l => l.Contains("**2 wolne punkty**", StringComparison.Ordinal));
-        Assert.Contains(lines, l => l.Contains("`60 + L × hpPerLevel(klasa) + Vigor × 6 + przedmioty`", StringComparison.Ordinal));
-        Assert.Contains(lines, l => l.Contains("`20 + L × mpPerLevel(klasa) + Spirit × 5 + przedmioty`", StringComparison.Ordinal));
+        // PROPOZYCJA_DOC: the default VitalsFormula coefficients are the doc's "propozycja" values (L37–L41).
+        VitalsFormula f = new();
+        Assert.Contains(lines, l => l.Contains($"`{f.BaseHp} + L × hpPerLevel(klasa) + Vigor × {f.HpPerVigor} + przedmioty`", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.Contains($"`{f.BaseMp} + L × mpPerLevel(klasa) + Spirit × {f.MpPerSpirit} + przedmioty`", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.Contains("Formuła (propozycja)", StringComparison.Ordinal));
+        Assert.StartsWith("PROPOZYCJA_DOC", VitalsFormula.PropozycjaDoc, StringComparison.Ordinal);
+        Assert.Throws<ArgumentException>(() => CharacterRules.LoadEmbedded(Catalog, new VitalsFormula { BaseHp = 0 }));
     }
 
     [Fact]
@@ -146,6 +152,9 @@ public class SaveGameContractTests
         Assert.Equal(1, Catalog.Find("starter_sword")!.StackLimit);
         Assert.Null(Catalog.Find("no_such_item"));
         Assert.All(SaveGameRules.ClassIds, c => Assert.Equal(20, Catalog.Find("treatise_proficiency_" + c)!.StackLimit));
+        // K10 (shop table "consumable" vs skill_tier_items.csv): no save rule may depend on which version wins.
+        Assert.All(SaveGameRules.ClassIds, c => Assert.DoesNotContain(
+            Catalog.Find("treatise_proficiency_" + c)!.Category, new[] { ItemCatalog.CategoryEquipment, ItemCatalog.CategoryMaterial }));
 
         const string ItemsHeader = "itemId,namePl,category,slot,itemType,itemLevel,rarity,stack,baseStats,requiredClass,source,asset\n";
         const string ShopHeader = "itemId,namePl,category,itemLevel,rarity,stack,buyPrice,sellToNpcPrice,effect\n";

@@ -287,6 +287,30 @@ public class SaveGameApiTests
     }
 
     [Fact]
+    public async Task Put_HpAndMpClamp_UsesTheConfiguredVitalsFormula()
+    {
+        using var factory = new MetinArServerFactory(settings: new Dictionary<string, string>
+        {
+            ["VitalsFormula:BaseHp"] = "100",
+            ["VitalsFormula:HpPerVigor"] = "10",
+            ["VitalsFormula:BaseMp"] = "30",
+            ["VitalsFormula:MpPerSpirit"] = "1",
+        });
+        using HttpClient client = await factory.CreateClient().WithPlayerAsync("save-p23");
+        (string etag, JsonObject save) = await client.GetSaveAsync("save-p23");
+        save["character"]!["hpCurrent"] = 9999;
+        save["character"]!["mpCurrent"] = 9999;
+
+        HttpResponseMessage put = await client.PutSaveAsync("save-p23", save, etag);
+        string text = await put.Content.ReadAsStringAsync();
+
+        Assert.True(put.StatusCode == HttpStatusCode.OK, text);
+        // Warrior level 1: 100 + 1×14 + Krzepa 5×10 = 164 HP; 30 + 1×4 + Duch 2×1 = 36 MP.
+        Assert.Equal(164, (int)JsonNode.Parse(text)!["saveGame"]!["character"]!["hpCurrent"]!);
+        Assert.Equal(36, (int)JsonNode.Parse(text)!["saveGame"]!["character"]!["mpCurrent"]!);
+    }
+
+    [Fact]
     public async Task Put_CapacityStackLimitAndCatalogViolations_Return400()
     {
         using var factory = new MetinArServerFactory();

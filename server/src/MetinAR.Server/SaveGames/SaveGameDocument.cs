@@ -130,7 +130,7 @@ public sealed record SaveInventory
 
 /// <summary>
 /// Overflow for loot that did not fit the bag (ITEMS_COMBAT_SPEC §5: 8 places, 24 h). Every entry takes one place and
-/// expires at <c>expiresAtUtc</c>; expired loot is lost (#71 decision 7). Only the server adds entries.
+/// expires at <c>expiresAtUtc</c>; what happens after that is configurable (<see cref="LootStashOptions"/>, default keep; #71 §11.7, owner decision open). Only the server adds entries.
 /// </summary>
 public sealed record SaveLootStash
 {

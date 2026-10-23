@@ -45,7 +45,7 @@ Windows (PowerShell): same commands; delete the data folder with `Remove-Item -R
 cd server
 dotnet build MetinAR.Server.sln -c Release                 # warnings are errors
 dotnet format MetinAR.Server.sln --verify-no-changes        # style/lint
-dotnet test  MetinAR.Server.sln -c Release                  # 150 tests, no network
+dotnet test  MetinAR.Server.sln -c Release                  # 153 tests, no network
 dotnet list  MetinAR.Server.sln package --vulnerable --include-transitive
 ./scripts/smoke-local.sh                                    # Linux/macOS/WSL/Git Bash: real process + restart
 ```
@@ -73,7 +73,7 @@ SaveGame contract, local file format, placeholders and the settled questions (§
 Schema: [`docs/contracts/savegame.v1.schema.json`](../docs/contracts/savegame.v1.schema.json). Prototype reward caps and
 defaults are in the `SaveGameLimits` / `PrototypeSaveGameDefaults` sections of `appsettings.json` (placeholders, not balance).
 The server also embeds the item tables from `docs/design/tables/` (catalog, stack limits, HP/MP max); bag 24–56,
-loot stash 8 entries / 24 h (expired loot is lost), HP/MP clamped to the class max, +2 stat / +1 skill point per level.
+loot stash 8 entries / 24 h (after 24 h: `LootStash:AfterExpiry`, default `Keep` = nothing is lost; owner decision open), HP/MP clamped to the class max, +2 stat / +1 skill point per level.
 
 Encounter authority limits (distance, accuracy, fix age, TTL) live in the `EncounterRules` section of `appsettings.json`.
 **They are prototype values** (owner decision D3/Q3, [#33](https://github.com/mromanowski832-ctrl/MetinAR-2026/issues/33#issuecomment-6316048203)): technical anti-abuse / GPS-noise

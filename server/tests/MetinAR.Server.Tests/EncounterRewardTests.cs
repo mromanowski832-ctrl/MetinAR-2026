@@ -186,10 +186,15 @@ public class EncounterRewardTests
         Assert.Equal([0, 1], stacks.Select(n => (int)n!["slotIndex"]!));
     }
 
-    [Fact]
-    public async Task Reward_WhenBagIsFull_GoesToTheLootStashFor24Hours_ThenIsLost()
+    // After-24 h behaviour is OPEN for the owner (#71 §11.7, ITEMS_COMBAT_SPEC L116). Default config = Keep: never lost.
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("Keep", false)]
+    [InlineData("Expire", true)]
+    public async Task Reward_WhenBagIsFull_GoesToTheLootStash_AfterExpiryFollowsTheConfiguredBehaviour(string? afterExpiry, bool lostAfter24Hours)
     {
-        using var factory = new MetinArServerFactory();
+        Dictionary<string, string> settings = afterExpiry is null ? [] : new() { ["LootStash:AfterExpiry"] = afterExpiry };
+        using var factory = new MetinArServerFactory(settings: settings);
         using HttpClient client = await factory.CreateClient().WithPlayerAsync("rw-p7");
         await SeedSaveAsync(factory, client, "rw-p7", FullBag);
         (string id, string nonce) = await client.CompletedEncounterAsync("rw-p7", "seed-mob-0001");
@@ -216,12 +221,18 @@ public class EncounterRewardTests
         Assert.Equal(4, CountStash((await client.GetSaveAsync("rw-p7")).SaveGame));
 
         factory.Clock.Advance(TimeSpan.FromHours(1));
-        (string etag, JsonObject expired) = await client.GetSaveAsync("rw-p7");
-        Assert.Equal(0, CountStash(expired));
+        (string etag, JsonObject after) = await client.GetSaveAsync("rw-p7");
+        Assert.Equal(lostAfter24Hours ? 0 : 4, CountStash(after));
 
-        // The next write stores the pruned stash; the client sending the GET view back is not a stash change.
-        HttpResponseMessage put = await client.PutSaveAsync("rw-p7", expired, etag);
+        // The client sending the GET view back is not a stash change; with Expire the next write stores the pruned stash.
+        HttpResponseMessage put = await client.PutSaveAsync("rw-p7", after, etag);
         Assert.True(put.StatusCode == HttpStatusCode.OK, await put.Content.ReadAsStringAsync());
+
+        factory.Clock.Advance(TimeSpan.FromDays(30));
+        (_, JsonObject later) = await client.GetSaveAsync("rw-p7");
+        Assert.Equal(lostAfter24Hours ? 0 : 4, CountStash(later));
+        SaveGameDocument stored = (await factory.Services.GetRequiredService<ISaveGameStore>().GetAsync("rw-p7", default))!.Document;
+        Assert.Equal(lostAfter24Hours ? 0 : 4, stored.Inventory.LootStash.Stacks.Count + stored.Inventory.LootStash.Items.Count);
     }
 
     [Fact]

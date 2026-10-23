@@ -13,6 +13,35 @@ public sealed record ClassDefinition(
     int MpPerLevel);
 
 /// <summary>
+/// PROPOZYCJA_DOC — coefficients of the MaxHp/MaxMp formulas (CHARACTER_PROGRESSION L37–L41, header "Formuła
+/// (propozycja)"). Stage I working values, not approved balance; override via the <c>VitalsFormula</c> configuration
+/// section. Per-class <c>hpPerLevel</c>/<c>mpPerLevel</c> come from the class table (CHARACTER_PROGRESSION §1.2).
+/// </summary>
+public sealed class VitalsFormula
+{
+    public const string SectionName = "VitalsFormula";
+
+    /// <summary>Marker for code that uses a formula the design doc labels "propozycja".</summary>
+    public const string PropozycjaDoc = "PROPOZYCJA_DOC: CHARACTER_PROGRESSION L37-L41 (MaxHp/MaxMp), Stage I working values";
+
+    public int BaseHp { get; set; } = 60;
+
+    public int HpPerVigor { get; set; } = 6;
+
+    public int BaseMp { get; set; } = 20;
+
+    public int MpPerSpirit { get; set; } = 5;
+
+    public IEnumerable<string> Validate()
+    {
+        if (BaseHp < 1 || BaseMp < 0 || HpPerVigor < 0 || MpPerSpirit < 0)
+        {
+            yield return "VitalsFormula: BaseHp must be >= 1; BaseMp, HpPerVigor and MpPerSpirit must be >= 0.";
+        }
+    }
+}
+
+/// <summary>
 /// Server-side character rules from CHARACTER_PROGRESSION (#71 decisions 3 and 6): level-up point grants and the
 /// max HP/MP clamp. The class table mirrors CHARACTER_PROGRESSION §1.2 (no machine-readable copy exists; a test parses
 /// the markdown table and fails on drift). Item bonuses use the item catalog, rarity_tiers.csv and temper_levels.csv.
@@ -51,9 +80,17 @@ public sealed class CharacterRules
     private readonly IReadOnlyDictionary<string, double> _rarityMultiplier;
     private readonly IReadOnlyDictionary<int, int> _temperBonusPct;
 
-    public CharacterRules(ItemCatalog catalog, IReadOnlyDictionary<string, double> rarityMultiplier, IReadOnlyDictionary<int, int> temperBonusPct)
+    public CharacterRules(ItemCatalog catalog, IReadOnlyDictionary<string, double> rarityMultiplier, IReadOnlyDictionary<int, int> temperBonusPct,
+        VitalsFormula? formula = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
+        Formula = formula ?? new VitalsFormula();
+        string? invalid = Formula.Validate().FirstOrDefault();
+        if (invalid is not null)
+        {
+            throw new ArgumentException(invalid, nameof(formula));
+        }
+
         ArgumentNullException.ThrowIfNull(rarityMultiplier);
         ArgumentNullException.ThrowIfNull(temperBonusPct);
         Catalog = catalog;
@@ -62,6 +99,9 @@ public sealed class CharacterRules
     }
 
     public ItemCatalog Catalog { get; }
+
+    /// <summary>PROPOZYCJA_DOC coefficients (see <see cref="VitalsFormula"/>).</summary>
+    public VitalsFormula Formula { get; }
 
     public static ClassDefinition Class(string classId) =>
         Classes.FirstOrDefault(c => c.Id == classId) ?? throw new ArgumentException($"Unknown class '{classId}'.", nameof(classId));
@@ -82,22 +122,28 @@ public sealed class CharacterRules
         };
     }
 
-    /// <summary><c>MaxHp = 60 + L × hpPerLevel + Vigor × 6 + przedmioty</c> (CHARACTER_PROGRESSION §1.3).</summary>
+    /// <summary>
+    /// <c>MaxHp = 60 + L × hpPerLevel + Vigor × 6 + przedmioty</c> (CHARACTER_PROGRESSION §1.3).
+    /// PROPOZYCJA_DOC: 60 and 6 are <see cref="VitalsFormula.BaseHp"/> / <see cref="VitalsFormula.HpPerVigor"/>.
+    /// </summary>
     public int MaxHp(SaveGameDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
         SaveCharacter ch = document.Character;
         SavePrimaryStats totals = Totals(ch.ClassId, ch.Level, document.Stats.Allocated);
-        return checked(60 + (ch.Level * Class(ch.ClassId).HpPerLevel) + (totals.Vigor * 6) + ItemBonus(document, true));
+        return checked(Formula.BaseHp + (ch.Level * Class(ch.ClassId).HpPerLevel) + (totals.Vigor * Formula.HpPerVigor) + ItemBonus(document, true));
     }
 
-    /// <summary><c>MaxMp = 20 + L × mpPerLevel + Spirit × 5 + przedmioty</c> (CHARACTER_PROGRESSION §1.3).</summary>
+    /// <summary>
+    /// <c>MaxMp = 20 + L × mpPerLevel + Spirit × 5 + przedmioty</c> (CHARACTER_PROGRESSION §1.3).
+    /// PROPOZYCJA_DOC: 20 and 5 are <see cref="VitalsFormula.BaseMp"/> / <see cref="VitalsFormula.MpPerSpirit"/>.
+    /// </summary>
     public int MaxMp(SaveGameDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
         SaveCharacter ch = document.Character;
         SavePrimaryStats totals = Totals(ch.ClassId, ch.Level, document.Stats.Allocated);
-        return checked(20 + (ch.Level * Class(ch.ClassId).MpPerLevel) + (totals.Spirit * 5) + ItemBonus(document, false));
+        return checked(Formula.BaseMp + (ch.Level * Class(ch.ClassId).MpPerLevel) + (totals.Spirit * Formula.MpPerSpirit) + ItemBonus(document, false));
     }
 
     /// <summary>Clamp current HP/MP to [0, max]. Never heals: a value below max is kept.</summary>
@@ -134,7 +180,7 @@ public sealed class CharacterRules
         return total;
     }
 
-    public static CharacterRules LoadEmbedded(ItemCatalog catalog)
+    public static CharacterRules LoadEmbedded(ItemCatalog catalog, VitalsFormula? formula = null)
     {
         static string Read(string resource)
         {
@@ -144,10 +190,10 @@ public sealed class CharacterRules
             return reader.ReadToEnd();
         }
 
-        return Parse(catalog, Read(RarityResourceName), Read(TemperResourceName));
+        return Parse(catalog, Read(RarityResourceName), Read(TemperResourceName), formula);
     }
 
-    public static CharacterRules Parse(ItemCatalog catalog, string rarityCsv, string temperCsv)
+    public static CharacterRules Parse(ItemCatalog catalog, string rarityCsv, string temperCsv, VitalsFormula? formula = null)
     {
         var rarity = new Dictionary<string, double>(StringComparer.Ordinal);
         foreach (string[] row in Rows(rarityCsv, "rarityId", "baseStatMultiplier"))
@@ -169,7 +215,7 @@ public sealed class CharacterRules
             }
         }
 
-        return new CharacterRules(catalog, rarity, temper);
+        return new CharacterRules(catalog, rarity, temper, formula);
     }
 
     private static IEnumerable<string[]> Rows(string csv, string keyColumn, string valueColumn)

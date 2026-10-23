@@ -55,7 +55,8 @@ public static partial class Endpoints
 
     internal static async Task<IResult> GetSaveGameAsync(
         HttpContext http, string playerId, IPlayerStore players, ISaveGameStore saves, ExpCurveTable curve, CharacterRules character,
-        IOptions<PrototypeSaveGameDefaults> defaults, TimeProvider time, ILoggerFactory loggers, CancellationToken ct)
+        IOptions<PrototypeSaveGameDefaults> defaults, IOptions<LootStashOptions> stashOptions, TimeProvider time, ILoggerFactory loggers,
+        CancellationToken ct)
     {
         if (!Validation.IsValidId(playerId))
         {
@@ -76,16 +77,18 @@ public static partial class Endpoints
             return failure;
         }
 
-        // Expired loot-stash entries are lost (#71 decision 7): filtered on read, dropped from storage on the next write.
+        // After-24 h stash behaviour is configurable (#71 §11.7, OPEN for the owner). Default Keep: nothing is removed.
+        // With Expire, expired entries are filtered on read and dropped from storage on the next write.
         SaveGameDocument document = SaveGameRules.PruneExpiredStash(
-            stored?.Document ?? SaveGameRules.CreateInitial(profile, defaults.Value, curve, character), UtcTimestamp.Normalize(time.GetUtcNow()));
+            stored?.Document ?? SaveGameRules.CreateInitial(profile, defaults.Value, curve, character), UtcTimestamp.Normalize(time.GetUtcNow()),
+            stashOptions.Value.AfterExpiry);
         return SaveGameOk(http, document, time);
     }
 
     internal static async Task<IResult> PutSaveGameAsync(
         HttpContext http, string playerId, IPlayerStore players, ISaveGameStore saves, ExpCurveTable curve, CharacterRules character,
         SaveGameMigrator migrator, IOptions<PrototypeSaveGameDefaults> defaults, IOptions<SaveGameLimits> limits,
-        TimeProvider time, ILoggerFactory loggers, CancellationToken ct)
+        IOptions<LootStashOptions> stashOptions, TimeProvider time, ILoggerFactory loggers, CancellationToken ct)
     {
         var errors = new ValidationErrors();
         Validation.Id(errors, "playerId", playerId);
@@ -158,15 +161,16 @@ public static partial class Endpoints
         }
 
         DateTimeOffset now = UtcTimestamp.Normalize(time.GetUtcNow());
+        LootStashAfterExpiry afterExpiry = stashOptions.Value.AfterExpiry;
         SaveGameDocument current = SaveGameRules.PruneExpiredStash(
-            stored?.Document ?? SaveGameRules.CreateInitial(profile, defaults.Value, curve, character), now);
+            stored?.Document ?? SaveGameRules.CreateInitial(profile, defaults.Value, curve, character), now, afterExpiry);
         if (current.Revision != expectedRevision)
         {
             return RevisionConflict(http, current.Revision);
         }
 
-        // Both sides are pruned at the same instant, so loot that expired while the client was offline is gone from both.
-        incoming = SaveGameRules.PruneExpiredStash(incoming, now);
+        // With Expire, both sides are pruned at the same instant, so loot that expired while the client was offline is gone from both.
+        incoming = SaveGameRules.PruneExpiredStash(incoming, now, afterExpiry);
         IReadOnlyList<string> changed = SaveGameRules.ServerOwnedChanges(current, incoming);
         if (changed.Count > 0)
         {
@@ -185,9 +189,10 @@ public static partial class Endpoints
     internal static async Task<IResult> ClaimEncounterRewardAsync(
         HttpContext http, ClaimEncounterRewardRequest? body, IEncounterStore encounters, IPlayerStore players, ISaveGameStore saves,
         ExpCurveTable curve, CharacterRules character, IOptions<PrototypeSaveGameDefaults> defaults, IOptions<SaveGameLimits> limitOptions,
-        TimeProvider time, ILoggerFactory loggers, CancellationToken ct)
+        IOptions<LootStashOptions> stashOptions, TimeProvider time, ILoggerFactory loggers, CancellationToken ct)
     {
         SaveGameLimits limits = limitOptions.Value;
+        LootStashAfterExpiry afterExpiry = stashOptions.Value.AfterExpiry;
         var errors = new ValidationErrors();
         var overCaps = new ValidationErrors();
         RewardClaim? claim = null;
@@ -261,7 +266,7 @@ public static partial class Endpoints
         {
             result = await saves.ApplyRewardAsync(
                 encounter.Id, encounter.PlayerId, claimJson, initial,
-                (document, nextRevision) => SaveGameRules.ApplyReward(SaveGameRules.PruneExpiredStash(document, now), claim!, encounter,
+                (document, nextRevision) => SaveGameRules.ApplyReward(SaveGameRules.PruneExpiredStash(document, now, afterExpiry), claim!, encounter,
                     nextRevision, now, curve, character, limits.MaxEncounterResultsInDocument, Guid.NewGuid),
                 now, ct).ConfigureAwait(false);
         }

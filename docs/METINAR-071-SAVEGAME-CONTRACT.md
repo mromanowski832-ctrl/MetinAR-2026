@@ -45,9 +45,9 @@ them (§11.12) still waits for the owner's consent to a `.github/` change.
 | `stats.*` | server | Allocated primary stats and free points. Each level-up grants **2** free stat points (§11.3). There is no allocation endpoint yet (S6), so the client cannot spend them today. |
 | `skills.freeSkillPoints`, `skills.progress[]` | server | Rank model per `classes_skills.json` (PROPOSAL #40). Each level-up grants **1** free skill point (§11.3). |
 | `skills.loadout` | client | Attack/aura/slot1/slot2 skill ids. |
-| `inventory.capacity` | server | `24`, `32`, `40`, `48` or `56`: 24 at start, Sakwa +8, max 56 ([ITEMS_COMBAT_SPEC §5](design/ITEMS_COMBAT_SPEC.md#L113), Q17). |
+| `inventory.capacity` | server | `24`, `32`, `40`, `48` or `56`: 24 at start, Sakwa +8, max 56 = the **bag** maximum ([ITEMS_COMBAT_SPEC.md#L113](design/ITEMS_COMBAT_SPEC.md#L113) to L114, Q17). |
 | `inventory.stacks[]`, `items[]` | client places / server owns contents | Unique `slotIndex` < capacity. `definitionId` must be in the item catalog (below). A stack must be a stackable item, with quantity 1…its stack limit (e.g. 50 consumables, 99 materials, 20 smith oil). An item instance must be a non-stacking item. Materials are ordinary stacks here (§11.4). |
-| `inventory.lootStash` | server adds, client may take out | Loot that did not fit the bag: **at most 8 entries** (stacks + items together), each with `expiresAtUtc` = grant time + **24 h**. Expired entries are **lost** (§11.7). A client may move whole entries into the bag but never add or change one (`409`, field `inventory.lootStash`). |
+| `inventory.lootStash` | server adds, client may take out | Loot that did not fit the bag: **at most 8 entries** (stacks + items together), each with `expiresAtUtc` = grant time + **24 h**. What happens after 24 h is **OPEN** (owner, §11.7): server setting `LootStash:AfterExpiry` = `Keep` (default, the entry stays and is never lost) or `Expire` (the entry is removed). A client may move whole entries into the bag but never add or change one (`409`, field `inventory.lootStash`). |
 | `equipment[]` | client places / server owns contents | Unique `slot`. |
 | item instance `instanceId` | server | Lowercase UUID, unique across bag, stash and equipment. Moving an item is allowed; changing its `definitionId`/level/rarity/temper/affixes is not. `locked` is client-owned. |
 | `currency.talers` | server | |
@@ -144,7 +144,8 @@ Requires `If-Match: "<revision>"` (strong ETag from the last GET/PUT/reward). Th
 5. `mode: "local"` → `422 SAVEGAME_LOCAL_MODE_NOT_SYNCABLE` (local import is #39, an owner decision).
 6. Compares with the stored revision → `412 SAVEGAME_REVISION_CONFLICT` with `currentRevision`. A missing If-Match
    → `428 SAVEGAME_PRECONDITION_REQUIRED`.
-7. Drops expired stash entries from both the stored and the incoming document (same server time), then compares
+7. Only with `LootStash:AfterExpiry = Expire`: drops expired stash entries from both the stored and the incoming
+   document (same server time). With the default `Keep` nothing is dropped. Then compares
    server-owned values → `409 SAVEGAME_SERVER_OWNED_FIELD_CHANGED` with `fields`, e.g.
    `["character.totalExp","currency","items","inventory.lootStash"]`.
 8. Clamps `hpCurrent`/`mpCurrent` to the max (§11.6), then stores it with compare-and-set in one SQLite
@@ -178,7 +179,8 @@ ledger row:
 - Stacks, then materials (both are inventory stacks, §11.4): top up bag stacks of the same item to its stack limit,
   then fill the lowest free slots in stacks of at most the limit, then go to the loot stash.
 - Items get server-minted UUIDs and go to the lowest free slot, else the loot stash.
-- A new stash entry expires 24 h after the grant. Expired entries are removed first.
+- A new stash entry gets `expiresAtUtc` = grant + 24 h. Expired entries are removed first **only** with
+  `LootStash:AfterExpiry = Expire`; with the default `Keep` they stay and count toward the 8 places (§11.7).
 - HP/MP are clamped to the new max (a level-up does not heal).
 - An `encounterResults` entry (`source: server`, `status: applied`) is appended.
 
@@ -262,13 +264,14 @@ What the client needs to do for #71 acceptance (the server side is ready to be u
 6. Do not call `PUT savegame` with a local save. It is refused by design; v1 has no local→server import (§11.1).
 7. Mirror the server rules in local mode: bag capacity 24 (+8 per Sakwa, max 56); stack limits from the item tables;
    materials as ordinary bag stacks; overflow to an 8-entry loot stash with `expiresAtUtc` = +24 h, and expired
-   entries removed on load; +2 stat and +1 skill point per level-up; HP/MP clamped to the class max
+   entries **kept** (default; removed on load only if the server setting is `Expire`, §11.7); +2 stat and +1 skill point per level-up; HP/MP clamped to the class max
    (CHARACTER_PROGRESSION §1.2/§1.3).
 
 ## 11. Settled questions
 
-All twelve questions from the first version of this contract were settled by the **production lead** on 2026-10-23.
-They are **not owner decisions**. Each entry gives the source and the spec lines it relies on. Line links point to
+The twelve questions from the first version of this contract were settled by the **production lead** on 2026-10-23
+04:31, with corrections at 04:47. They are **not owner decisions**. One part is open again: the loot stash after 24 h
+(item 7, **OTWARTE (właściciel)**); item 13 (K10) is new and also waits for the owner. Each entry gives the source and the spec lines it relies on. Line links point to
 `docs/design/` as of this branch.
 
 1. **Local → server import.** **ROZSTRZYGNIĘTE** (decyzja kierownika produkcji 2026-10-23 04:31): no import of local progress in v1. Local mode is
@@ -281,8 +284,16 @@ They are **not owner decisions**. Each entry gives the source and the spec lines
 3. **Level-up grants.** **ROZSTRZYGNIĘTE** (decyzja kierownika produkcji 2026-10-23 04:31): per CHARACTER_PROGRESSION, computed by the server: **2** free
    stat points and the class's automatic +1 in two stats per level-up ([CHARACTER_PROGRESSION.md#L23](design/CHARACTER_PROGRESSION.md#L23),
    class table [L25–L30](design/CHARACTER_PROGRESSION.md#L25)), and **1** skill point per level-up from level 2
-   ([CLASSES_SKILLS.md#L26](design/CLASSES_SKILLS.md#L26)). Implemented. Gaps: no allocation endpoint (S6); death EXP
-   loss ([CHARACTER_PROGRESSION.md#L113](design/CHARACTER_PROGRESSION.md#L113)) is not implemented.
+   ([CLASSES_SKILLS.md#L26](design/CLASSES_SKILLS.md#L26)). Implemented. Not in this PR (production lead, 04:47):
+   - **Point-spending endpoint**: S6 "Awans i statystyki" ([OPEN_QUESTIONS_PLAN.md#L52](design/OPEN_QUESTIONS_PLAN.md#L52):
+     "rozdawanie punktów, panel postaci, reset"). Free points accumulate in `stats.freeStatPoints` and
+     `skills.freeSkillPoints` and cannot be spent yet. Not implemented now.
+   - **Death EXP loss**: Stage II / S6 together with Q4 ([CHARACTER_PROGRESSION.md#L113](design/CHARACTER_PROGRESSION.md#L113):
+     "Utrata 2% EXP bieżącego poziomu (nie schodzi poniżej 0 na poziomie)"; Q4
+     [OPEN_QUESTIONS_PLAN.md#L15](design/OPEN_QUESTIONS_PLAN.md#L15); owner spec [§7 L337](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2a039cd8bad5eaa4547caddb4981c6b68429dfe6/docs/design/OWNER_SPEC_2026-10-23.md#L337)). Not implemented:
+     the server never lowers `character.totalExp` today, and `PUT` refuses a client that does (`409`). Note for the
+     owner: the owner spec lists "Rozwój postaci" under ETAP III ([§18 L729–L731](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2a039cd8bad5eaa4547caddb4981c6b68429dfe6/docs/design/OWNER_SPEC_2026-10-23.md#L729-L731)), not ETAP II,
+     and does not place the death penalty in any stage; the stage given here is the production lead's.
 4. **Materials.** **ROZSTRZYGNIĘTE** (decyzja kierownika produkcji 2026-10-23 04:31): there is no separate bag in the player model
    ([MODES_DATA_MODEL.md#L48](design/MODES_DATA_MODEL.md#L48) to L51), so materials are inventory stacks (bag 24 → 56,
    [ITEMS_COMBAT_SPEC.md#L113](design/ITEMS_COMBAT_SPEC.md#L113) to L115; Sakwa [ECONOMY.md#L38](design/ECONOMY.md#L38)) with the stack
@@ -296,30 +307,53 @@ They are **not owner decisions**. Each entry gives the source and the spec lines
    Item part: `max_hp`/`max_mp` base stats × rarity multiplier ([ITEMS_COMBAT_SPEC.md#L69](design/ITEMS_COMBAT_SPEC.md#L69) to L73) ×
    (1 + temper %) ([ITEMS_COMBAT_SPEC.md#L84](design/ITEMS_COMBAT_SPEC.md#L84)) + `max_hp_flat`/`max_mp_flat` affixes, of
    **equipped** items, rounded up. Implemented on `PUT`, reward and the initial save. The spec labels the formula "propozycja"
-   and does not define rounding; the server rounds the item part up.
-7. **Loot stash and defaults.** **ROZSTRZYGNIĘTE** (decyzja kierownika produkcji 2026-10-23 04:31): **8** places, **24 h**, expired loot is **lost**;
-   bag capacity cap **56** ([ITEMS_COMBAT_SPEC.md#L114](design/ITEMS_COMBAT_SPEC.md#L114) to L116). Default class `warrior` with `starter_sword`.
-   Implemented and tested, including `409 REWARD_NO_SPACE`. Note: the spec line only says "8 miejsc, 24 h, żeby nic nie przepadło";
-   that expired loot is lost comes from this decision. Expiry is applied on read (`GET` view) and stored on the next write.
+   ([CHARACTER_PROGRESSION.md#L37](design/CHARACTER_PROGRESSION.md#L37) to L41) and does not define rounding; the server
+   rounds the item part up. **These are Stage I working values, not approved balance** (production lead, 04:47). The
+   coefficients 60 / 6 / 20 / 5 are configuration (`VitalsFormula:BaseHp`, `HpPerVigor`, `BaseMp`, `MpPerSpirit` in
+   `appsettings.json`); `hpPerLevel`/`mpPerLevel` come from the class table (L25–L30). The code marks them with
+   `PROPOZYCJA_DOC` (`VitalsFormula.PropozycjaDoc`), and a test checks that the defaults still match the doc formula.
+7. **Loot stash and defaults.**
+   - **ROZSTRZYGNIĘTE** (decyzja kierownika produkcji 2026-10-23 04:31): the stash has **8** places and entries carry
+     `expiresAtUtc` = grant + **24 h** ([ITEMS_COMBAT_SPEC.md#L116](design/ITEMS_COMBAT_SPEC.md#L116)); a full stash gives
+     `409 REWARD_NO_SPACE`. Default class `warrior` with `starter_sword`. Implemented and tested.
+   - **After 24 h: OTWARTE (właściciel).** The spec line says only "łup trafia do skrytki łupu (8 miejsc, 24 h), żeby nic
+     nie przepadło w AR" ([ITEMS_COMBAT_SPEC.md#L116](design/ITEMS_COMBAT_SPEC.md#L116)) and does not say what happens
+     after 24 h. The production lead **withdrew** the earlier "expired loot is lost" decision on 2026-10-23 04:47. Until
+     the owner decides, the server setting `LootStash:AfterExpiry` is `Keep` (default: the entry stays and is never
+     lost) or `Expire` (the entry is removed on read and on the next write). Tests cover both values.
+   - Correction: **56 is the bag maximum** (Sakwa, [ITEMS_COMBAT_SPEC.md#L114](design/ITEMS_COMBAT_SPEC.md#L114)), not a
+     stash limit. The stash limit is 8.
 8. **Stack size limits.** **ROZSTRZYGNIĘTE** (decyzja kierownika produkcji 2026-10-23 04:31): limits from the item tables (50/99, also 20/10/5 for tier items)
    are enforced by the server ([ITEMS_COMBAT_SPEC.md#L52](design/ITEMS_COMBAT_SPEC.md#L52) to L58; column `stack` in
    [tables/items_starter.csv](design/tables/items_starter.csv), [shop_starter_merchant.csv](design/tables/shop_starter_merchant.csv),
    [skill_tier_items.csv](design/tables/skill_tier_items.csv)). Implemented and tested.
 9. **History retention.** **ROZSTRZYGNIĘTE** (decyzja kierownika produkcji 2026-10-23 04:31): keep 200 newest `encounterResults` in the document; the ledger and
    `player_savegame_revisions` are not trimmed. Unchanged.
-10. **HTTPS / auth / hosting.** **ROZSTRZYGNIĘTE** (decyzja kierownika produkcji 2026-10-23 04:31): Stage V (#39/#56); localhost only until then (§9). Documented
-    only. "Stage V" is the coordinator's stage numbering; the repo plan has no stage of that name.
+10. **HTTPS / auth / hosting.** **ROZSTRZYGNIĘTE** (decyzja kierownika produkcji 2026-10-23 04:31): Etap V (#39/#56); localhost only until then (§9). Documented
+    only. References for "Etap V":
+    - owner main spec (PR #96, `docs/design/OWNER_SPEC_2026-10-23.md` @ `2a039cd`):
+      [§18 "ETAP V — PEŁNY ŚWIAT I PRZYGOTOWANIE WYDANIA" L748–L759](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2a039cd8bad5eaa4547caddb4981c6b68429dfe6/docs/design/OWNER_SPEC_2026-10-23.md#L748-L759), in particular
+      "Stabilny backend" (L755) and "Testy wydajności i bezpieczeństwa" (L758); the target itself is in
+      [§14 L573–L578](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2a039cd8bad5eaa4547caddb4981c6b68429dfe6/docs/design/OWNER_SPEC_2026-10-23.md#L573-L578) (localhost is not a solution; HTTPS backend, authentication, player identity);
+    - S1–S13 plan: there is no step for hosting/HTTPS; the nearest is **S11** "Autorytet serwera dla nagród", which
+      depends on #39 ([OPEN_QUESTIONS_PLAN.md#L57](design/OPEN_QUESTIONS_PLAN.md#L57)).
 11. **JSON Schema library.** **ROZSTRZYGNIĘTE** (decyzja kierownika produkcji 2026-10-23 04:31): validation stays in code (§8), no new dependency. Unchanged.
 12. **CI path filter.** **zatwierdzone przez kierownika, czeka na zgodę właściciela na zmianę .github/** (decyzja kierownika produkcji 2026-10-23 04:31):
     add `docs/design/tables/**` and `docs/contracts/**` to the `push` and `pull_request` paths of
     `.github/workflows/server-tests.yml`. **Not changed in this PR.** Until then, a change that touches only those
     folders does not run server CI. That matters more now, because the server embeds five more tables.
+13. **Treatise category (K10).** **OTWARTE (właściciel).** `treatise_proficiency_<classId>` is `consumable` sold by the
+    Wędrowny Handlarz in [tables/shop_starter_merchant.csv#L14](design/tables/shop_starter_merchant.csv#L14), but a
+    skill-tier item from the trainer (`shop_trainer`) in [tables/skill_tier_items.csv#L2](design/tables/skill_tier_items.csv#L2).
+    Recorded as **K10** in [SPEC_CONFLICTS_2026-10-23_K10.md](design/SPEC_CONFLICTS_2026-10-23_K10.md) (to be folded into
+    SPEC_CONFLICTS_2026-10-23.md, PR #84). This contract assumes **neither** version: it checks only the id and the stack
+    limit 20, which both tables agree on, and no save rule depends on the treatise's category.
 
 ## 12. Verification
 
 Gates run in `server/`:
 - `dotnet build -c Release` (warnings as errors);
 - `dotnet format --verify-no-changes`;
-- `dotnet test` (150 tests);
+- `dotnet test` (153 tests);
 - `scripts/smoke-local.sh` (real process: savegame, reward, replay, 428/412, restart persistence);
 - `dotnet list package --vulnerable --include-transitive`.

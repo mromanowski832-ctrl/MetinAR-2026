@@ -27,6 +27,10 @@ builder.Services.AddOptions<SaveGameLimits>()
     .Bind(builder.Configuration.GetSection(SaveGameLimits.SectionName))
     .Validate(l => !l.Validate().Any(), "SaveGameLimits configuration is invalid (see SaveGameLimits.Validate).")
     .ValidateOnStart();
+builder.Services.AddOptions<LootStashOptions>()
+    .Bind(builder.Configuration.GetSection(LootStashOptions.SectionName))
+    .Validate(o => Enum.IsDefined(o.AfterExpiry), "LootStash:AfterExpiry must be Keep or Expire.")
+    .ValidateOnStart();
 builder.Services.TryAddSingleton(TimeProvider.System);
 
 string connectionString = builder.Configuration.GetConnectionString("MetinAR")
@@ -42,7 +46,9 @@ builder.Services.AddSingleton<IWorldStore>(sp => sp.GetRequiredService<SqliteGam
 builder.Services.AddSingleton<IEncounterStore>(sp => sp.GetRequiredService<SqliteGameStore>());
 builder.Services.AddSingleton(ExpCurveTable.LoadEmbedded());
 builder.Services.AddSingleton(itemCatalog);
-builder.Services.AddSingleton(CharacterRules.LoadEmbedded(itemCatalog));
+// PROPOZYCJA_DOC: MaxHp/MaxMp coefficients (CHARACTER_PROGRESSION L37-L41), Stage I working values from configuration.
+VitalsFormula vitalsFormula = builder.Configuration.GetSection(VitalsFormula.SectionName).Get<VitalsFormula>() ?? new VitalsFormula();
+builder.Services.AddSingleton(CharacterRules.LoadEmbedded(itemCatalog, vitalsFormula));
 builder.Services.AddSingleton<SaveGameMigrator>();
 builder.Services.AddSingleton<ISaveGameStore, SqliteSaveGameStore>();
 

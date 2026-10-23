@@ -66,7 +66,10 @@ public sealed class ItemCatalog
     /// Builds the catalog from the three design tables that define item ids: <c>items_starter.csv</c> (primary, has
     /// <c>baseStats</c>), <c>shop_starter_merchant.csv</c> (adds shop-only consumables/materials; <c>service</c> rows
     /// such as the bag expansion are not items) and <c>skill_tier_items.csv</c> (<c>&lt;classId&gt;</c> expands per class).
-    /// An id that appears in several tables must have the same stack limit everywhere.
+    /// An id that appears in several tables must have the same stack limit everywhere. Its <c>Category</c> is taken
+    /// from the first table and is not authoritative: <c>treatise_proficiency_&lt;classId&gt;</c> is <c>consumable</c>
+    /// in the shop table but a skill-tier item in <c>skill_tier_items.csv</c> (SPEC_CONFLICTS K10, owner decision).
+    /// No save rule depends on it; the rules only check the <c>equipment</c> and <c>material</c> categories.
     /// </summary>
     public static ItemCatalog Parse(string itemsCsv, string shopCsv, string skillTierItemsCsv, IEnumerable<string> classIds)
     {
