@@ -37,11 +37,13 @@ powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARQa.ps1
 powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARQa.ps1 -Gates Hygiene,DotNetTests
 
 # re-audit an existing APK without rebuilding
-powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARQa.ps1 -Gates ApkAudit -ApkPath client\Builds\Android\MetinAR-ar-encounter-dev.apk
+powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARQa.ps1 -Gates ApkAudit -ApkPath client\Builds\Android\MetinAR-ar-encounter-qa.apk
 
 # physical phone (owner connects + authorizes USB debugging first)
-powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARDeviceSmoke.ps1 -ApkPath client\Builds\Android\MetinAR-ar-encounter-dev.apk -SoakSeconds 60
+powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARDeviceSmoke.ps1 -ApkPath client\Builds\Android\MetinAR-ar-encounter-qa.apk -SoakSeconds 60
 ```
+
+The QA runner builds the **QA variant** (`com.metinar.game.qa`, label "MetinAR QA", `MetinAR-ar-encounter-qa.apk`) so it installs next to the game; see [METINAR-037-QA-APK-ADB.md](METINAR-037-QA-APK-ADB.md).
 
 Options: `-UnityPath` (or env `METINAR_UNITY`), `-SkipUnity`, `-SkipAndroid`, `-StopOnFail`, `-OutputDir`,
 `-RevertUnityRewrites` (restores tracked files that Unity rewrote during the run and were clean before it).
