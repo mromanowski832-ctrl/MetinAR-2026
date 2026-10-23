@@ -202,6 +202,69 @@ namespace AssetPipeline.Tests
             Assert.Single(r);
             Assert.True(r.ContainsKey("SFX/UI/A.wav"));
         }
+        private const string LedgerHeader = "| File | Origin | Author | License | Source | SHA-256 |\n|---|---|---|---|---|---|\n";
+        private const string CcByHeader = "| File | Title | Author | Source URL | License | License URL | Attribution | Changes |\n|---|---|---|---|---|---|---|---|\n";
+
+        [Fact]
+        public void AudioLedgerUsesAudioParserAndScansCcByTable()
+        {
+            string md = LedgerHeader +
+                        "| `SFX/Combat/A.wav` | cc_by | Jane Doe | CC-BY-4.0 | Jane Doe, https://example.org/1 | `" + Sha + "` |\n\n" + CcByHeader +
+                        "| `SFX/Combat/A.wav` | Hit | Jane Doe | https://example.org/1 | CC-BY-4.0 | https://creativecommons.org/licenses/by/4.0/ | \"Hit\" by Jane Doe, CC BY 4.0 | resampled from a Gameforge client |\n";
+            var issues = new List<PipelineIssue>();
+            Dictionary<string, string> r = AssetProvenanceRegister.ReadAudioLedgerSources(md, issues);
+            Assert.Empty(issues);
+            List<string> e = Errors(Input(new[] { "Audio/SFX/Combat/A.wav" }, audio: r));
+            Assert.Contains(e, x => x.Contains("gameforge"));
+        }
+
+        [Fact]
+        public void OrphanCcByRowIsScannedToo()
+        {
+            string md = CcByHeader + "| `SFX/B.wav` | Webzen theme | X | https://example.org/2 | CC-BY-4.0 | https://creativecommons.org/licenses/by/4.0/ | x | unmodified |\n";
+            var issues = new List<PipelineIssue>();
+            Dictionary<string, string> r = AssetProvenanceRegister.ReadAudioLedgerSources(md, issues);
+            Assert.Empty(r);
+            Assert.Contains(issues, i => i.Message.Contains("webzen"));
+        }
+
+        [Fact]
+        public void SixCellRowsOutsideTheLedgerTableAreNotCoverage()
+        {
+            // outdated 6-column CC-BY header: must not be read as ledger rows (the old 6-cell heuristic would have)
+            string md = "| File | Title | Author | Source URL | License | Changes |\n|---|---|---|---|---|---|\n| `SFX/C.wav` | T | A | https://example.org | CC-BY-4.0 | none |\n";
+            var issues = new List<PipelineIssue>();
+            Dictionary<string, string> r = AssetProvenanceRegister.ReadAudioLedgerSources(md, issues);
+            Assert.Empty(r);
+            Assert.Contains(issues, i => i.Message.Contains("outdated CC-BY"));
+        }
+
+        [Fact]
+        public void AudioLedgerFormatErrorsAreReported()
+        {
+            string md = LedgerHeader + "| `SFX/D.wav` | original | MetinAR project | MetinAR-Owned | procedural |\n";
+            var issues = new List<PipelineIssue>();
+            AssetProvenanceRegister.ReadAudioLedgerSources(md, issues);
+            Assert.Contains(issues, i => i.Message.Contains("expected 6 columns"));
+        }
+
+        [Theory]
+        [InlineData("CC-BY-SA-4.0")]
+        [InlineData("CC-BY-NC-4.0")]
+        [InlineData("CC-BY-3.0")]
+        public void CsvRowsAcceptOnlyDocumentedThirdPartyLicences(string license)
+        {
+            // METINAR-009 §11 / MODES_DATA_MODEL §5: graphics accept CC-BY-4.0; SA needs owner_approved (not in the CSV).
+            List<string> e = Errors(Input(new[] { "Art/A.png" }, Header + "\n" + Row("Art/A.png", origin: "third_party", license: license, sourceUrl: "https://example.org/a") + "\n"));
+            Assert.Contains(e, x => x.Contains("Licence '" + license + "'"));
+        }
+
+        [Fact]
+        public void CsvRowAcceptsCcBy40Licence()
+        {
+            List<string> e = Errors(Input(new[] { "Art/A.png" }, Header + "\n" + Row("Art/A.png", origin: "third_party", license: "CC-BY-4.0", sourceUrl: "https://example.org/a") + "\n"));
+            Assert.DoesNotContain(e, x => x.Contains("Licence '"));
+        }
     }
 
     /// <summary>

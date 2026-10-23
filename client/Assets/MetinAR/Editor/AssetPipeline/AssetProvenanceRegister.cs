@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using MetinAR.Editor.Audio;
 
 namespace MetinAR.Editor.AssetPipeline
 {
@@ -326,7 +327,7 @@ namespace MetinAR.Editor.AssetPipeline
             string ledger = Path.Combine(scope, AudioFolder, "LICENSES.md");
             if (File.Exists(ledger))
             {
-                foreach (KeyValuePair<string, string> e in ReadAudioLedgerSources(File.ReadAllText(ledger)))
+                foreach (KeyValuePair<string, string> e in ReadAudioLedgerSources(File.ReadAllText(ledger), issues))
                 {
                     input.AudioLedgerSources[e.Key] = e.Value;
                 }
@@ -357,28 +358,46 @@ namespace MetinAR.Editor.AssetPipeline
         }
 
         /// <summary>
-        /// Rows of the main table in Audio/LICENSES.md (| `File` | Origin | Author | License | Source | SHA-256 |), outside
-        /// fenced blocks: file (relative to Audio/) → "author | license | source" (for the forbidden-source scan).
-        /// Full ledger validation (SHA, licences, attribution) stays in AudioPipelineRules / AudioRepositoryTests.
+        /// Audio/LICENSES.md through the audio pipeline's own parser (AudioLicenseLedger.Parse, header-based: ledger table
+        /// | File | Origin | Author | License | Source | SHA-256 | and CC-BY table | File | Title | Author | Source URL | License |
+        /// License URL | Attribution | Changes |, fenced blocks ignored). Returns ledger file (relative to Audio/) → every text
+        /// field of its ledger row and CC-BY row (for the forbidden-source scan). ParseErrors and forbidden names in CC-BY
+        /// rows without a ledger row go to <paramref name="issues"/>. SHA/licence/attribution rules stay in
+        /// AudioPipelineRules / AudioRepositoryTests (one parser, one source of truth).
         /// </summary>
-        public static Dictionary<string, string> ReadAudioLedgerSources(string text)
+        public static Dictionary<string, string> ReadAudioLedgerSources(string text, List<PipelineIssue> issues = null)
         {
             var result = new Dictionary<string, string>(StringComparer.Ordinal);
-            bool fenced = false;
-            foreach (string raw in (text ?? string.Empty).Replace("\r\n", "\n").Split('\n'))
+            AudioLicenseLedger ledger = AudioLicenseLedger.Parse(text);
+            foreach (string e in ledger.ParseErrors)
             {
-                string line = raw.Trim();
-                if (line.StartsWith("```", StringComparison.Ordinal)) { fenced = !fenced; continue; }
-                if (fenced || !line.StartsWith("|", StringComparison.Ordinal)) continue;
-                string[] cells = line.Trim('|').Split('|');
-                if (cells.Length != 6) continue;
-                string file = cells[0].Trim().Trim('`').Trim();
-                if (!file.Contains("/") || !IsContentFile(file)) continue;
-                if (!result.ContainsKey(file)) result[file] = cells[2].Trim() + " | " + cells[3].Trim() + " | " + cells[4].Trim();
+                issues?.Add(PipelineIssue.Error(AudioLedgerPath, "Audio/LICENSES.md " + e));
+            }
+
+            foreach (AudioLicenseEntry e in ledger.Entries)
+            {
+                string fields = string.Join(" | ", e.File, e.Origin, e.Author, e.License, e.Source);
+                AudioAttributionEntry a = ledger.FindAttribution(e.File);
+                if (a != null) fields += " | " + AttributionText(a);
+                result[e.File] = fields;
+            }
+
+            foreach (AudioAttributionEntry a in ledger.Attributions)
+            {
+                if (result.ContainsKey(a.File)) continue;
+                string bad = FindForbiddenToken(AttributionText(a));
+                if (bad != null) issues?.Add(PipelineIssue.Error(AudioLedgerPath, "CC-BY row '" + a.File + "' references '" + bad + "'."));
             }
 
             return result;
         }
+
+        private static string AttributionText(AudioAttributionEntry a)
+        {
+            return string.Join(" | ", a.File, a.Title, a.Author, a.SourceUrl, a.License, a.LicenseUrl, a.Attribution, a.Changes);
+        }
+
+        public const string AudioLedgerPath = ScopeRoot + "/" + AudioFolder + "/LICENSES.md";
     }
 
     public sealed class AssetProvenanceRow

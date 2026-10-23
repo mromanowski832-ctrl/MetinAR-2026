@@ -17,7 +17,7 @@ Every file path in scope (also code) is still scanned for the forbidden names.
 | Source | Covers | Rules |
 |---|---|---|
 | `ASSET_SOURCE.txt` (METINAR-009 §11) | every content file in its folder and sub-folders (nearest one wins) | `AssetSourceManifest` |
-| `client/Assets/MetinAR/Audio/LICENSES.md` | audio files listed in its table (METINAR-018) | `AudioPipelineRules` + forbidden-name scan |
+| `client/Assets/MetinAR/Audio/LICENSES.md` | audio files listed in its ledger table (METINAR-018) | read with the audio parser `AudioLicenseLedger.Parse` (header-based, both tables); its `ParseErrors` fail the register; every field of the ledger **and** CC-BY tables is scanned for forbidden names |
 | `docs/assets/provenance/*.csv` (this folder) | single loose files that have no `ASSET_SOURCE.txt` folder | below |
 
 A file covered by two sources (e.g. a CSV row inside an `ASSET_SOURCE.txt` folder) is an error, so a folder is
@@ -49,6 +49,20 @@ python tools/assets/provenance_rows.py --asset-id ArEncounter --date 2026-10-20 
   --created-with "Unity editor script ..." client/Assets/MetinAR/Art/ArEncounter/*.png >> docs/assets/provenance/<fragment>.csv
 dotnet test tests/AssetPipeline.Tests --filter AssetProvenance
 ```
+
+## Licences: graphics vs audio (agreed with METINAR-040, PR #99 review)
+
+- One logical record for audio and graphics: `path, sha256, origin, author, license, source_url` plus, for CC-BY, the
+  credits fields `title, license_url, attribution, changes` (names/order as the credits spec, MODES_DATA_MODEL §5).
+  Audio keeps its two Markdown tables (`Audio/LICENSES.md`, unchanged); graphics use `ASSET_SOURCE.txt` / this CSV.
+- Graphics accept `MetinAR-Owned`, `CC0-1.0`, `CC-BY-4.0` (with attribution), `MIT`, `Apache-2.0`, `BSD-3-Clause`
+  (METINAR-009 §11; owner decision 2026-10-21 names CC-BY-4.0). NC/ND are always rejected; SA/GPL need
+  `owner_approved: yes` in an `ASSET_SOURCE.txt` (the CSV has no such column, so SA is always rejected there).
+- Audio currently accepts `CC-BY-x.y` (METINAR-018). Whether graphics should also accept CC-BY-3.0 is an open
+  controller/owner decision; until then graphics stay on 4.0 only.
+- CC-BY columns (`title, license_url, attribution, changes`) will be appended to the CSV in that order when the first
+  CC-BY graphic lands (credits generator #40 then reads one attribution schema). Until then third-party/CC-BY graphics
+  go into an `ASSET_SOURCE.txt` folder with `license_file` and `attribution`.
 
 ## Open PRs at the time of E1
 
