@@ -45,7 +45,7 @@ Windows (PowerShell): same commands; delete the data folder with `Remove-Item -R
 cd server
 dotnet build MetinAR.Server.sln -c Release                 # warnings are errors
 dotnet format MetinAR.Server.sln --verify-no-changes        # style/lint
-dotnet test  MetinAR.Server.sln -c Release                  # 100 tests, no network
+dotnet test  MetinAR.Server.sln -c Release                  # 134 tests, no network
 dotnet list  MetinAR.Server.sln package --vulnerable --include-transitive
 ./scripts/smoke-local.sh                                    # Linux/macOS/WSL/Git Bash: real process + restart
 ```
@@ -61,7 +61,17 @@ curl -X POST http://localhost:5080/api/v1/encounters/start -H "Content-Type: app
      -d '{"playerId":"demo-player","worldEntityId":"seed-mob-0001","clientPosition":{"latitude":0.0005,"longitude":0.00048,"horizontalAccuracyMeters":5}}'
 curl -X POST http://localhost:5080/api/v1/encounters/complete -H "Content-Type: application/json" \
      -d '{"encounterId":"<id from start>","playerId":"demo-player","nonce":"<nonce from start>"}'
+# SaveGame v1 (METINAR-071): read, claim the reward once per encounter, sync client-owned fields
+curl -i http://localhost:5080/api/v1/player/demo-player/savegame          # ETag: "0"
+curl -X POST http://localhost:5080/api/v1/encounters/reward -H "Content-Type: application/json" \
+     -d '{"encounterId":"<id>","playerId":"demo-player","nonce":"<nonce>","claim":{"exp":30,"talers":12,"stacks":[],"items":[],"materials":[]}}'
+curl -X PUT http://localhost:5080/api/v1/player/demo-player/savegame -H "Content-Type: application/json" \
+     -H 'If-Match: "1"' -d @savegame.json                                   # body: saveGame from the last response
 ```
+
+SaveGame contract, local file format, placeholders and open questions: [`docs/METINAR-071-SAVEGAME-CONTRACT.md`](../docs/METINAR-071-SAVEGAME-CONTRACT.md).
+Schema: [`docs/contracts/savegame.v1.schema.json`](../docs/contracts/savegame.v1.schema.json). Prototype reward caps and
+defaults are in the `SaveGameLimits` / `PrototypeSaveGameDefaults` sections of `appsettings.json` (placeholders, not balance).
 
 Encounter authority limits (distance, accuracy, fix age, TTL) live in the `EncounterRules` section of `appsettings.json`.
 **They are prototype values** (owner decision D3/Q3, [#33](https://github.com/mromanowski832-ctrl/MetinAR-2026/issues/33#issuecomment-6316048203)): technical anti-abuse / GPS-noise

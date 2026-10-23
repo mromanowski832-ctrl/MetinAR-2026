@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Persistence/Migrations/*.sql" LogicalName="MetinAR.Server.Persistence.Migrations.%(Filename)%(Extension)" />
+    <!-- Single source of truth for the EXP curve (#71): the design table itself, shared with the Unity client. -->
+    <EmbeddedResource Include="../../../docs/design/tables/exp_curve.csv" LogicalName="MetinAR.Server.Design.exp_curve.csv" Link="Design/exp_curve.csv" />
   </ItemGroup>
 
   <ItemGroup>

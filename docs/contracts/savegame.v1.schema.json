@@ -1,0 +1,261 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/main/docs/contracts/savegame.v1.schema.json",
+  "title": "MetinAR SaveGame v1 (METINAR-071, #71)",
+  "description": "One player's saved progress. The same document is stored by the Unity client in its local save file (mode = local) and served/stored by the server (mode = server). See docs/METINAR-071-SAVEGAME-CONTRACT.md. Unknown fields are rejected everywhere (additionalProperties: false); a new field means a new schemaVersion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "mode", "playerId", "revision", "updatedAtUtc", "profile", "character", "stats", "skills", "inventory", "equipment", "currency", "materials", "quests", "exploration", "encounterResults"],
+  "properties": {
+    "schemaVersion": { "const": 1, "description": "Contract version. Readers migrate older versions forward step by step and refuse newer ones." },
+    "mode": { "enum": ["local", "server"], "description": "local = written by the client without server confirmation (unverified, must be shown as 'tryb lokalny'); server = this exact state was confirmed by the server at `revision`." },
+    "playerId": { "$ref": "#/$defs/id" },
+    "revision": { "type": "integer", "minimum": 0, "description": "Server revision this document reflects (ETag). Always 0 in local mode." },
+    "updatedAtUtc": { "$ref": "#/$defs/utc" },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["displayName", "createdAtUtc"],
+      "properties": {
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "createdAtUtc": { "$ref": "#/$defs/utc" }
+      }
+    },
+    "character": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classId", "pathId", "level", "totalExp", "hpCurrent", "mpCurrent"],
+      "properties": {
+        "classId": { "enum": ["warrior", "ninja", "shaman", "slajter"] },
+        "pathId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/id" }] },
+        "level": { "type": "integer", "minimum": 1, "maximum": 99, "description": "Derived: must equal the level for totalExp in docs/design/tables/exp_curve.csv." },
+        "totalExp": { "type": "integer", "minimum": 0, "description": "Total EXP since level 1 (same meaning as PlayerProgress.TotalExp on the client); capped at the cumulative EXP of level 99." },
+        "hpCurrent": { "type": "integer", "minimum": 0 },
+        "mpCurrent": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allocated", "freeStatPoints"],
+      "properties": {
+        "allocated": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["might", "finesse", "spirit", "vigor"],
+          "properties": {
+            "might": { "$ref": "#/$defs/count" },
+            "finesse": { "$ref": "#/$defs/count" },
+            "spirit": { "$ref": "#/$defs/count" },
+            "vigor": { "$ref": "#/$defs/count" }
+          }
+        },
+        "freeStatPoints": { "$ref": "#/$defs/count" }
+      }
+    },
+    "skills": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["freeSkillPoints", "progress", "loadout"],
+      "properties": {
+        "freeSkillPoints": { "$ref": "#/$defs/count" },
+        "progress": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/skillProgress" }, "description": "One entry per skill, skillId unique." },
+        "loadout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attack", "aura", "slot1", "slot2"],
+          "properties": {
+            "attack": { "$ref": "#/$defs/optionalId" },
+            "aura": { "$ref": "#/$defs/optionalId" },
+            "slot1": { "$ref": "#/$defs/optionalId" },
+            "slot2": { "$ref": "#/$defs/optionalId" }
+          }
+        }
+      }
+    },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capacity", "stacks", "items", "lootStash"],
+      "properties": {
+        "capacity": { "type": "integer", "minimum": 1, "maximum": 200 },
+        "stacks": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/slottedStack" } },
+        "items": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/slottedItem" } },
+        "lootStash": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stacks", "items"],
+          "description": "Overflow when the inventory is full (ITEMS_COMBAT_SPEC §5 'skrytka łupu'), so a reward is never lost.",
+          "properties": {
+            "stacks": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/stack" } },
+            "items": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/itemInstance" } }
+          }
+        }
+      }
+    },
+    "equipment": { "type": "array", "maxItems": 12, "items": { "$ref": "#/$defs/equippedItem" }, "description": "slot unique." },
+    "currency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["talers"],
+      "properties": { "talers": { "type": "integer", "minimum": 0 } }
+    },
+    "materials": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/stack" }, "description": "Material bag, definitionId unique." },
+    "quests": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/questState" }, "description": "questId unique. Quest design is not decided yet." },
+    "exploration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalMetersCredited", "daily", "discoveredCellIds"],
+      "properties": {
+        "totalMetersCredited": { "type": "number", "minimum": 0 },
+        "daily": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["dateUtc", "metersCredited", "cellsDiscovered"],
+              "properties": {
+                "dateUtc": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+                "metersCredited": { "type": "number", "minimum": 0 },
+                "cellsDiscovered": { "$ref": "#/$defs/count" }
+              }
+            }
+          ]
+        },
+        "discoveredCellIds": { "type": "array", "maxItems": 10000, "items": { "$ref": "#/$defs/id" } }
+      }
+    },
+    "encounterResults": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/encounterResult" }, "description": "Newest last, encounterId unique; the most recent 200 are kept in the document (the server ledger keeps all)." }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{3,64}$" },
+    "optionalId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/id" }] },
+    "utc": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$", "description": "UTC, millisecond precision, e.g. 2026-10-23T02:00:00.000Z." },
+    "optionalUtc": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/utc" }] },
+    "count": { "type": "integer", "minimum": 0 },
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "stack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["definitionId", "quantity"],
+      "properties": {
+        "definitionId": { "$ref": "#/$defs/id" },
+        "quantity": { "type": "integer", "minimum": 1, "maximum": 999999 }
+      }
+    },
+    "slottedStack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slotIndex", "definitionId", "quantity"],
+      "properties": {
+        "slotIndex": { "type": "integer", "minimum": 0 },
+        "definitionId": { "$ref": "#/$defs/id" },
+        "quantity": { "type": "integer", "minimum": 1, "maximum": 999999 }
+      }
+    },
+    "itemInstance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instanceId", "definitionId", "itemLevel", "rarity", "temper", "affixes", "locked"],
+      "properties": {
+        "instanceId": { "$ref": "#/$defs/uuid" },
+        "definitionId": { "$ref": "#/$defs/id" },
+        "itemLevel": { "type": "integer", "minimum": 1, "maximum": 99 },
+        "rarity": { "enum": ["common", "uncommon", "rare", "epic", "legendary"] },
+        "temper": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "affixes": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["affixId", "value"],
+            "properties": { "affixId": { "$ref": "#/$defs/id" }, "value": { "type": "number" } }
+          }
+        },
+        "locked": { "type": "boolean" }
+      }
+    },
+    "slottedItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slotIndex", "item"],
+      "properties": { "slotIndex": { "type": "integer", "minimum": 0 }, "item": { "$ref": "#/$defs/itemInstance" } }
+    },
+    "equippedItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slot", "item"],
+      "properties": {
+        "slot": { "enum": ["weapon", "off_hand", "helmet", "armor", "gloves", "boots", "earrings", "necklace", "bracelet", "ring", "quick_1", "quick_2"] },
+        "item": { "$ref": "#/$defs/itemInstance" }
+      }
+    },
+    "skillProgress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skillId", "rankIndex", "tierId", "tierRank", "pointsSpent", "attemptsTotal", "lastAttemptAtUtc", "nextAttemptAtUtc"],
+      "properties": {
+        "skillId": { "$ref": "#/$defs/id" },
+        "rankIndex": { "type": "integer", "minimum": 1, "maximum": 29 },
+        "tierId": { "enum": ["practice", "proficiency", "artistry", "apex"] },
+        "tierRank": { "type": "integer", "minimum": 1, "maximum": 14 },
+        "pointsSpent": { "$ref": "#/$defs/count" },
+        "attemptsTotal": { "$ref": "#/$defs/count" },
+        "lastAttemptAtUtc": { "$ref": "#/$defs/optionalUtc" },
+        "nextAttemptAtUtc": { "$ref": "#/$defs/optionalUtc" }
+      }
+    },
+    "questState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["questId", "status", "counters", "updatedAtUtc"],
+      "properties": {
+        "questId": { "$ref": "#/$defs/id" },
+        "status": { "enum": ["active", "completed"] },
+        "counters": { "type": "object", "maxProperties": 16, "propertyNames": { "pattern": "^[A-Za-z0-9_-]{1,64}$" }, "additionalProperties": { "$ref": "#/$defs/count" } },
+        "updatedAtUtc": { "$ref": "#/$defs/utc" }
+      }
+    },
+    "rewardGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exp", "talers", "stacks", "items", "materials"],
+      "properties": {
+        "exp": { "$ref": "#/$defs/count" },
+        "talers": { "$ref": "#/$defs/count" },
+        "stacks": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/stack" } },
+        "items": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["definitionId", "itemLevel", "rarity", "instanceId"],
+            "properties": {
+              "definitionId": { "$ref": "#/$defs/id" },
+              "itemLevel": { "type": "integer", "minimum": 1, "maximum": 99 },
+              "rarity": { "enum": ["common", "uncommon", "rare", "epic", "legendary"] },
+              "instanceId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/uuid" }], "description": "Minted by whoever applied the reward (server in server mode, client in local mode)." }
+            }
+          }
+        },
+        "materials": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/stack" } }
+      }
+    },
+    "encounterResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["encounterId", "source", "status", "worldEntityId", "completedAtUtc", "reward"],
+      "properties": {
+        "encounterId": { "$ref": "#/$defs/id" },
+        "source": { "enum": ["server", "local"], "description": "server = encounter session issued by POST /api/v1/encounters/start; local = generated on the device, id prefixed 'local-'." },
+        "status": { "enum": ["applied", "pending", "local_unverified"], "description": "applied = reward applied by the server (in the server ledger); pending = client-only, claim not yet acknowledged (never stored by the server); local_unverified = applied locally in local mode." },
+        "worldEntityId": { "$ref": "#/$defs/optionalId" },
+        "completedAtUtc": { "$ref": "#/$defs/utc" },
+        "reward": { "$ref": "#/$defs/rewardGrant" }
+      }
+    }
+  }
+}

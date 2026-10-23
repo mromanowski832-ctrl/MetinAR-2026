@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# METINAR-010/012 local smoke test: builds and starts the real server process on localhost against a
+# METINAR-010/012/071 local smoke test: builds and starts the real server process on localhost against a
 # temporary SQLite file, exercises every endpoint, restarts the process and checks persistence.
 # Needs only the .NET 8 SDK, curl and python3. No external network or service is contacted.
 set -euo pipefail
@@ -66,6 +66,20 @@ check "first completion"         "True" "$(curl -fsS -X POST "${BASE}/api/v1/enc
   -d "${COMPLETE}" | json "d['firstCompletion']")"
 check "repeat completion"        "False" "$(curl -fsS -X POST "${BASE}/api/v1/encounters/complete" -H 'Content-Type: application/json' \
   -d "${COMPLETE}" | json "d['firstCompletion']")"
+# #71 SaveGame contract: initial save, server-side reward by encounterId (idempotent), optimistic-concurrency sync.
+SAVE_URL="${BASE}/api/v1/player/smoke-player/savegame"
+check "initial savegame revision" "0 server" "$(curl -fsS "${SAVE_URL}" | json "str(d['revision']) + ' ' + d['saveGame']['mode']")"
+CLAIM="{\"encounterId\":\"${ENC}\",\"playerId\":\"smoke-player\",\"nonce\":\"${NONCE}\",\"claim\":{\"exp\":30,\"talers\":12,\"stacks\":[{\"definitionId\":\"potion_hp_s\",\"quantity\":2}],\"items\":[],\"materials\":[]}}"
+check "reward applied"           "True 1" "$(curl -fsS -X POST "${BASE}/api/v1/encounters/reward" -H 'Content-Type: application/json' \
+  -d "${CLAIM}" | json "str(d['applied']) + ' ' + str(d['revision'])")"
+check "reward replay idempotent" "True 12" "$(curl -fsS -X POST "${BASE}/api/v1/encounters/reward" -H 'Content-Type: application/json' \
+  -d "${CLAIM}" | json "str(d['alreadyApplied']) + ' ' + str(d['saveGame']['currency']['talers'])")"
+SAVE="$(curl -fsS "${SAVE_URL}" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['saveGame']))")"
+check "sync without If-Match"    "428" "$(curl -s -o /dev/null -w '%{http_code}' -X PUT "${SAVE_URL}" -H 'Content-Type: application/json' -d "${SAVE}")"
+STALE="$(echo "${SAVE}" | python3 -c "import json,sys; d=json.load(sys.stdin); d['revision']=0; print(json.dumps(d))")"
+check "sync stale revision"      "412" "$(curl -s -o /dev/null -w '%{http_code}' -X PUT "${SAVE_URL}" -H 'Content-Type: application/json' -H 'If-Match: "0"' -d "${STALE}")"
+check "sync current revision"    "200 \"2\"" "$(curl -s -D - -o /dev/null -X PUT "${SAVE_URL}" -H 'Content-Type: application/json' -H 'If-Match: "1"' -d "${SAVE}" \
+  | tr -d '\r' | awk 'NR==1{c=$2} tolower($1)=="etag:"{e=$2} END{print c " " e}')"
 stop_server
 
 echo "--- restarting server process ---"
@@ -74,7 +88,10 @@ check "player persisted"         "Smoke" "$(curl -fsS "${BASE}/api/v1/player/smo
 check "coarse position persisted" "[0.012, 0.046]" "$(curl -fsS "${BASE}/api/v1/player/smoke-player" | json "[d['lastKnownPosition']['latitude'], d['lastKnownPosition']['longitude']]")"
 check "completion still idempotent after restart" "False" "$(curl -fsS -X POST "${BASE}/api/v1/encounters/complete" -H 'Content-Type: application/json' \
   -d "${COMPLETE}" | json "d['firstCompletion']")"
-check "schema version"           "0003_encounter_authority_and_spawn_schedules" "$(curl -fsS "${BASE}/health" | json "d['schemaVersion']")"
+check "savegame persisted"       "2 12" "$(curl -fsS "${SAVE_URL}" | json "str(d['revision']) + ' ' + str(d['saveGame']['currency']['talers'])")"
+check "reward still idempotent after restart" "True" "$(curl -fsS -X POST "${BASE}/api/v1/encounters/reward" -H 'Content-Type: application/json' \
+  -d "${CLAIM}" | json "d['alreadyApplied']")"
+check "schema version"           "0004_savegame_and_reward_ledger" "$(curl -fsS "${BASE}/health" | json "d['schemaVersion']")"
 check "log has no client coordinates" "0" "$(grep -c '0\.00048\|0\.0050' "${LOG}" || true)"
 check "seed not duplicated"      "3" "$(curl -fsS "${BASE}/api/v1/world/nearby?lat=0&lon=0&radiusMeters=1000" | json "d['totalInRadius']")"
 grep -q "Now listening on: ${BASE}" "${LOG}" || fail "server did not report listening on localhost"

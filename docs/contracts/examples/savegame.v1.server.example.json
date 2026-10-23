@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "mode": "server",
+  "playerId": "player-demo-01",
+  "revision": 3,
+  "updatedAtUtc": "2026-10-23T02:15:00.000Z",
+  "profile": {
+    "displayName": "Wędrowiec",
+    "createdAtUtc": "2026-10-20T08:00:00.000Z"
+  },
+  "character": {
+    "classId": "warrior",
+    "pathId": null,
+    "level": 3,
+    "totalExp": 520,
+    "hpCurrent": 87,
+    "mpCurrent": 40
+  },
+  "stats": {
+    "allocated": { "might": 0, "finesse": 0, "spirit": 0, "vigor": 0 },
+    "freeStatPoints": 0
+  },
+  "skills": {
+    "freeSkillPoints": 0,
+    "progress": [
+      {
+        "skillId": "warrior_heavy_slash",
+        "rankIndex": 1,
+        "tierId": "practice",
+        "tierRank": 1,
+        "pointsSpent": 1,
+        "attemptsTotal": 0,
+        "lastAttemptAtUtc": null,
+        "nextAttemptAtUtc": null
+      }
+    ],
+    "loadout": { "attack": "warrior_heavy_slash", "aura": null, "slot1": null, "slot2": null }
+  },
+  "inventory": {
+    "capacity": 24,
+    "stacks": [
+      { "slotIndex": 0, "definitionId": "potion_hp_s", "quantity": 3 }
+    ],
+    "items": [
+      {
+        "slotIndex": 1,
+        "item": {
+          "instanceId": "6f1c2a9e-3b4d-4e5f-8a7b-1c2d3e4f5a6b",
+          "definitionId": "starter_boots",
+          "itemLevel": 1,
+          "rarity": "uncommon",
+          "temper": 0,
+          "affixes": [ { "affixId": "max_hp_flat", "value": 6 } ],
+          "locked": true
+        }
+      }
+    ],
+    "lootStash": { "stacks": [], "items": [] }
+  },
+  "equipment": [
+    {
+      "slot": "weapon",
+      "item": {
+        "instanceId": "0b5e7a2c-91d4-8c3f-a1e2-55d6c7b8a9f0",
+        "definitionId": "starter_sword",
+        "itemLevel": 1,
+        "rarity": "common",
+        "temper": 0,
+        "affixes": [],
+        "locked": false
+      }
+    }
+  ],
+  "currency": { "talers": 145 },
+  "materials": [
+    { "definitionId": "ore_shard", "quantity": 4 }
+  ],
+  "quests": [
+    {
+      "questId": "quest-placeholder-01",
+      "status": "active",
+      "counters": { "kills": 2 },
+      "updatedAtUtc": "2026-10-23T02:10:00.000Z"
+    }
+  ],
+  "exploration": {
+    "totalMetersCredited": 1834.5,
+    "daily": { "dateUtc": "2026-10-23", "metersCredited": 412.5, "cellsDiscovered": 3 },
+    "discoveredCellIds": [ "cell-placeholder-001", "cell-placeholder-002", "cell-placeholder-003" ]
+  },
+  "encounterResults": [
+    {
+      "encounterId": "9d3b1f0e2a6c4b7d8e9f0a1b2c3d4e5f",
+      "source": "server",
+      "status": "applied",
+      "worldEntityId": "seed-mob-0001",
+      "completedAtUtc": "2026-10-23T02:14:30.000Z",
+      "reward": {
+        "exp": 30,
+        "talers": 12,
+        "stacks": [],
+        "items": [
+          { "definitionId": "starter_boots", "itemLevel": 1, "rarity": "uncommon", "instanceId": "6f1c2a9e-3b4d-4e5f-8a7b-1c2d3e4f5a6b" }
+        ],
+        "materials": [ { "definitionId": "ore_shard", "quantity": 1 } ]
+      }
+    }
+  ]
+}

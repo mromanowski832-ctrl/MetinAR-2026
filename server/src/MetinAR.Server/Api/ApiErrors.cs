@@ -21,6 +21,18 @@ public static class ErrorCodes
     public const string NotFound = "NOT_FOUND";
     public const string MethodNotAllowed = "METHOD_NOT_ALLOWED";
     public const string InternalError = "INTERNAL_ERROR";
+
+    // SaveGame (#71)
+    public const string PayloadTooLarge = "PAYLOAD_TOO_LARGE";
+    public const string SaveGameSchemaUnsupported = "SAVEGAME_SCHEMA_UNSUPPORTED";
+    public const string SaveGameLocalModeNotSyncable = "SAVEGAME_LOCAL_MODE_NOT_SYNCABLE";
+    public const string SaveGamePreconditionRequired = "SAVEGAME_PRECONDITION_REQUIRED";
+    public const string SaveGameRevisionConflict = "SAVEGAME_REVISION_CONFLICT";
+    public const string SaveGameServerOwnedFieldChanged = "SAVEGAME_SERVER_OWNED_FIELD_CHANGED";
+    public const string SaveGameIntegrityFailed = "SAVEGAME_INTEGRITY_FAILED";
+    public const string EncounterNotCompleted = "ENCOUNTER_NOT_COMPLETED";
+    public const string RewardClaimRejected = "REWARD_CLAIM_REJECTED";
+    public const string RewardNoSpace = "REWARD_NO_SPACE";
 }
 
 /// <summary>Builds RFC 9457 problem+json responses with the MetinAR <c>code</c> and <c>traceId</c> extensions.</summary>
