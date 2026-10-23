@@ -4,7 +4,7 @@ origin: original
 author: MetinAR project (Grok Bot implementation agent for the owner Michał Romanowski)
 license: MetinAR-Owned
 commercial_use: yes
-created_with: Blender 4.2.3 LTS (official blender.org build) driven by project scripts art-source/FppHandsSword/*.py; hands/forearms rig (29 bones) + Idle/Attack/AuraActivate clips; geometry, rig, animation, UVs and textures generated procedurally; Cycles bakes; Unity 6000.6.4f1 for materials/controller/prefabs
+created_with: Blender 4.2.3 LTS (official blender.org build) driven by project scripts art-source/FppHandsSword/*.py; geometry, UVs and textures generated procedurally; Unity 6000.6.4f1 for materials/prefabs; final gauntlets (GloveWarrior01: plated cuff, knuckle plates, segmented fingers; material slot 0, swappable) and forearms/sleeves (slot 1) on the 30-bone hands rig (+B_Socket_ShieldL); 16 clips (V3 Idle/Attack/AuraActivate, 1H combo x3, 2H combo x3, Aura 1H/2H, ShieldIdle/Block/BlockHold/BlockEnd, Idle2H)
 date_added: 2026-10-21
-modifications: n/a (first version)
-notes: no external meshes, scans, textures, marketplace or AI-generated content; the owner's reference image was NOT used as a model or texture; reproducible with blender -b --factory-startup --python art-source/FppHandsSword/fpp_build.py -- full <out_dir>
+modifications: 2026-10-23 #91 final gauntlets/forearms, glove material split, combo/block/aura clips with events (replaces the V3 blockout mesh; V3 contract values unchanged)
+notes: no external meshes, scans, textures, marketplace or AI-generated content; no third-party game assets; the owner's reference image was NOT used as a model or texture; reproducible with blender -b --factory-startup --python art-source/FppHandsSword/fpp_build.py -- final91 <out_dir>

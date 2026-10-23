@@ -18,7 +18,8 @@ namespace MetinAR.Editor.FppArt
     ///   PR #32 left-hand pose of contract V3 "v3-a31-retest" (reference values copied below, see docs/METINAR-FPP-ART-001.md §2);
     /// - hand/sword intersection on the skinned mesh (BakeMesh) against the sword proxies;
     /// - visibility of grip/guard/blade/left hand in the estimated A31 portrait + landscape view;
-    /// - preview screenshots (FPP portrait/landscape, outside, grip close-up) into Builds/metinar-fpp-art/.
+    /// - preview screenshots (FPP portrait/landscape, outside, grip close-up) into Builds/metinar-fpp-art/;
+    /// - #91 combo/block/aura clips, weapon prefabs, buckler clipping and centre box: FppArtComboCheck.
     /// Creates an unsaved temporary scene only; never modifies assets or project scenes.
     /// Batch: -executeMethod MetinAR.Editor.FppArt.FppArtAssetCheck.RunBatch
     /// </summary>
@@ -127,7 +128,7 @@ namespace MetinAR.Editor.FppArt
             EditorApplication.Exit(code);
         }
 
-        private sealed class Ctx
+        internal sealed class Ctx
         {
             public readonly StringBuilder Log = new StringBuilder();
             public int Errors;
@@ -156,6 +157,7 @@ namespace MetinAR.Editor.FppArt
             }
 
             CheckStatic(c, armsPrefab, swordPrefab);
+            FppArtComboCheck.CheckStatic(c, armsPrefab);
 
             var root = (GameObject)PrefabUtility.InstantiatePrefab(armsPrefab);
             try
@@ -165,7 +167,9 @@ namespace MetinAR.Editor.FppArt
                 Transform sockL = FppArtAssetBuilder.FindDeep(root.transform, FppArtAssetBuilder.LeftGripSocketBone);
                 SkinnedMeshRenderer smr = root.GetComponentInChildren<SkinnedMeshRenderer>(true);
                 CheckClips(c, model.gameObject, sock, sockL, smr);
+                FppArtComboCheck.CheckClips(c, root, model.gameObject, smr);
                 Screenshots(c, root, model.gameObject, smr);
+                FppArtComboCheck.Screenshots(c, model.gameObject, smr);
             }
             finally
             {
@@ -290,7 +294,7 @@ namespace MetinAR.Editor.FppArt
             Camera cam = MakeCamera("VisCam", PortraitAspect, PortraitVerticalFov);
             try
             {
-                foreach (string state in FppArtAssetBuilder.States)
+                foreach (string state in FppArtAssetBuilder.V3States) // V3 contract poses; the #91 clips: FppArtComboCheck
                 {
                     AnimationClip clip = FppArtAssetBuilder.LoadClip(state);
                     c.Check(clip != null, state + ": clip loads");
@@ -417,7 +421,7 @@ namespace MetinAR.Editor.FppArt
             return side;
         }
 
-        private static Camera MakeCamera(string name, float aspect, float vfov)
+        internal static Camera MakeCamera(string name, float aspect, float vfov)
         {
             var go = new GameObject(name);
             Camera cam = go.AddComponent<Camera>();
@@ -502,7 +506,7 @@ namespace MetinAR.Editor.FppArt
             c.Check(written == shots.Length * 3 + shots.Count(s => s.state != "Attack"), "screenshots written: " + written + " into " + OutDir);
         }
 
-        private static bool Shot(Camera cam, int w, int h, string name)
+        internal static bool Shot(Camera cam, int w, int h, string name)
         {
             var rt = RenderTexture.GetTemporary(w, h, 24, RenderTextureFormat.ARGB32);
             RenderTexture prev = RenderTexture.active;
@@ -527,6 +531,6 @@ namespace MetinAR.Editor.FppArt
             }
         }
 
-        private static string Fmt(Vector3 v) => "(" + v.x.ToString("0.000") + ", " + v.y.ToString("0.000") + ", " + v.z.ToString("0.000") + ")";
+        internal static string Fmt(Vector3 v) => "(" + v.x.ToString("0.000") + ", " + v.y.ToString("0.000") + ", " + v.z.ToString("0.000") + ")";
     }
 }

@@ -10,6 +10,9 @@ Status: assets + editor tooling delivered for **isolated preview**. No integrati
 The hands are virtual on-screen hands holding the sword; there is no camera hand tracking.
 Phone (Galaxy A31) and performance: **UNVERIFIED**.
 
+**#91 final set** (branch `feat/fpp-art-final-combo`): final gauntlets/forearms, 1H/2H swords, combos, Block and
+Aura 1H/2H on top of the V3 clips — see [section 11](#11-91-final-gauntlets-swords-combos-block-aura).
+
 ## 0. What is and is not in this change
 
 Delivered:
@@ -232,3 +235,84 @@ Unity -batchmode -projectPath client -executeMethod MetinAR.Editor.AssetPipeline
 1. Accept the `Player` category and its budget (section 4) or set different limits.
 2. #31: keep code-driven sockets or play the baked clips (both match).
 3. #31: add the Attack left-hand dodge to `FppPoseContract.LeftHandPose` (section 6.1).
+
+## 11. #91 final gauntlets, swords, combos, Block, Aura
+
+Issue #91 (ACK 91#issuecomment-6355623104), Aura steps #93 (ACK 93#issuecomment-6355623291); buckler from PR #63
+(referenced, not modified, not on this branch). #92 (runtime weapon swap / gameplay) and #97 are **not** started.
+Contract V3 `v3-a31-retest` values are unchanged: `Idle`, `Attack`, `AuraActivate` keep their socket tracks
+(Blender socket deviation vs PR #32 0.0 mm / 0.0°, Attack hilt-to-left-socket min 74.8 mm @ 0.42 s).
+
+Reproduce: `FPP_BUCKLER_MODEL=<#63 art-source/StarterBuckler> blender -b --factory-startup --python
+art-source/FppHandsSword/fpp_build.py -- final91 <out_dir>` (writes `Assets/**`, `build_report_91.json`,
+`clip_reference.json`, renders). Then the three Unity commands of section 8.
+
+### 11.1 Assets and budgets (Blender export)
+
+| Asset | Triangles | Bones | Materials | Textures |
+|---|---|---|---|---|
+| `SK_Player_FppArms` (glove 6388 + sleeve 2192) | 8580 / 10000 | 30 / 40 | 2 (slot 0 `M_FppArms_GloveWarrior01`, slot 1 `M_FppArms`) | 1024², BC/N/MS/E per material |
+| `SM_Weapon_FppSword` (1H, final) | 2208 / 3000 | – | 1 | 1024² BC/N/MS/E |
+| `SM_Weapon_FppSword02` (second 1H) | 1892 / 3000 | – | 1 | 1024² BC/N/MS/E |
+| `SM_Weapon_FppGreatsword` (2H) | 2290 / 3000 | – | 1 | 1024² BC/N/MS/E |
+
+- New bone `B_Socket_ShieldL` (child of `B_Hand_L`): the #63 buckler `PF_Weapon_StarterBuckler` is parented there with
+  identity transform and scale 1 (`SHIELD_REL` convention in `fpp_buckler.py`).
+- Gloves are swappable: the glove is its own submesh/material slot 0 (`GloveId = "GloveWarrior01"`); a new glove set
+  only needs another material (same UV layout) or a mesh with the same slot order.
+- The greatsword and Sword02 use the same socket set as FppSword and are drawn on `B_Socket_Sword` at the contract
+  scale 0.75; the arms prefab keeps the nested 1H sword. Swapping weapons at runtime is #92.
+- Animation events call `OnFppAnimEvent(string)` on `FppArmsAnimationEvents` (added to the arms model by the builder);
+  it only relays (`Fired`, `LastEvent`, `Count`) — no gameplay logic, subscription is #92.
+
+### 11.2 Clips and events (100 fps, seconds)
+
+| Clip | Length | Loop | Weapon | Buckler | Left hand | Events |
+|---|---|---|---|---|---|---|
+| Idle (V3) | 2.00 | yes | 1H | – | free | Breath 0 |
+| Attack (V3) | 0.72 | – | 1H | – | free (dodge) | Windup 0, HitStart .18, HitEnd .42, Recovered .72 |
+| AuraActivate (V3) | 1.15 | – | 1H | – | grips | 9 Aura steps (below) |
+| Attack1H_01 / _02 | 0.72 | – | 1H | yes | buckler | Windup 0, HitStart .18, ComboWindowOpen .40, HitEnd .42, ComboWindowClose .66, Recovered .72 |
+| Attack1H_03 (finisher) | 0.80 | – | 1H | yes | buckler | Windup 0, HitStart .22, HitEnd .48, Recovered .80 |
+| Attack2H_01 / _02 | 1.00 | – | 2H | – | grips | Windup 0, HitStart .32, ComboWindowOpen .60, HitEnd .62, ComboWindowClose .92, Recovered 1.00 |
+| Attack2H_03 (finisher) | 1.15 | – | 2H | – | grips | Windup 0, HitStart .38, HitEnd .72, Recovered 1.15 |
+| AuraActivate1H | 1.15 | – | 1H | yes (hangs on the forearm) | grips | 9 Aura steps |
+| AuraActivate2H | 1.15 | – | 2H | – | grips | 9 Aura steps |
+| ShieldIdle | 2.00 | yes | 1H | yes | buckler | Breath 0 |
+| ShieldBlock | 0.20 | – | 1H | yes | buckler | BlockRaise 0, BlockActive .12, BlockHold .20 |
+| ShieldBlockHold | 1.00 | yes | 1H | yes | buckler | BlockHold 0 |
+| ShieldBlockEnd | 0.30 | – | 1H | yes | buckler | BlockRelease 0, Recovered .30 |
+| Idle2H | 2.00 | yes | 2H | – | grips | Breath 0 |
+
+Aura steps (#93): AuraRaise 0, AuraReach .05, AuraGrip .35, AuraStabilize .40, AuraChargeStart .45, AuraSpread .55,
+AuraFlash .65, AuraSustain .75, AuraReturn .90, Recovered 1.15. Every combo clip starts and ends in its stance
+(1H: V3 rest pose; 2H: Idle2H pose). The per-frame socket tracks and the events are in
+`art-source/FppHandsSword/clip_reference.json`; the Unity builder reads events/loop flags from it, `FppArtComboCheck`
+compares the imported clips with it.
+
+### 11.3 Checks (Blender, `build_report_91.json`)
+
+- Hand vertices inside the weapon proxies: 0 in all 16 clips (right and left).
+- Free left hand to the drawn hilt: min 74.8 mm (Attack @ 0.42 s, V3); 1H combo/shield clips ≥ 228 mm.
+- Buckler clipping (#63 solid, margin 0): 0 hits in all 8 buckler clips (right arm, left arm, left-hand planks,
+  parked handle, sword). With a 20 mm margin only the left hand that holds the handle is reported — expected.
+- Central 20 % screen box blocked by the buckler: max 8 % (AuraActivate1H @ 0.97 s), ShieldBlock 4 %; limit 10 %.
+- Wrist gaps 0.0 mm; budgets above all inside.
+
+Unity (`FppArtAssetCheck` → `FppArtComboCheck`) repeats sockets (2 mm / 1°), events, loop flags, proxy penetration,
+free-left-hand distance, buckler clipping, centre box, budgets, URP materials and prefab sockets — see 11.5.
+
+### 11.4 Previews
+
+[1H + buckler + Block sheet](METINAR-FPP-ART-001/final91/sheet_1h.jpg),
+[2H + Aura sheet](METINAR-FPP-ART-001/final91/sheet_2h_aura.jpg),
+[V3 sheet](METINAR-FPP-ART-001/final91/sheet_v3.jpg); single frames in `METINAR-FPP-ART-001/final91/renders/`
+(portrait 9:20, centre kept clear).
+
+### 11.5 Known limitations / blockouts
+
+- **Temporary blockouts**: the buckler hang on the forearm in AuraActivate1H (the #63 buckler has no strap — a strap
+  on #63 is proposed as a follow-up), the Block pose (right hand goes to the frame edge), 2H_03 wrist bend ≈110°.
+- No Heavy Cut, no LOD levels (single LOD, inside the LOD0 budget).
+- Unity screenshots show no buckler (#63 is not on this branch); Blender previews do.
+- Phone (A31): UNVERIFIED. Unity gate results are posted in the PR (they come from the #33 LuzMen slot).

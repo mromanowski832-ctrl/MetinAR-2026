@@ -1,0 +1,1110 @@
+{
+  "issue": "#91",
+  "contract_id": "v3-a31-retest",
+  "sword_scale": 0.75,
+  "fps": 100,
+  "triangles": {
+    "SM_Weapon_FppSword": 2208,
+    "SM_Weapon_FppSword02": 1892,
+    "SM_Weapon_FppGreatsword": 2290,
+    "SK_Player_FppArms": 8580
+  },
+  "vertices": {
+    "SM_Weapon_FppSword": 1230,
+    "SM_Weapon_FppSword02": 1051,
+    "SM_Weapon_FppGreatsword": 1290,
+    "SK_Player_FppArms": 5082
+  },
+  "materials": {
+    "SM_Weapon_FppSword": 1,
+    "SM_Weapon_FppSword02": 1,
+    "SM_Weapon_FppGreatsword": 1,
+    "SK_Player_FppArms": [
+      "M_FppArms_GloveWarrior01",
+      "M_FppArms"
+    ]
+  },
+  "textures": {
+    "FppSword": [
+      "T_FppSword_BC.png",
+      "T_FppSword_E.png",
+      "T_FppSword_MS.png",
+      "T_FppSword_N.png"
+    ],
+    "FppSword02": [
+      "T_FppSword02_BC.png",
+      "T_FppSword02_E.png",
+      "T_FppSword02_MS.png",
+      "T_FppSword02_N.png"
+    ],
+    "FppGreatsword": [
+      "T_FppGreatsword_BC.png",
+      "T_FppGreatsword_E.png",
+      "T_FppGreatsword_MS.png",
+      "T_FppGreatsword_N.png"
+    ],
+    "FppArms": [
+      "T_FppArms_BC.png",
+      "T_FppArms_E.png",
+      "T_FppArms_GloveWarrior01_BC.png",
+      "T_FppArms_GloveWarrior01_E.png",
+      "T_FppArms_GloveWarrior01_MS.png",
+      "T_FppArms_GloveWarrior01_N.png",
+      "T_FppArms_MS.png",
+      "T_FppArms_N.png"
+    ]
+  },
+  "budget": {
+    "SM_Weapon_FppSword": {
+      "triangles": [
+        2208,
+        3000
+      ],
+      "materials": [
+        1,
+        1
+      ],
+      "texture": [
+        1024,
+        1024
+      ],
+      "ok": true
+    },
+    "SM_Weapon_FppSword02": {
+      "triangles": [
+        1892,
+        3000
+      ],
+      "materials": [
+        1,
+        1
+      ],
+      "texture": [
+        1024,
+        1024
+      ],
+      "ok": true
+    },
+    "SM_Weapon_FppGreatsword": {
+      "triangles": [
+        2290,
+        3000
+      ],
+      "materials": [
+        1,
+        1
+      ],
+      "texture": [
+        1024,
+        1024
+      ],
+      "ok": true
+    },
+    "SK_Player_FppArms": {
+      "triangles": [
+        8580,
+        10000
+      ],
+      "bones": [
+        30,
+        40
+      ],
+      "materials": [
+        2,
+        2
+      ],
+      "texture": [
+        1024,
+        1024
+      ],
+      "ok": true
+    }
+  },
+  "triangles_parts": {
+    "Glove_GloveWarrior01": 6388,
+    "Sleeve": 2192
+  },
+  "bones": 30,
+  "bone_names": [
+    "B_Root",
+    "B_UpperArm_R",
+    "B_Forearm_R",
+    "B_Hand_R",
+    "B_Index1_R",
+    "B_Index2_R",
+    "B_Middle1_R",
+    "B_Middle2_R",
+    "B_Ring1_R",
+    "B_Ring2_R",
+    "B_Pinky1_R",
+    "B_Pinky2_R",
+    "B_Thumb1_R",
+    "B_Thumb2_R",
+    "B_Socket_Sword",
+    "B_UpperArm_L",
+    "B_Forearm_L",
+    "B_Hand_L",
+    "B_Index1_L",
+    "B_Index2_L",
+    "B_Middle1_L",
+    "B_Middle2_L",
+    "B_Ring1_L",
+    "B_Ring2_L",
+    "B_Pinky1_L",
+    "B_Pinky2_L",
+    "B_Thumb1_L",
+    "B_Thumb2_L",
+    "B_Socket_GripL",
+    "B_Socket_ShieldL"
+  ],
+  "clips": {
+    "Idle": {
+      "frames": 201,
+      "seconds": 2.0,
+      "loop": true,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppSword",
+      "events": [
+        [
+          "Breath",
+          0.0
+        ]
+      ],
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "Attack": {
+      "frames": 73,
+      "seconds": 0.72,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppSword",
+      "events": [
+        [
+          "Windup",
+          0.0
+        ],
+        [
+          "HitStart",
+          0.18
+        ],
+        [
+          "HitEnd",
+          0.42
+        ],
+        [
+          "Recovered",
+          0.72
+        ]
+      ],
+      "left_finger_fit_frames": 30,
+      "left_finger_fit_range": [
+        -0.6,
+        0.0
+      ]
+    },
+    "AuraActivate": {
+      "frames": 116,
+      "seconds": 1.15,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppSword",
+      "events": [
+        [
+          "AuraRaise",
+          0.0
+        ],
+        [
+          "AuraReach",
+          0.05
+        ],
+        [
+          "AuraGrip",
+          0.35
+        ],
+        [
+          "AuraStabilize",
+          0.4
+        ],
+        [
+          "AuraChargeStart",
+          0.45
+        ],
+        [
+          "AuraSpread",
+          0.55
+        ],
+        [
+          "AuraFlash",
+          0.65
+        ],
+        [
+          "AuraSustain",
+          0.75
+        ],
+        [
+          "AuraReturn",
+          0.9
+        ],
+        [
+          "Recovered",
+          1.15
+        ]
+      ],
+      "left_finger_fit_frames": 43,
+      "left_finger_fit_range": [
+        -0.029,
+        0.2
+      ]
+    },
+    "Attack1H_01": {
+      "frames": 73,
+      "seconds": 0.72,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppSword",
+      "events": [
+        [
+          "Windup",
+          0.0
+        ],
+        [
+          "HitStart",
+          0.18
+        ],
+        [
+          "ComboWindowOpen",
+          0.4
+        ],
+        [
+          "HitEnd",
+          0.42
+        ],
+        [
+          "ComboWindowClose",
+          0.66
+        ],
+        [
+          "Recovered",
+          0.72
+        ]
+      ],
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "Attack1H_02": {
+      "frames": 73,
+      "seconds": 0.72,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppSword",
+      "events": [
+        [
+          "Windup",
+          0.0
+        ],
+        [
+          "HitStart",
+          0.18
+        ],
+        [
+          "ComboWindowOpen",
+          0.4
+        ],
+        [
+          "HitEnd",
+          0.42
+        ],
+        [
+          "ComboWindowClose",
+          0.66
+        ],
+        [
+          "Recovered",
+          0.72
+        ]
+      ],
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "Attack1H_03": {
+      "frames": 81,
+      "seconds": 0.8,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppSword",
+      "events": [
+        [
+          "Windup",
+          0.0
+        ],
+        [
+          "HitStart",
+          0.22
+        ],
+        [
+          "HitEnd",
+          0.48
+        ],
+        [
+          "Recovered",
+          0.8
+        ]
+      ],
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "Attack2H_01": {
+      "frames": 101,
+      "seconds": 1.0,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppGreatsword",
+      "events": [
+        [
+          "Windup",
+          0.0
+        ],
+        [
+          "HitStart",
+          0.32
+        ],
+        [
+          "ComboWindowOpen",
+          0.6
+        ],
+        [
+          "HitEnd",
+          0.62
+        ],
+        [
+          "ComboWindowClose",
+          0.92
+        ],
+        [
+          "Recovered",
+          1.0
+        ]
+      ],
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "Attack2H_02": {
+      "frames": 101,
+      "seconds": 1.0,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppGreatsword",
+      "events": [
+        [
+          "Windup",
+          0.0
+        ],
+        [
+          "HitStart",
+          0.32
+        ],
+        [
+          "ComboWindowOpen",
+          0.6
+        ],
+        [
+          "HitEnd",
+          0.62
+        ],
+        [
+          "ComboWindowClose",
+          0.92
+        ],
+        [
+          "Recovered",
+          1.0
+        ]
+      ],
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "Attack2H_03": {
+      "frames": 116,
+      "seconds": 1.15,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppGreatsword",
+      "events": [
+        [
+          "Windup",
+          0.0
+        ],
+        [
+          "HitStart",
+          0.38
+        ],
+        [
+          "HitEnd",
+          0.72
+        ],
+        [
+          "Recovered",
+          1.15
+        ]
+      ],
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "AuraActivate2H": {
+      "frames": 116,
+      "seconds": 1.15,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppGreatsword",
+      "events": [
+        [
+          "AuraRaise",
+          0.0
+        ],
+        [
+          "AuraReach",
+          0.05
+        ],
+        [
+          "AuraGrip",
+          0.35
+        ],
+        [
+          "AuraStabilize",
+          0.4
+        ],
+        [
+          "AuraChargeStart",
+          0.45
+        ],
+        [
+          "AuraSpread",
+          0.55
+        ],
+        [
+          "AuraFlash",
+          0.65
+        ],
+        [
+          "AuraSustain",
+          0.75
+        ],
+        [
+          "AuraReturn",
+          0.9
+        ],
+        [
+          "Recovered",
+          1.15
+        ]
+      ],
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "ShieldBlock": {
+      "frames": 21,
+      "seconds": 0.2,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppSword",
+      "events": [
+        [
+          "BlockRaise",
+          0.0
+        ],
+        [
+          "BlockActive",
+          0.12
+        ],
+        [
+          "BlockHold",
+          0.2
+        ]
+      ],
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "ShieldBlockHold": {
+      "frames": 101,
+      "seconds": 1.0,
+      "loop": true,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppSword",
+      "events": [
+        [
+          "BlockHold",
+          0.0
+        ]
+      ],
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "ShieldBlockEnd": {
+      "frames": 31,
+      "seconds": 0.3,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppSword",
+      "events": [
+        [
+          "BlockRelease",
+          0.0
+        ],
+        [
+          "Recovered",
+          0.3
+        ]
+      ],
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "Idle2H": {
+      "frames": 201,
+      "seconds": 2.0,
+      "loop": true,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppGreatsword",
+      "events": [
+        [
+          "Breath",
+          0.0
+        ]
+      ],
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "ShieldIdle": {
+      "frames": 201,
+      "seconds": 2.0,
+      "loop": true,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppSword",
+      "events": [
+        [
+          "Breath",
+          0.0
+        ]
+      ],
+      "left_finger_fit_frames": 0,
+      "left_finger_fit_range": [
+        0.0,
+        0.0
+      ]
+    },
+    "AuraActivate1H": {
+      "frames": 116,
+      "seconds": 1.15,
+      "loop": false,
+      "max_wrist_gap_m": 0.0,
+      "weapon": "SM_Weapon_FppSword",
+      "events": [
+        [
+          "AuraRaise",
+          0.0
+        ],
+        [
+          "AuraReach",
+          0.05
+        ],
+        [
+          "AuraGrip",
+          0.35
+        ],
+        [
+          "AuraStabilize",
+          0.4
+        ],
+        [
+          "AuraChargeStart",
+          0.45
+        ],
+        [
+          "AuraSpread",
+          0.55
+        ],
+        [
+          "AuraFlash",
+          0.65
+        ],
+        [
+          "AuraSustain",
+          0.75
+        ],
+        [
+          "AuraReturn",
+          0.9
+        ],
+        [
+          "Recovered",
+          1.15
+        ]
+      ],
+      "left_finger_fit_frames": 22,
+      "left_finger_fit_range": [
+        0.0,
+        0.2
+      ]
+    }
+  },
+  "socket_vs_pr32_blender": {
+    "Attack": {
+      "right_pos_m": 0.0,
+      "right_rot_deg": 0.0,
+      "left_pos_m": 0.0,
+      "left_rot_deg": 0.0
+    },
+    "AuraActivate": {
+      "right_pos_m": 0.0,
+      "right_rot_deg": 0.0,
+      "left_pos_m": 0.0,
+      "left_rot_deg": 0.0
+    }
+  },
+  "attack_hilt_left_socket": {
+    "min_m": 0.0748,
+    "at_s": 0.42,
+    "required_m": 0.05,
+    "contract_min_m": 0.0748
+  },
+  "contacts": {
+    "Idle": {
+      "weapon": "SM_Weapon_FppSword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": 0.1481,
+      "left_free_min_at_s": 1.74
+    },
+    "Attack": {
+      "weapon": "SM_Weapon_FppSword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": 0.0748,
+      "left_free_min_at_s": 0.42
+    },
+    "AuraActivate": {
+      "weapon": "SM_Weapon_FppSword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": 0.1524,
+      "left_free_min_at_s": 0.0
+    },
+    "Attack1H_01": {
+      "weapon": "SM_Weapon_FppSword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": 0.2704,
+      "left_free_min_at_s": 0.63
+    },
+    "Attack1H_02": {
+      "weapon": "SM_Weapon_FppSword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": 0.296,
+      "left_free_min_at_s": 0.05
+    },
+    "Attack1H_03": {
+      "weapon": "SM_Weapon_FppSword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": 0.2972,
+      "left_free_min_at_s": 0.0
+    },
+    "Attack2H_01": {
+      "weapon": "SM_Weapon_FppGreatsword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": null,
+      "left_free_min_at_s": null
+    },
+    "Attack2H_02": {
+      "weapon": "SM_Weapon_FppGreatsword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": null,
+      "left_free_min_at_s": null
+    },
+    "Attack2H_03": {
+      "weapon": "SM_Weapon_FppGreatsword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": null,
+      "left_free_min_at_s": null
+    },
+    "AuraActivate2H": {
+      "weapon": "SM_Weapon_FppGreatsword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": null,
+      "left_free_min_at_s": null
+    },
+    "ShieldBlock": {
+      "weapon": "SM_Weapon_FppSword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": 0.2311,
+      "left_free_min_at_s": 0.17
+    },
+    "ShieldBlockHold": {
+      "weapon": "SM_Weapon_FppSword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": 0.2289,
+      "left_free_min_at_s": 0.5
+    },
+    "ShieldBlockEnd": {
+      "weapon": "SM_Weapon_FppSword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": 0.2313,
+      "left_free_min_at_s": 0.0
+    },
+    "Idle2H": {
+      "weapon": "SM_Weapon_FppGreatsword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": null,
+      "left_free_min_at_s": null
+    },
+    "ShieldIdle": {
+      "weapon": "SM_Weapon_FppSword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": 0.2962,
+      "left_free_min_at_s": 1.5
+    },
+    "AuraActivate1H": {
+      "weapon": "SM_Weapon_FppSword",
+      "penetrating_vertices": {
+        "R": 0,
+        "L": 0
+      },
+      "left_free_min_hilt_distance_m": 0.2972,
+      "left_free_min_at_s": 0.0
+    }
+  },
+  "buckler_check": {
+    "margin_0mm": {
+      "source": "PR #63 feat/032-starter-buckler-mesh @ 1dd895a (art-source/StarterBuckler/buckler_model.py dimensions)",
+      "margin_m": 0.0,
+      "states": {
+        "Attack1H_01": {
+          "frames": 73,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 0,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {},
+          "errors": 0,
+          "centre_box_blocked_max": 0.0,
+          "centre_box_blocked_at_s": null
+        },
+        "Attack1H_02": {
+          "frames": 73,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 0,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {},
+          "errors": 0,
+          "centre_box_blocked_max": 0.0,
+          "centre_box_blocked_at_s": null
+        },
+        "Attack1H_03": {
+          "frames": 81,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 0,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {},
+          "errors": 0,
+          "centre_box_blocked_max": 0.0,
+          "centre_box_blocked_at_s": null
+        },
+        "ShieldBlock": {
+          "frames": 21,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 0,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {},
+          "errors": 0,
+          "centre_box_blocked_max": 0.04,
+          "centre_box_blocked_at_s": 0.14
+        },
+        "ShieldBlockHold": {
+          "frames": 101,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 0,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {},
+          "errors": 0,
+          "centre_box_blocked_max": 0.0,
+          "centre_box_blocked_at_s": null
+        },
+        "ShieldBlockEnd": {
+          "frames": 31,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 0,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {},
+          "errors": 0,
+          "centre_box_blocked_max": 0.0,
+          "centre_box_blocked_at_s": null
+        },
+        "ShieldIdle": {
+          "frames": 201,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 0,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {},
+          "errors": 0,
+          "centre_box_blocked_max": 0.0,
+          "centre_box_blocked_at_s": null
+        },
+        "AuraActivate1H": {
+          "frames": 116,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 0,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {},
+          "errors": 0,
+          "centre_box_blocked_max": 0.08,
+          "centre_box_blocked_at_s": 0.97
+        }
+      },
+      "errors": 0
+    },
+    "margin_20mm": {
+      "source": "PR #63 feat/032-starter-buckler-mesh @ 1dd895a (art-source/StarterBuckler/buckler_model.py dimensions)",
+      "margin_m": 0.02,
+      "states": {
+        "Attack1H_01": {
+          "frames": 73,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 25988,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {
+            "left_hand_planks": 0.0
+          },
+          "errors": 25988,
+          "centre_box_blocked_max": 0.0,
+          "centre_box_blocked_at_s": null
+        },
+        "Attack1H_02": {
+          "frames": 73,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 25988,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {
+            "left_hand_planks": 0.0
+          },
+          "errors": 25988,
+          "centre_box_blocked_max": 0.0,
+          "centre_box_blocked_at_s": null
+        },
+        "Attack1H_03": {
+          "frames": 81,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 28836,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {
+            "left_hand_planks": 0.0
+          },
+          "errors": 28836,
+          "centre_box_blocked_max": 0.0,
+          "centre_box_blocked_at_s": null
+        },
+        "ShieldBlock": {
+          "frames": 21,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 6636,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {
+            "left_hand_planks": 0.0
+          },
+          "errors": 6636,
+          "centre_box_blocked_max": 0.04,
+          "centre_box_blocked_at_s": 0.14
+        },
+        "ShieldBlockHold": {
+          "frames": 101,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 31916,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {
+            "left_hand_planks": 0.0
+          },
+          "errors": 31916,
+          "centre_box_blocked_max": 0.0,
+          "centre_box_blocked_at_s": null
+        },
+        "ShieldBlockEnd": {
+          "frames": 31,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 9796,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {
+            "left_hand_planks": 0.0
+          },
+          "errors": 9796,
+          "centre_box_blocked_max": 0.0,
+          "centre_box_blocked_at_s": null
+        },
+        "ShieldIdle": {
+          "frames": 201,
+          "hits": {
+            "right_arm": 0,
+            "left_arm": 0,
+            "left_hand_planks": 71556,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {
+            "left_hand_planks": 0.0
+          },
+          "errors": 71556,
+          "centre_box_blocked_max": 0.0,
+          "centre_box_blocked_at_s": null
+        },
+        "AuraActivate1H": {
+          "frames": 116,
+          "hits": {
+            "right_arm": 17,
+            "left_arm": 1485,
+            "left_hand_planks": 7597,
+            "left_hand_handle": 0,
+            "sword": 0
+          },
+          "first_hit_s": {
+            "left_hand_planks": 0.0,
+            "left_arm": 0.26,
+            "right_arm": 0.94
+          },
+          "errors": 9099,
+          "centre_box_blocked_max": 0.08,
+          "centre_box_blocked_at_s": 0.97
+        }
+      },
+      "errors": 209815
+    }
+  }
+}

@@ -164,6 +164,9 @@ def finger_joints(y, last_scale):
 
 
 def hand_frame(side, action="Rest", time=0.0):
+    import fpp_combo as K
+    if action in K.all_states():
+        return K.right_pose(action, time) if side > 0 else K.left_pose(action, time)
     if side > 0:
         return C.sword_pose(action, time) if action != "Rest" else C.sword_pose("Idle", 0.0)
     return C.left_hand_pose(action, time) if action != "Rest" else C.left_hand_pose("Idle", 0.0)
@@ -182,7 +185,7 @@ def bone_names(side):
     return names
 
 
-DEFORM_BONES = ["B_Root"] + bone_names(1) + bone_names(-1) + ["B_Socket_Sword", "B_Socket_GripL"]
+DEFORM_BONES = ["B_Root"] + bone_names(1) + bone_names(-1) + ["B_Socket_Sword", "B_Socket_GripL", "B_Socket_ShieldL"]
 
 
 # ---------------------------------------------------------------- arm IK (Unity space)
@@ -215,6 +218,10 @@ def all_wrists(side):
         for f in range(int(round(length * C.FPS)) + 1):
             out.append(wrist_world(side, action, f / C.FPS))
     out.append(wrist_world(side, "Rest"))
+    import fpp_combo as K  # #91: the shoulder must reach every combo / 2H pose too
+    for action in K.all_states():
+        for f in range(int(round(K.seconds(action) * C.FPS)) + 1):
+            out.append(wrist_world(side, action, f / C.FPS))
     return out
 
 
@@ -438,6 +445,15 @@ def build_armature():
         sock.tail = sock.head + Vector(m.col[1][:3]) * 0.05
         sock.align_roll(Vector(m.col[2][:3]))
         sock.parent = hand
+        if side < 0:
+            # K6 / #59: buckler socket (PR #63 pivot convention), LeftHand frame turned so the front faces the knuckles
+            import fpp_combo as K
+            ms = C.to_blender_node_matrix(pos, rot @ K.SHIELD_REL)
+            sh = eb.new("B_Socket_ShieldL")
+            sh.head = ms.translation.copy()
+            sh.tail = sh.head + Vector(ms.col[1][:3]) * 0.05
+            sh.align_roll(Vector(ms.col[2][:3]))
+            sh.parent = hand
     bpy.ops.object.mode_set(mode="OBJECT")
     for pb in rig.pose.bones:
         pb.rotation_mode = "QUATERNION"
