@@ -1,0 +1,11 @@
+START compile,build,status,build,status,check,validate,qa,selftest,status 2026-10-21T16:04:24.6794724+02:00 head=034851eff87a36abcd163cbf9d8a5dce1094043f
+compile#1 exit=0 secs=18 freeBefore=58,32GB freeAfter=58,31GB
+build#2 exit=0 secs=23 freeBefore=58,31GB freeAfter=58,29GB
+status#3 lines=0
+build#4 exit=0 secs=24 freeBefore=58,29GB freeAfter=58,23GB
+status#5 lines=0
+check#6 exit=0 secs=34 freeBefore=58,23GB freeAfter=58,18GB
+validate#7 exit=0 secs=23 freeBefore=58,18GB freeAfter=58,16GB
+qa#8 exit=0 secs=28 freeBefore=58,16GB freeAfter=58,14GB
+runner stopped 16:07:01 per #33 RULE 16:08 (parallel permission withdrawn); qa Unity PID 16952 left to finish on its own; selftest NOT started
+NOTE (added from the logs): selftest#9 had already been started by the runner at 16:06:57, before the stop; it finished on its own at 16:07:25: "[METINAR-009] Asset pipeline self-test: tests=14 failures=0". git status after it: 0 lines (checked read-only at 16:08). 0 error CS in all logs.

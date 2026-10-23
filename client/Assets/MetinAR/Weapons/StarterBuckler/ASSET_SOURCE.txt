@@ -1,0 +1,10 @@
+# METINAR-032 — provenance / licence record (METINAR-009 section 11)
+asset_id: StarterBuckler
+origin: original
+author: MetinAR project (Grok Bot implementation agent, 3D models, for the owner Michał Romanowski)
+license: MetinAR-Owned
+commercial_use: yes
+created_with: Blender 4.2.3 LTS (official blender.org build) driven by the project script art-source/StarterBuckler/buckler_build.py; geometry, UVs and textures generated procedurally (textures painted in UV space with numpy); Unity 6000.6.4f1 for material and prefab
+date_added: 2026-10-21
+modifications: n/a (first version)
+notes: item starter_buckler (Lipowy Puklerz), ITEMS_COMBAT_SPEC section 8 shield budget (1.5k tris, 0 bones, 1 material, 512 textures); no external meshes, scans, textures, marketplace or AI-generated content; reproducible with blender -b --factory-startup --python art-source/StarterBuckler/buckler_build.py -- <out_dir>

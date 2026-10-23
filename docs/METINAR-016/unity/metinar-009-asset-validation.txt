@@ -1,0 +1,2 @@
+[METINAR-009] Asset pipeline validation: files=22 errors=0 warnings=1
+WARNING Assets/MetinAR/Characters/NPC/WanderingMerchant/Models/SK_Npc_WanderingMerchant.fbx: Pivot is not on the ground: mesh min Y = -0,124 m (expected 0 ± 0,02).
