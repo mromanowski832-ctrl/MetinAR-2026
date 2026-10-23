@@ -27,13 +27,19 @@ namespace MetinAR.ArEncounter
         HoldConsumed = 4,
     }
 
-    /// <summary>Charged skill bound to "hold ATAK" (warrior: <c>warrior_heavy_slash</c>, CLASSES_SKILLS.md).</summary>
+    /// <summary>
+    /// Skill bound to "hold ATAK" (warrior: <c>warrior_heavy_slash</c>, Ciężkie Cięcie).
+    /// OWNER_SPEC_2026-10-23 §4: holding ATAK ~0.6 s starts Ciężkie Cięcie directly — no unlock/assignment condition.
+    /// Cost and cooldown come from the skill's data: <see cref="CanCast"/> is the hook for that check (null = no check here).
+    /// </summary>
     public sealed class ChargedSkillSlot
     {
+        public const string WarriorHeavySlashId = "warrior_heavy_slash";
         public string SkillId;
-        public bool Unlocked;
-        public bool Assigned;
-        public bool Available { get { return Unlocked && Assigned && !string.IsNullOrEmpty(SkillId); } }
+        /// <summary>Cost/cooldown check from skill data (e.g. enough resource and cooldown elapsed). Null = always castable.</summary>
+        public Func<string, bool> CanCast;
+        public bool Available { get { return !string.IsNullOrEmpty(SkillId) && (CanCast == null || CanCast(SkillId)); } }
+        public static ChargedSkillSlot WarriorHeavySlash() { return new ChargedSkillSlot { SkillId = WarriorHeavySlashId }; }
     }
 
     /// <summary>A hit registered by blade sampling (never by the button). Feed it to <c>EncounterCombatSession.RegisterHit</c>.</summary>
@@ -74,7 +80,7 @@ namespace MetinAR.ArEncounter
     ///   <see cref="WeaponComboConfig.InputBufferSeconds"/> of cios 1/2 → buffered, chains when the swing ends (COMBAT_PHYSICS.md §4).
     ///   Any other press (mid-swing, during cios 3) is ignored, including as a hold.</item>
     /// <item>No tap inside the window → back to cios 1 (Idle). After cios 3 the combo ends (Idle; next tap = cios 1).</item>
-    /// <item>Hold ≥ threshold fires the charged skill only when it is unlocked and assigned, and resets the combo to cios 1.
+    /// <item>Hold ≥ threshold fires Ciężkie Cięcie directly (only its cost/cooldown check can refuse it), and resets the combo to cios 1.
     ///   A hold never starts or chains a combo swing, so it can never produce a combo hit.</item>
     /// <item>Hits come only from <see cref="SampleBlade"/> (real blade pose vs target) over the step's hit interval crossed by
     ///   the last <see cref="Tick"/>; max 1 hit per target per swing; every step is its own swing (new <see cref="SwingId"/>).</item>
@@ -118,7 +124,7 @@ namespace MetinAR.ArEncounter
         public double ClipTime { get { return SwingElapsed * _weapon.AttackSpeed; } }
         public double WindowRemaining { get; private set; }
         public bool AttackHeld { get { return _pressed; } }
-        public ChargedSkillSlot ChargedSkill { get; set; }
+        public ChargedSkillSlot ChargedSkill { get; set; } = ChargedSkillSlot.WarriorHeavySlash();
 
         /// <summary>Clip-time interval crossed by the last <see cref="Tick"/> inside the hit interval of swing <see cref="HitSwingId"/>.</summary>
         public bool HasHitWindow { get; private set; }
@@ -134,9 +140,9 @@ namespace MetinAR.ArEncounter
         public event Action ComboReset;
         /// <summary>Cios 3 finished; the combo ended.</summary>
         public event Action ComboCompleted;
-        /// <summary>Hold reached the threshold and the charged skill is unlocked and assigned: skill id.</summary>
+        /// <summary>Hold reached the threshold and the skill passed its cost/cooldown check: skill id.</summary>
         public event Action<string> ChargedSkillFired;
-        /// <summary>Hold reached the threshold but the charged skill is locked or not assigned: nothing fires.</summary>
+        /// <summary>Hold reached the threshold but the skill failed its cost/cooldown check (or no skill is bound): nothing fires.</summary>
         public event Action ChargedSkillUnavailable;
         /// <summary>Weapon switched: the view swaps model, hand layout, animation set, reach, damage and sounds from this config.</summary>
         public event Action<WeaponComboConfig> WeaponChanged;

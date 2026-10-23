@@ -313,10 +313,10 @@ namespace MetinAR.Gameplay.Tests
         // ---------- tap vs hold ----------
 
         [Fact]
-        public void Hold_FiresChargedSkill_WhenUnlockedAndAssigned_NeverAComboSwing()
+        public void Hold_FiresHeavySlash_NeverAComboSwing()
         {
             var m = Machine();
-            m.ChargedSkill = new ChargedSkillSlot { SkillId = "warrior_heavy_slash", Unlocked = true, Assigned = true };
+            m.ChargedSkill = ChargedSkillSlot.WarriorHeavySlash();
             var fired = new List<string>();
             int starts = 0;
             m.ChargedSkillFired += fired.Add;
@@ -338,7 +338,7 @@ namespace MetinAR.Gameplay.Tests
         public void HoldFromWindow_FiresSkill_AndResetsComboToStepOne()
         {
             var m = Machine();
-            m.ChargedSkill = new ChargedSkillSlot { SkillId = "warrior_heavy_slash", Unlocked = true, Assigned = true };
+            m.ChargedSkill = ChargedSkillSlot.WarriorHeavySlash();
             int fired = 0;
             m.ChargedSkillFired += id => fired++;
             Tap(m); RunUntilPhaseChanges(m);
@@ -353,14 +353,26 @@ namespace MetinAR.Gameplay.Tests
             Assert.Equal(1, m.Step);
         }
 
-        [Theory]
-        [InlineData(false, true)]
-        [InlineData(true, false)]
-        [InlineData(false, false)]
-        public void Hold_WithSkillLockedOrUnassigned_FiresNothing(bool unlocked, bool assigned)
+        [Fact]
+        public void Hold_FiresHeavySlash_ByDefault_WithoutAnyAssignment()
+        {
+            var m = Machine(); // no ChargedSkill set: spec §4 binds hold ATAK to Ciężkie Cięcie directly
+            var fired = new List<string>();
+            m.ChargedSkillFired += fired.Add;
+            m.PressAttack(true);
+            Run(m, 0.62);
+            Assert.Equal(new[] { "warrior_heavy_slash" }, fired);
+            Assert.Equal(ComboInputResult.HoldConsumed, m.ReleaseAttack(true));
+        }
+
+        [Fact]
+        public void Hold_WhenCostOrCooldownCheckFails_FiresNothing()
         {
             var m = Machine();
-            m.ChargedSkill = new ChargedSkillSlot { SkillId = "warrior_heavy_slash", Unlocked = unlocked, Assigned = assigned };
+            var slot = ChargedSkillSlot.WarriorHeavySlash();
+            string asked = null;
+            slot.CanCast = id => { asked = id; return false; };
+            m.ChargedSkill = slot;
             int fired = 0, unavailable = 0, starts = 0;
             m.ChargedSkillFired += id => fired++;
             m.ChargedSkillUnavailable += () => unavailable++;
@@ -368,6 +380,7 @@ namespace MetinAR.Gameplay.Tests
             m.PressAttack(true);
             Run(m, 0.7);
             Assert.Equal(ComboInputResult.HoldConsumed, m.ReleaseAttack(true));
+            Assert.Equal("warrior_heavy_slash", asked);
             Assert.Equal(0, fired);
             Assert.Equal(1, unavailable);
             Assert.Equal(0, starts);
@@ -378,7 +391,7 @@ namespace MetinAR.Gameplay.Tests
         public void ReleaseJustBeforeThreshold_IsATap()
         {
             var m = Machine();
-            m.ChargedSkill = new ChargedSkillSlot { SkillId = "warrior_heavy_slash", Unlocked = true, Assigned = true };
+            m.ChargedSkill = ChargedSkillSlot.WarriorHeavySlash();
             int fired = 0;
             m.ChargedSkillFired += id => fired++;
             m.PressAttack(true);
@@ -392,7 +405,7 @@ namespace MetinAR.Gameplay.Tests
         public void IgnoredMidSwingPress_CannotBecomeAChargedSkill()
         {
             var m = Machine();
-            m.ChargedSkill = new ChargedSkillSlot { SkillId = "warrior_heavy_slash", Unlocked = true, Assigned = true };
+            m.ChargedSkill = ChargedSkillSlot.WarriorHeavySlash();
             int fired = 0;
             m.ChargedSkillFired += id => fired++;
             Tap(m);
