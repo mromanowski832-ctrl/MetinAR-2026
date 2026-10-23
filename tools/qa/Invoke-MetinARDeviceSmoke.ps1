@@ -17,13 +17,21 @@
     Frames         SurfaceFlinger present-time FPS (display side, approximate) + gfxinfo summary
     PerfBudget     [MetinARPerf] samples (development builds) vs. tools/qa/perf-budgets.json
     Thermal        thermal status + battery temperature
+  METINAR-037 (#73): before every step `adb devices` must still list the phone as `device`. A short drop is waited out
+  (-AdbReconnectSeconds) and recorded as an adb/logcat gap; a lasting loss ends the run with an `Adb` FAIL, every step
+  not yet run is UNVERIFIED and the exit code is 3. adb is never restarted (no kill-server). On LuzMen, starting or
+  closing Unity kills the adb server - see the #33 slot rules.
+  Install refuses to replace an installed protected package (qa-config androidBuild.protectedPackages, e.g. the game
+  com.metinar.game) unless -AllowReplaceInstalled; the QA APK has its own id com.metinar.game.qa.
   Writes Builds/qa/device-<timestamp>/device-report.md, device-report.json and logcat-redacted.txt.
   Raw logcat is never written to disk; only the redacted copy (no serial, IP, MAC, e-mail, coordinates, IDs).
 
-  Exit codes: 0 = no FAIL, 1 = at least one FAIL, 2 = no authorized device (nothing verified).
+  Exit codes: 0 = no FAIL, 1 = at least one FAIL, 2 = no authorized device (nothing verified),
+              3 = adb connection lost during the run (partial; remaining steps UNVERIFIED),
+              4 = logcat collection error (adb logcat exit != 0, empty dump or no line of the app): Crash UNVERIFIED.
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARDeviceSmoke.ps1 -ApkPath client\Builds\Android\MetinAR-ar-encounter-dev.apk
+  powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARDeviceSmoke.ps1 -ApkPath client\Builds\Android\MetinAR-ar-encounter-qa.apk
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARDeviceSmoke.ps1 -SkipInstall -SoakSeconds 120 -BudgetScene WorldMapPrototype
 #>
@@ -40,7 +48,9 @@ param(
     [int]$PermissionWaitSeconds = 0,
     [string]$BudgetScene,
     [switch]$SkipInstall,
-    [switch]$SkipBackgroundTest
+    [switch]$SkipBackgroundTest,
+    [int]$AdbReconnectSeconds = 20,
+    [switch]$AllowReplaceInstalled
 )
 $ErrorActionPreference = 'Continue'
 Import-Module (Join-Path $PSScriptRoot 'MetinARQa.psm1') -Force -DisableNameChecking
@@ -70,6 +80,7 @@ function Add-Result($r) {
 function Adb {
     $a = @(); if ($Serial) { $a += @('-s', $Serial) }
     $out = & $AdbPath @($a + $args) 2>&1 | ForEach-Object { "$_" }
+    $script:AdbExit = $LASTEXITCODE   # read by callers that need it (logcat dump); a failed command must not look clean
     return @($out)
 }
 function Write-Report {
@@ -109,7 +120,40 @@ $deviceInfo['API'] = (Adb shell getprop ro.build.version.sdk | Select-Object -Fi
 $deviceInfo['ABI'] = (Adb shell getprop ro.product.cpu.abi | Select-Object -First 1).Trim()
 Add-Result (New-MetinARGateResult -Name 'Device' -Status 'PASS' -Detail ("1 authorized device: {0}, Android {1} (API {2}), {3}" -f $deviceInfo.Model, $deviceInfo.Android, $deviceInfo.API, $deviceInfo.ABI))
 
+# --- adb health before every step (METINAR-037) ----------------------------------------------
+$plannedSteps = @('Install', 'ColdLaunch', 'PermissionUi', 'Process', 'Permissions', 'Background', 'Crash', 'Memory', 'Cpu', 'Frames', 'PerfBudget', 'Thermal')
+$script:adbChecks = 0
+$script:adbLastOk = Get-Date
+function Stop-AdbLost([string]$Step, [string]$State, [datetime]$Since) {
+    Add-Result (New-MetinARGateResult -Name 'Adb' -Status 'FAIL' -Detail ("adb connection lost before step '{0}': state={1} since {2:HH:mm:ss}, last OK {3:HH:mm:ss}; not restarted (no kill-server). Check the cable and whether Unity was started/closed on this PC." -f $Step, $State, $Since, $script:adbLastOk))
+    $done = @($results | ForEach-Object { $_.Name })
+    foreach ($n in $plannedSteps) { if ($done -notcontains $n) { Add-Result (New-MetinARGateResult -Name $n -Status 'UNVERIFIED' -Detail "not run: adb connection lost before '$Step'") } }
+    $notes.Add(("Logcat/host gap: adb lost from {0:HH:mm:ss} (state {1}); the redacted logcat may be missing or incomplete." -f $Since, $State))
+    Write-Report
+    exit 3
+}
+function Assert-AdbReady([string]$Step) {
+    $script:adbChecks++
+    $deadline = (Get-Date).AddSeconds([math]::Max(0, $AdbReconnectSeconds))
+    $lostAt = $null; $lostState = $null
+    while ($true) {
+        $st = ConvertFrom-MetinARAdbDevices -Lines @(& $AdbPath devices 2>&1 | ForEach-Object { "$_" }) -Serial $Serial
+        if ($st.State -eq 'device') {
+            if ($lostAt) {
+                $gap = ("adb gap before step '{0}': state={1} from {2:HH:mm:ss} to {3:HH:mm:ss} ({4:N0} s); logcat lines in this window may be missing." -f $Step, $lostState, $lostAt, (Get-Date), ((Get-Date) - $lostAt).TotalSeconds)
+                $notes.Add($gap); Write-Host "[adb] $gap" -ForegroundColor Yellow
+            }
+            $script:adbLastOk = Get-Date
+            return
+        }
+        if (-not $lostAt) { $lostAt = Get-Date; $lostState = $st.State; Write-Host ("[adb] device state '{0}' before step '{1}' - waiting up to {2} s (adb is not restarted)" -f $st.State, $Step, $AdbReconnectSeconds) -ForegroundColor Yellow }
+        if ((Get-Date) -ge $deadline) { Stop-AdbLost $Step $lostState $lostAt }
+        Start-Sleep -Seconds 2
+    }
+}
+
 # --- Install -------------------------------------------------------------------------------
+Assert-AdbReady 'Install'
 $activity = $null
 if ($ApkPath) {
     $aapt = Find-MetinARAndroidTool -Name aapt -UnityPath $UnityPath
@@ -121,11 +165,19 @@ if ($ApkPath) {
 if (-not $SkipInstall) {
     if (-not $ApkPath -or -not (Test-Path $ApkPath)) {
         Add-Result (New-MetinARGateResult -Name 'Install' -Status 'FAIL' -Detail 'no -ApkPath given (or use -SkipInstall)')
+    } elseif (($guard = Test-MetinARInstallGuard -Package $Package -ProtectedPackages @($config.androidBuild.protectedPackages) `
+                -InstalledPackages @((Adb shell pm list packages $Package) | ForEach-Object { "$_".Trim() -replace '^package:', '' }) -AllowReplace:$AllowReplaceInstalled).Status -eq 'FAIL') {
+        Add-Result (New-MetinARGateResult -Name 'Install' -Status 'FAIL' -Detail ('APK not installed: ' + $guard.Reason))
     } elseif (@((Test-MetinARApkPlayerData -Entries @(Get-MetinARZipEntries -Path $ApkPath)).Problems).Count) {
         # #31: never install an APK whose player data mixes whole files with stale .split chunks (crashes on scene load).
         $pd = Test-MetinARApkPlayerData -Entries @(Get-MetinARZipEntries -Path $ApkPath)
         Add-Result (New-MetinARGateResult -Name 'Install' -Status 'FAIL' -Detail 'APK rejected before install: inconsistent player data (stale .split chunks)' -Evidence @($pd.Problems))
+    } elseif (($arc = Test-MetinARApkArCore -Entries @(Get-MetinARZipEntries -Path $ApkPath) -Rule $config.androidBuild.arCore `
+                -RuntimeInitializeJson (Get-MetinARZipEntryText -Path $ApkPath -Entry $config.androidBuild.arCore.runtimeInitializeEntry)).Status -eq 'FAIL') {
+        # #31 f194aa9 / audit N-01: an APK without the ARCore registrations starts with "AR unavailable"; don't spend a phone slot on it.
+        Add-Result (New-MetinARGateResult -Name 'Install' -Status 'FAIL' -Detail ("APK rejected before install: ARCore registrations {0}/{1}" -f $arc.Found, $arc.Required) -Evidence @($arc.Problems))
     } else {
+        if ($guard.Reason) { $notes.Add($guard.Reason) }
         $t0 = Get-Date
         $out = Adb install '-r' '-t' $ApkPath
         $ok = ($out -join ' ') -match 'Success'
@@ -146,6 +198,7 @@ if (-not $activity) {
 $component = if ($activity) { if ($activity.StartsWith('.')) { "$Package/$Package$activity" } elseif ($activity.Contains('/')) { $activity } else { "$Package/$activity" } } else { $null }
 
 # --- Cold launch ---------------------------------------------------------------------------
+Assert-AdbReady 'ColdLaunch'
 Adb shell am force-stop $Package | Out-Null
 Adb logcat '-c' | Out-Null
 Start-Sleep -Seconds 1
@@ -159,6 +212,7 @@ Add-Result (New-MetinARGateResult -Name 'ColdLaunch' -Status $st -Detail ("compo
 Start-Sleep -Seconds $LaunchWaitSeconds
 
 # --- Permission UI (never tapped) ----------------------------------------------------------
+Assert-AdbReady 'PermissionUi'
 function Get-Focus { return ((Adb shell dumpsys window) | Where-Object { $_ -match 'mCurrentFocus|mFocusedApp' } | Select-Object -First 1) }
 $focus = Get-Focus
 $dialog = $focus -match 'permissioncontroller|GrantPermissionsActivity'
@@ -171,17 +225,20 @@ Add-Result (New-MetinARGateResult -Name 'PermissionUi' -Status $(if ($dialog) { 
 
 # --- Soak ----------------------------------------------------------------------------------
 Start-Sleep -Seconds $SoakSeconds
+Assert-AdbReady 'Process'
 $appPid = ((Adb shell pidof $Package) | Select-Object -First 1)
 $appPid = if ($appPid) { $appPid.Trim() } else { '' }
 $resumed = ((Adb shell dumpsys activity activities) | Where-Object { $_ -match '(mResumedActivity|topResumedActivity|ResumedActivity)' -and $_ -match [regex]::Escape($Package) }).Count -gt 0
 Add-Result (New-MetinARGateResult -Name 'Process' -Status $(if ($appPid -and ($resumed -or $dialog)) { 'PASS' } elseif ($appPid) { 'WARN' } else { 'FAIL' }) -Detail ("alive={0} resumed={1} after {2} s" -f [bool]$appPid, $resumed, ($LaunchWaitSeconds + $SoakSeconds)))
 
+Assert-AdbReady 'Permissions'
 $pkgDump = Adb shell dumpsys package $Package
 $perm = ConvertFrom-MetinARGrantedPermissions -Lines $pkgDump
 $permText = @($perm.PSObject.Properties | Where-Object { $_.Name -match 'LOCATION|CAMERA' } | ForEach-Object { "$($_.Name -replace '^android\.permission\.', '')=$(if ($_.Value) { 'granted' } else { 'denied/unset' })" }) -join ', '
 $bgGranted = ($perm.PSObject.Properties['android.permission.ACCESS_BACKGROUND_LOCATION'] -and $perm.'android.permission.ACCESS_BACKGROUND_LOCATION')
 Add-Result (New-MetinARGateResult -Name 'Permissions' -Status $(if ($bgGranted) { 'FAIL' } else { 'PASS' }) -Detail $(if ($permText) { $permText } else { 'no runtime location/camera permission entries' }))
 
+Assert-AdbReady 'Memory'
 $mem = ConvertFrom-MetinARMeminfo -Lines (Adb shell dumpsys meminfo $Package)
 $gfx = Adb shell dumpsys gfxinfo $Package
 $gfxTotal = ($gfx | Where-Object { $_ -match 'Total frames rendered' } | Select-Object -First 1)
@@ -194,6 +251,7 @@ $thermal = ConvertFrom-MetinARThermal -ThermalLines (Adb shell dumpsys thermalse
 
 # --- Background / resume -------------------------------------------------------------------
 if (-not $SkipBackgroundTest -and -not $dialog -and $appPid) {
+    Assert-AdbReady 'Background'
     Adb shell input keyevent KEYCODE_HOME | Out-Null
     Start-Sleep -Seconds 6
     $bgPid = ((Adb shell pidof $Package) | Select-Object -First 1)
@@ -214,8 +272,14 @@ if (-not $SkipBackgroundTest -and -not $dialog -and $appPid) {
 }
 
 # --- Logcat (redacted) ---------------------------------------------------------------------
-$raw = Adb logcat '-d' '-v' threadtime '-b' 'main,system,crash,events'
+Assert-AdbReady 'Crash'
+$script:AdbExit = $null
+$raw = @(Adb logcat '-d' '-v' threadtime '-b' 'main,system,crash,events')
+$logcatExit = $script:AdbExit
 $pids = @(); foreach ($p in @($appPid, $rePid)) { if ($p -and "$p".Trim() -match '^\d+$') { $pids += [int]"$p".Trim() } }
+# An empty, failed (exit != 0) or app-less dump must never read as "no crash".
+$capture = Test-MetinARLogcatCapture -Lines $raw -ExitCode $logcatExit -Package $Package -Pids $pids
+if ($capture.Kind -eq 'Lost') { Stop-AdbLost 'Crash' 'logcat dump failed' (Get-Date) }
 $problems = Find-MetinARLogcatProblems -Lines $raw -Package $Package -Pids $pids
 $appLines = @($raw | Where-Object {
     $l = $_; $mine = $false
@@ -225,8 +289,15 @@ $appLines = @($raw | Where-Object {
 $redacted = ConvertTo-MetinARRedactedText -Lines $appLines -Secrets $secrets
 Set-Content -Path (Join-Path $OutputDir 'logcat-redacted.txt') -Value $redacted -Encoding UTF8
 $raw = $null
-$ev = @() + @($problems.Crashes) + @($problems.Anrs) + @($problems.FatalLines) + @($problems.UnityErrors | Select-Object -First 5)
-Add-Result (New-MetinARGateResult -Name 'Crash' -Status $problems.Status -Detail ("crash={0} anr={1} fatal={2} unityErrors={3} (redacted app log: {4} lines)" -f $problems.Crashes.Count, $problems.Anrs.Count, $problems.FatalLines.Count, $problems.UnityErrors.Count, $redacted.Count) -Evidence (ConvertTo-MetinARRedactedText -Lines $ev -Secrets $secrets))
+$ev = @() + @($problems.Crashes) + @($problems.Anrs) + @($problems.FatalLines) + @($problems.MetinARExceptions | ForEach-Object { "MetinAR exception: $_" }) + @($problems.UnityErrors | Select-Object -First 5)
+$crashStatus = $problems.Status; $crashPrefix = ''
+if ($capture.Kind -ne 'Ok') {
+    $script:logcatCollectionError = $true
+    if ($crashStatus -ne 'FAIL') { $crashStatus = 'UNVERIFIED' }
+    $crashPrefix = "logcat collection error: $($capture.Reason); "
+    $notes.Add("Logcat collection error ($($capture.Reason)): crash/ANR/exception state is UNVERIFIED, not PASS. Repeat the capture.")
+}
+Add-Result (New-MetinARGateResult -Name 'Crash' -Status $crashStatus -Detail ($crashPrefix + ("crash={0} anr={1} fatal={2} metinarExceptions={3} unityErrors={4} (redacted app log: {5} lines)" -f $problems.Crashes.Count, $problems.Anrs.Count, $problems.FatalLines.Count, $problems.MetinARExceptions.Count, $problems.UnityErrors.Count, $redacted.Count)) -Evidence (ConvertTo-MetinARRedactedText -Lines $ev -Secrets $secrets))
 
 # --- Memory / frames / perf budgets / thermal ----------------------------------------------
 $samples = Get-MetinARPerfSamples -Lines $redacted
@@ -276,6 +347,9 @@ elseif (($null -ne $thermal.ThermalStatus -and $thermal.ThermalStatus -ge [int]$
 if ($null -eq $thermal.ThermalStatus -and $null -eq $thermal.BatteryTempC) { $st = 'UNVERIFIED' }
 Add-Result (New-MetinARGateResult -Name 'Thermal' -Status $st -Detail ("thermalStatus={0} batteryTemp={1} C batteryLevel={2}% (short run; not a sustained thermal test)" -f $thermal.ThermalStatus, $thermal.BatteryTempC, $thermal.BatteryLevel))
 
+$notes.Add(("adb devices checked {0} times before steps; connection stayed up unless an adb gap is listed above." -f $script:adbChecks))
 $notes.Add('A short scripted run is a smoke check, not proof that GPS accuracy, AR tracking quality, hand tracking or long-session thermals are acceptable; those need the owner checklist in docs/METINAR-011-QA-GATES.md.')
 Write-Report
-if (@($results | Where-Object { $_.Status -eq 'FAIL' }).Count) { exit 1 } else { exit 0 }
+if (@($results | Where-Object { $_.Status -eq 'FAIL' }).Count) { exit 1 }
+if ($script:logcatCollectionError) { exit 4 }   # no usable logcat: the run is not a pass
+exit 0

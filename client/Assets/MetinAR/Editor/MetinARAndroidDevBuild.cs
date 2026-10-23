@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using MetinAR.Editor.Build;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
@@ -14,6 +15,7 @@ namespace MetinAR.Editor
     /// Usage: -executeMethod MetinAR.Editor.MetinARAndroidDevBuild.BuildDevelopmentApk
     ///        -executeMethod MetinAR.Editor.MetinARAndroidDevBuild.BuildWorldMapDevelopmentApk
     ///        -executeMethod MetinAR.Editor.MetinARAndroidDevBuild.BuildArEncounterDevelopmentApk
+    ///        -executeMethod MetinAR.Editor.MetinARAndroidDevBuild.BuildArEncounterQaApk   (QA variant, com.metinar.game.qa)
     /// </summary>
     public static class MetinARAndroidDevBuild
     {
@@ -25,7 +27,7 @@ namespace MetinAR.Editor
 
         public static void BuildDevelopmentApk()
         {
-            Build(ApkRelativePath, null);
+            ExitWith(Build(ApkRelativePath, null));
         }
 
         /// <summary>
@@ -33,7 +35,7 @@ namespace MetinAR.Editor
         /// </summary>
         public static void BuildWorldMapDevelopmentApk()
         {
-            Build(WorldMapApkRelativePath, WorldMapScenePath);
+            ExitWith(Build(WorldMapApkRelativePath, WorldMapScenePath));
         }
 
         /// <summary>
@@ -41,10 +43,82 @@ namespace MetinAR.Editor
         /// </summary>
         public static void BuildArEncounterDevelopmentApk()
         {
-            Build(ArEncounterApkRelativePath, WorldMapScenePath, ArEncounterScenePath);
+            ExitWith(Build(ArEncounterApkRelativePath, WorldMapScenePath, ArEncounterScenePath));
         }
 
-        private static void Build(string apkRelativePath, string requiredStartupScene, string requiredScene = null)
+        /// <summary>
+        /// METINAR-037 (#73): the same scenes as <see cref="BuildArEncounterDevelopmentApk"/>, but with the QA identity from
+        /// <see cref="QaApkVariant"/> (applicationId com.metinar.game.qa, label "MetinAR QA", own APK file), so the QA
+        /// build installs next to com.metinar.game and never replaces it. The project's applicationIdentifier and
+        /// productName are captured first and restored in a finally block (also after a failed build or an exception)
+        /// and saved, so ProjectSettings stay as committed. EditorApplication.Exit runs only after the restore.
+        /// </summary>
+        public static void BuildArEncounterQaApk()
+        {
+            NamedBuildTarget android = NamedBuildTarget.Android;
+            string originalId = PlayerSettings.GetApplicationIdentifier(android);
+            string originalName = PlayerSettings.productName;
+            string problem = QaApkVariant.SideBySideProblem(originalId, QaApkVariant.ApplicationIdentifier);
+            if (problem != null)
+            {
+                Debug.LogError(Tag + "FAILED " + problem);
+                ExitWith(false);
+                return;
+            }
+
+            // Platform guard (#31 f194aa9 / audit N-01): with another active target the APK misses ARCore's runtime
+            // registrations ("AR unavailable"). The QA runner starts Unity with -buildTarget Android.
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
+            {
+                Debug.LogError(Tag + "FAILED active build target is " + EditorUserBuildSettings.activeBuildTarget
+                               + ", expected Android. Start Unity with -buildTarget Android.");
+                ExitWith(false);
+                return;
+            }
+
+            bool ok = false;
+            try
+            {
+                PlayerSettings.SetApplicationIdentifier(android, QaApkVariant.ApplicationIdentifier);
+                PlayerSettings.productName = QaApkVariant.ProductName;
+                Debug.Log(Tag + "QA variant id=" + QaApkVariant.ApplicationIdentifier + " name=" + QaApkVariant.ProductName
+                          + " (project id=" + originalId + ")");
+                ok = Build(QaApkVariant.ApkRelativePath, WorldMapScenePath, ArEncounterScenePath);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError(Tag + "FAILED exception " + e);
+                ok = false;
+            }
+            finally
+            {
+                PlayerSettings.SetApplicationIdentifier(android, originalId);
+                PlayerSettings.productName = originalName;
+                AssetDatabase.SaveAssets();
+            }
+
+            string restoredId = PlayerSettings.GetApplicationIdentifier(android);
+            if (restoredId != originalId || PlayerSettings.productName != originalName)
+            {
+                Debug.LogError(Tag + "RESTORE MISMATCH id=" + restoredId + " name=" + PlayerSettings.productName);
+                ok = false;
+            }
+            else
+            {
+                Debug.Log(Tag + "settings restored id=" + restoredId + " name=" + originalName);
+            }
+
+            ExitWith(ok);
+        }
+
+        private const string Tag = "[MetinARAndroidDevBuild] ";
+
+        private static void ExitWith(bool ok)
+        {
+            EditorApplication.Exit(ok ? 0 : 1);
+        }
+
+        private static bool Build(string apkRelativePath, string requiredStartupScene, string requiredScene = null)
         {
             string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
             string apkPath = Path.Combine(projectRoot, apkRelativePath);
@@ -58,8 +132,7 @@ namespace MetinAR.Editor
             {
                 Debug.LogError("[MetinARAndroidDevBuild] FAILED active build target is " + EditorUserBuildSettings.activeBuildTarget
                                + ", expected Android. Start Unity with -buildTarget Android.");
-                EditorApplication.Exit(1);
-                return;
+                return false; // exit code set by the caller (ExitWith), after the QA variant restored ProjectSettings
             }
 
             EditorUserBuildSettings.buildAppBundle = false;
@@ -79,15 +152,13 @@ namespace MetinAR.Editor
             if (requiredStartupScene != null && scenes[0] != requiredStartupScene)
             {
                 Debug.LogError("[MetinARAndroidDevBuild] startup scene is " + scenes[0] + ", expected " + requiredStartupScene);
-                EditorApplication.Exit(1);
-                return;
+                return false;
             }
 
             if (requiredScene != null && Array.IndexOf(scenes, requiredScene) < 0)
             {
                 Debug.LogError("[MetinARAndroidDevBuild] required scene not enabled: " + requiredScene);
-                EditorApplication.Exit(1);
-                return;
+                return false;
             }
 
             Debug.Log("[MetinARAndroidDevBuild] scenes=" + string.Join(",", scenes));
@@ -116,8 +187,7 @@ namespace MetinAR.Editor
                     + summary.totalErrors
                     + " path="
                     + apkPath);
-                EditorApplication.Exit(1);
-                return;
+                return false;
             }
 
             IReadOnlyList<string> dataProblems = ValidateApkPlayerData(apkPath);
@@ -129,8 +199,7 @@ namespace MetinAR.Editor
                 }
 
                 Debug.LogError("[MetinARAndroidDevBuild] FAILED inconsistent player data in " + apkPath);
-                EditorApplication.Exit(1);
-                return;
+                return false; // exit code set by the caller (ExitWith), after the QA variant restored ProjectSettings
             }
 
             Debug.Log("[MetinARAndroidDevBuild] APK player data check PASS (no whole+split duplicates)");
@@ -144,8 +213,7 @@ namespace MetinAR.Editor
                 }
 
                 Debug.LogError("[MetinARAndroidDevBuild] FAILED ARCore subsystems would not load in " + apkPath);
-                EditorApplication.Exit(1);
-                return;
+                return false; // exit code set by the caller (ExitWith), after the QA variant restored ProjectSettings
             }
 
             Debug.Log("[MetinARAndroidDevBuild] APK ARCore check PASS (all Unity.XR.ARCore registrations present)");
@@ -156,8 +224,10 @@ namespace MetinAR.Editor
                 + " sizeBytes="
                 + (File.Exists(apkPath) ? new FileInfo(apkPath).Length : 0)
                 + " time="
-                + summary.totalTime);
-            EditorApplication.Exit(0);
+                + summary.totalTime
+                + " id="
+                + PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android));
+            return true;
         }
 
         /// <summary>

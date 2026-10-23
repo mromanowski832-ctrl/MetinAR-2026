@@ -18,6 +18,7 @@
     <!-- #31: engine-free APK player-data check used by MetinARAndroidDevBuild. -->
     <Compile Include="../../client/Assets/MetinAR/Editor/Build/AndroidPlayerDataValidator.cs" Link="Production/AndroidPlayerDataValidator.cs" />
     <Compile Include="../../client/Assets/MetinAR/Editor/SmokeExceptionClassifier.cs" Link="Production/SmokeExceptionClassifier.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Editor/QaApkVariant.cs" Link="Production/QaApkVariant.cs" />
     <!-- #31: engine-free ARCore registration check (integration APK f194aa9: "Failed to load session subsystem"). -->
     <Compile Include="../../client/Assets/MetinAR/Editor/Build/ArCorePlayerDataValidator.cs" Link="Production/ArCorePlayerDataValidator.cs" />
   </ItemGroup>
