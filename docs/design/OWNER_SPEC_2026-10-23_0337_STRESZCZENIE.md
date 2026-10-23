@@ -1,7 +1,15 @@
-# Specyfikacja właściciela 2026-10-23 03:37 — STRESZCZENIE MENEDŻERA
+# Specyfikacja właściciela 2026-10-23 03:37 — STRESZCZENIE MENEDŻERA (wcześniejsze, zastąpione przez #96)
 
+> **WCZEŚNIEJSZA WERSJA — ZASTĄPIONA.** Właściciel przysłał o 03:48 i zatwierdził o 03:50 główną specyfikację
+> „METINAR 2026 — GŁÓWNA SPECYFIKACJA GRY I POLECENIE DLA KIEROWNIKA PRODUKCJI” (§1–20), dosłownie w PR #96:
+> https://github.com/mromanowski832-ctrl/MetinAR-2026/pull/96 (plik `docs/design/OWNER_SPEC_2026-10-23.md`, commit `2bb0a72`).
+> **Tam, gdzie ten plik różni się od głównej specyfikacji, rozstrzyga główna specyfikacja** (np. pętla ETAP I ma 22 kroki,
+> nie 26; Aura ma 9 kroków, nie 7; etapy I–V; dźwięk, reakcje i ataki potworów oraz dopracowanie HUD należą do ETAPU II).
+> Ten plik zostaje wyłącznie jako zapis wcześniejszej wiadomości właściciela z 03:37 (szczegóły, których główna specyfikacja
+> nie zmienia). Lista różnic: [SPEC_CONFLICTS_2026-10-23.md](SPEC_CONFLICTS_2026-10-23.md) §0.
+>
 > **Status:** wiążąca decyzja właściciela (czat, 2026-10-23 03:37, „METINAR / METIN2AR — PEŁNA SPECYFIKACJA GRY I POLECENIE PRODUKCYJNE DLA GROKA”, sekcje 1–24).
-> **To NIE jest tekst dosłowny.** To wierne streszczenie spisane przez kierownika produkcji. Pełny tekst dosłowny dojdzie jako `OWNER_SPEC_2026-10-23.md`, gdy właściciel prześle go ponownie. Przy rozbieżności rozstrzyga tekst właściciela.
+> **To NIE jest tekst dosłowny.** To wierne streszczenie spisane przez kierownika produkcji.
 > Nadrzędna wobec starszych dokumentów, m.in. założenia o śledzeniu prawdziwej dłoni w `docs/PROJECT_BRIEF.md`.
 > Cytaty w cudzysłowach są dosłowne.
 

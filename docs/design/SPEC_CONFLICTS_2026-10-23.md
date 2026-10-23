@@ -1,101 +1,75 @@
-# Konflikty dokumentów ze specyfikacją właściciela 2026-10-23
+# Sprzeczności dokumentów z główną specyfikacją właściciela 2026-10-23
 
-Stan: 2026-10-23 (Europe/Warsaw). Podstawa: [OWNER_SPEC_2026-10-23_STRESZCZENIE.md](OWNER_SPEC_2026-10-23_STRESZCZENIE.md)
-(streszczenie kierownika; przy rozbieżności rozstrzyga tekst dosłowny właściciela, gdy zostanie dodany).
-Porównanie z `main` @ `e1bdf80`. Ten plik **tylko wskazuje** miejsca i potrzebną zmianę. Dokumentów źródłowych tu nie zmieniamy.
-Zasada ze specyfikacji: „Nowsza, jednoznaczna decyzja właściciela wygrywa, a dokumenty się aktualizuje”.
+Stan: 2026-10-23 (Europe/Warsaw). **Źródło nadrzędne:** „METINAR 2026 — GŁÓWNA SPECYFIKACJA GRY I POLECENIE DLA KIEROWNIKA
+PRODUKCJI” (§1–20), przysłana 03:48, zatwierdzona 03:50, dosłownie w PR #96 (https://github.com/mromanowski832-ctrl/MetinAR-2026/pull/96), commit `2bb0a72` (head PR; tekst dosłowny bez komentarzy)
+(https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md). Porównanie z `main` @ `e1bdf80`. Wszystkie odnośniki są stałe (permalinki do konkretnych commitów).
 
-Oznaczenia: **K** = sprzeczność (spec wygrywa, dokument do poprawy), **D** = dokument niepełny względem specu (do uzupełnienia),
-**N** = rozbieżność nazwy do sprawdzenia w tekście dosłownym (bez zmiany teraz).
+Zasada §19 specyfikacji: gdy specyfikacja streszcza zatwierdzone liczby i mechaniki, **dokładne wartości dają szczegółowe
+pliki projektowe**; rzeczywistą sprzeczność zgłaszamy z odnośnikami do obu źródeł, bez zgadywania ([spec §19 L822–824](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L822-L824)).
+Ten plik **tylko wskazuje** miejsca; dokumentów źródłowych tu nie zmieniamy.
 
-## 1. docs/PROJECT_BRIEF.md
+Oznaczenia:
+- **K** — rzeczywista sprzeczność; rozstrzyga ją specyfikacja (dokument do poprawy) albo trzeba decyzji (wtedy napisane wprost);
+- **K-R** — sprzeczność między dwoma plikami repo, której specyfikacja nie rozstrzyga → **do decyzji właściciela, nie zgadujemy**;
+- **D** — dokument niepełny lub opisuje stary zakres prototypu (do uzupełnienia, bez sprzeczności co do kierunku);
+- **zgodne** — sprawdzone, bez zmian.
 
-| Miejsce | Obecnie | Spec | Typ | Potrzebna zmiana |
-|---|---|---|---|---|
-| L17–18 | „The phone tracks the player's real hand. A virtual sword is attached to the tracked hand.” | Tryb B: wirtualne dłonie FPP, „brak śledzenia prawdziwej dłoni” | K | zastąpić opisem wirtualnych dłoni FPP (1H: miecz w prawej, tarcza/gesty w lewej; 2H: obie dłonie) |
-| L37 | pętla „…AR encounter becomes available” bez combo/nagród/zapisu | pętla etapu 1: śmierć, nagrody, ekwipunek, trwały zapis, dźwięki | D | dopisać pełną pętlę etapu 1 i odnośnik do testu 26 kroków |
-| L41 | „Build from scratch.” | „Nie zaczynamy od zera.” / „Zachowaj istniejący poprawny kod.” | K | usunąć; wpisać zasadę zachowania istniejącego kodu |
-| całość | brak trybów A/B, zapisu, audio, PvE, zakazu płatności | sekcje Wizja, Architektura | D | dodać skrót wizji i odnośnik do specyfikacji 2026-10-23 |
+## 0. Wcześniejsze streszczenie 03:37 a główna specyfikacja
 
-Powiązane issue: **#8** (METINAR-007 „Real hand tracking”, [BACKLOG]) i PR **#29** („Fix Galaxy A31 hand tracking”) dotyczą
-odrzuconego kierunku. Potrzebna zmiana: oznaczyć jako zastąpione przez spec (decyzja kierownika; bez zamykania w tym PR).
+Plik [streszczenie 03:37](OWNER_SPEC_2026-10-23_0337_STRESZCZENIE.md) to zapis wcześniejszej wiadomości właściciela (03:37). Gdzie się różni, wygrywa główna specyfikacja:
 
-## 2. docs/METINAR-FPP-001.md
+| Temat | Streszczenie 03:37 | Główna specyfikacja | Skutek |
+|---|---|---|---|
+| Test pętli | 26 kroków | 22 kroki ETAPU I, w tym sklep NPC (krok 18) [spec §18 L731–756](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L731-L756) | protokół QA: 22 kroki (#90) |
+| Aura | 7 kroków | 9 kroków [spec §5 L236–252](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L236-L252) | #93: 9 kroków |
+| Etapy | 6 etapów; dźwięk w etapie 1; blok i umiejętności wojownika w etapie 2 | ETAP I–V; dźwięk, reakcje/ataki potworów, HUD w ETAPIE II; umiejętności Wojownika w ETAPIE III [spec §18 L758–786](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L758-L786) | #85 → ETAP II (ale P0 z §17, start od razu); #52 → ETAP III |
+| Lista blokerów | §21: 5 pozycji | §17: 6 pozycji P0 (audio, backend, zapis, grafika, walka, test na telefonie) [spec §17 L697–725](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L697-L725) | werdykty w SPEC_GAP §2 |
+| NPC sklepu | „Wędrowny Kupiec” | „Wędrowny Handlarz” [spec §11 L506](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L506) | zgodne z repo ([ITEMS_COMBAT_SPEC.md L141](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/ITEMS_COMBAT_SPEC.md#L141)); bez zmian |
+| Przytrzymanie ATAK | „umiejętność ładowana, jeśli odblokowana i przypisana” | „około 0,6 s uruchamia odrębną umiejętność Ciężkie Cięcie” [spec §4 L179](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L179) | zgodne z [CLASSES_SKILLS.md L104](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/CLASSES_SKILLS.md#L104) (`warrior_heavy_slash`, 6 MP, 4 s) |
 
-| Miejsce | Obecnie | Spec | Typ | Potrzebna zmiana |
-|---|---|---|---|---|
-| L18 | „one sword, one attack, one Aura activation” | combo 1H i 2H po 3 ciosy, przytrzymanie = umiejętność ładowana | K | oznaczyć dokument jako prototyp etapu 1; combo opisane w #82 / METINAR-039 |
-| L19, L39, L78 | proceduralny blockout „to review on device” | „Bryły prymitywne nigdy nie przechodzą odbioru wizualnego” | K | wpisać, że blockout nie przejdzie odbioru wizualnego; finalne dłonie i miecz: #34/#36 → ETAP 2 |
-| L83 | „no … audio, haptics” | audio podpięte do zdarzeń, wibracje z wyłącznikiem | K | przenieść do „poza zakresem prototypu”, wskazać issue audio etapu 1 |
-| L124–126 | lewa dłoń w spoczynku, bez tarczy | 1H: lewa dłoń z tarczą i gestami | D | dopisać pozę lewej dłoni z tarczą (socket #72) |
-| L9 | Aura: dłoń do rękojeści, chwyt, energia, efekt | 7 kroków, bez przenikania, niebiesko-złoty efekt, powrót do postawy, bez obrażeń | D | rozpisać 7 kroków i kryteria odbioru |
+Szczegóły ze streszczenia, których główna specyfikacja nie porusza (np. budżet Kowala 10–20k / 2K / LOD0–2, 7 zakładek
+panelu postaci, osobne głośności, wyłącznik wibracji, brak lokalizacji w tle), pozostają wcześniejszymi decyzjami właściciela.
 
-## 3. docs/design/CHARACTER_PROGRESSION.md
+## 1. Rzeczywiste sprzeczności (K, K-R)
 
-| Miejsce | Obecnie | Spec | Typ | Potrzebna zmiana |
-|---|---|---|---|---|
-| L58–59 | jeden zamach 0,72 s, jedno okno trafienia 0,18–0,42 s | każdy cios combo ma własne okno trafienia; czasy i mnożniki w konfiguracji | K | zamienić na tabelę per cios (1H/2H × cios 1–3) w konfiguracji, wartości z #82 |
-| — | brak rozróżnienia 1H/2H | 2H: wolniej, szerszy łuk, własny zasięg i obrażenia | D | dopisać parametry 2H |
+| # | Źródło A (repo @ e1bdf80) | Źródło B | Na czym polega sprzeczność | Typ | Rozstrzygnięcie / potrzebna zmiana |
+|---|---|---|---|---|---|
+| K1 | [PROJECT_BRIEF.md L17–18](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/PROJECT_BRIEF.md#L17-L18): „The phone tracks the player's real hand. A virtual sword is attached to the tracked hand.” | [spec §2B L88–92](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L88-L92): „gracz nie musi pokazywać swoich prawdziwych dłoni kamerze… To jest zatwierdzony kierunek” | śledzenie dłoni vs wirtualne dłonie sterowane przyciskami | K | spec wygrywa; poprawić BRIEF. Issue #8 (https://github.com/mromanowski832-ctrl/MetinAR-2026/issues/8) i PR #29 (https://github.com/mromanowski832-ctrl/MetinAR-2026/pull/29) dotyczą odrzuconego kierunku → oznaczyć jako zastąpione (bez zamykania tutaj) |
+| K2 | [PROJECT_BRIEF.md L41](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/PROJECT_BRIEF.md#L41): „Build from scratch.” | [spec §16 L684–686](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L684-L686): „Nie implementować ponownie gotowych systemów… Nie zastępować zatwierdzonych decyzji” | budowa od zera vs zachowanie gotowych systemów | K | spec wygrywa; usunąć L41 z BRIEF |
+| K3 | [COMBAT_PHYSICS.md L105](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/COMBAT_PHYSICS.md#L105): „min. 20 FPS, p95 klatki ≤ 66 ms” | [perf-budgets.json L37–38](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/tools/qa/perf-budgets.json#L37-L38) i [DEVICE-ACCEPTANCE-LOOP-V0.md L57](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/qa/DEVICE-ACCEPTANCE-LOOP-V0.md#L57): fpsAvg ≥ 24, p95 ≤ 55 ms; [spec §15 L642–656](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L642-L656): „Stabilne 30 FPS na A31 podczas typowej walki… Nie deklarować 30 FPS na A31 na podstawie testów jednostkowych lub symulacji” | trzy różne progi FPS | K | cel produktu = 30 FPS w walce na A31 (spec); progi 20/24 zostają najwyżej jako bramka regresji prototypu i muszą tak być nazwane; COMBAT_PHYSICS L105 ujednolicić z perf-budgets; dodać bramkę `ArCombat` 30 FPS (#90) |
+| K4 | [MODES_DATA_MODEL.md L32](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/MODES_DATA_MODEL.md#L32): `expToNext[1..59]` | [spec §7 L323](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L323): „Maksymalny poziom: 99” oraz [CHARACTER_PROGRESSION.md L92](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/CHARACTER_PROGRESSION.md#L92) (1 → 99) | zakres krzywej EXP | K | spec wygrywa; `[1..99]` |
+| K5 | [ECONOMY.md L9](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/ECONOMY.md#L9): „Nazwa do decyzji (Q7: talary / złoto / srebrniki / inna)” | [spec §2A L53](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L53), [spec §18 L747](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L747): „talary” | nazwa waluty | K | rozstrzygnięte: talary; poprawić ECONOMY L9 i Q7 |
+| K6 | [CLASSES_SKILLS.md L14](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/CLASSES_SKILLS.md#L14): drugi slot wojownika „tarcza (tylko Bastion)”; ścieżka od poz. 10 ([spec §6 L308](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L308)) | [ITEMS_COMBAT_SPEC.md L137](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/ITEMS_COMBAT_SPEC.md#L137): `starter_buckler` (Lipowy Puklerz) w zestawie startowym poz. 1 wycinka; [spec §4 L151](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L151): „Lewa ręka pozostaje w naturalnej pozycji albo obsługuje tarczę” | czy wojownik bez Bastionu (poz. 1–9) może nosić tarczę | **K-R** | specyfikacja tego nie rozstrzyga → **decyzja właściciela**. Nie blokuje ETAPU I (pętla 22 kroków nie wymaga tarczy); blokuje odbiór #94 (blok tarczą). Do decyzji: (a) tarcza dla każdego wojownika z 1H, Bastion daje umiejętności tarczy, albo (b) tarcza tylko dla Bastionu i usunięcie puklerza z zestawu startowego |
+| K7 | [METINAR-009-ASSET-PIPELINE.md L38](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/METINAR-009-ASSET-PIPELINE.md#L38): NPC 10 000–20 000 trójkątów, 2048², LOD0–2 | [ITEMS_COMBAT_SPEC.md L155](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/ITEMS_COMBAT_SPEC.md#L155): „NPC (v1) ≤ 10 000, 1024², 1 LOD” (z dopiskiem „Zgodne z METINAR-009 §1”) | dwa różne budżety NPC w repo; [streszczenie 03:37](OWNER_SPEC_2026-10-23_0337_STRESZCZENIE.md) podaje dla Kowala 10–20k / 2K / LOD0–2; spec mówi tylko „LOD i kontrola zużycia pamięci” ([spec §3 L109](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L109)) | **K-R** | dotyczy NPC sklepu (krok 18, PR #45 https://github.com/mromanowski832-ctrl/MetinAR-2026/pull/45) i Kowala. Propozycja techniczna (grafik, #86): Kowal wg METINAR-009 i streszczenia 03:37; Handlarz v1 wg ITEMS §8 jako budżet tymczasowy, oba z LOD. Do potwierdzenia przez właściciela tylko, jeśli ma inne oczekiwanie |
 
-## 4. docs/design/COMBAT_PHYSICS.md
+## 2. Dokumenty niepełne (D) — bez sprzeczności co do kierunku
 
-| Miejsce | Obecnie | Spec | Typ | Potrzebna zmiana |
-|---|---|---|---|---|
-| §2 | jedno okno ataku podstawowego | trafienie tylko z rzeczywistej pozycji ostrza, maks. 1 trafienie na zamach na cel, okno per cios | D | dopisać okna per cios i regułę „1 trafienie / zamach / cel” |
-| §4 L71 | tap buforowany tylko w ostatnich 0,15 s powrotu, inaczej ignorowany | „Tapnięcie w oknie kontynuuje combo, brak tapnięcia wraca do ciosu 1” | K | zastąpić oknem kontynuacji combo (czas z konfiguracji) |
-| §4 L72 | przytrzymanie ≥ 0,6 s = umiejętność ładowana | „…jeśli jest odblokowana i przypisana, bez ciosów combo” | D | dopisać warunek odblokowania/przypisania i brak ciosów combo |
-| §5 | lista SFX bez dźwięków per cios combo | „Każdy cios ma własną animację, dźwięk…” | D | dodać zdarzenia SFX cios 1/2/3 × 1H/2H, Aura (impuls), blok tarczą |
-| §6 L105 | „min. 20 FPS, p95 klatki ≤ 66 ms” (dodatkowo niezgodne z `perf-budgets.json`: 24 / 55 ms) | „30 FPS na A31 podczas walki, łącznie z combo” | K | ustawić cel produktu 30 FPS w walce z combo; bramkę prototypu opisać osobno |
+| Miejsce | Obecnie | Specyfikacja | Potrzebna zmiana |
+|---|---|---|---|
+| [PROJECT_BRIEF.md L37](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/PROJECT_BRIEF.md#L37) | pętla kończy się na „AR encounter becomes available” | 22 kroki ETAPU I [spec §18 L731–756](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L731-L756) | dopisać pętlę lub odnośnik |
+| [METINAR-FPP-001.md L18](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/METINAR-FPP-001.md#L18) | „one sword, one attack, one Aura activation” | combo 1H/2H po 3 ciosy [spec §4 L161–193](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L161-L193) | oznaczyć jako zakres prototypu; combo: #82 (https://github.com/mromanowski832-ctrl/MetinAR-2026/issues/82) |
+| [METINAR-FPP-001.md L9](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/METINAR-FPP-001.md#L9) | Aura w 4 fazach | Aura w 9 krokach, naturalnie, bez nagłego przestawienia, bez obrażeń [spec §5 L236–254](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L236-L254) | rozpisać 9 kroków (#93) |
+| [METINAR-FPP-001.md L83](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/METINAR-FPP-001.md#L83) | „no … audio, haptics” | dźwięk zamachu/trafienia, wibracja jeśli dostępna [spec §4 L212–225](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L212-L225), §13 [spec §13 L568–583](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L568-L583) | przenieść do „poza zakresem prototypu”, odnośnik #85 |
+| [CHARACTER_PROGRESSION.md L58–59](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/CHARACTER_PROGRESSION.md#L58-L59) | jeden zamach 0,72 s, okno trafienia 0,18–0,42 s | combo 3 ciosy, każdy we właściwym oknie [spec §4 L171–177](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L171-L177) | tabela okien per cios 1H/2H w konfiguracji; wartości ustala #82 (decyzja techniczna, nie pytanie do właściciela, [spec §20 L832–834](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L832-L834)) |
+| [COMBAT_PHYSICS.md L71–72](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/COMBAT_PHYSICS.md#L71-L72) | tap buforowany w ostatnich 0,15 s powrotu; przytrzymanie ≥ 0,6 s = „umiejętność ładowana klasy” | okno kontynuacji combo, powrót do ciosu 1, animacja powrotu po 3. ciosie; przytrzymanie ≈ 0,6 s = Ciężkie Cięcie [spec §4 L171–179](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L171-L179) | to opis pojedynczego cięcia — dopisać okno combo; nazwać Ciężkie Cięcie (już w [CLASSES_SKILLS.md L104](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/CLASSES_SKILLS.md#L104)) |
+| [COMBAT_PHYSICS.md L105](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/COMBAT_PHYSICS.md#L105) i §2 | brak reguły „1 trafienie na cios na cel” w tekście combo | [spec §4 L195–208](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L195-L208) | dopisać |
+| [DEVICE-ACCEPTANCE-LOOP-V0.md L57](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/qa/DEVICE-ACCEPTANCE-LOOP-V0.md#L57) i cały plik | pętla v0 L1–L15 | 22 kroki na fizycznym telefonie [spec §18 L756](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L756) | nowy protokół 22 kroków (#90); zasady UNVERIFIED zostają |
+| [MODES_DATA_MODEL.md L57–58](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/MODES_DATA_MODEL.md#L57-L58) | lokalny JSON „oznaczony jako niezweryfikowany” | „Tryb lokalnego prototypu może działać podczas testów, ale nie może udawać gotowego systemu online” [spec §14 L625–627](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L625-L627) | **zgodne co do zasady**; dopisać widoczne w UI oznaczenie „tryb lokalny” (#71) |
+| [MODES_DATA_MODEL.md L60–62](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/MODES_DATA_MODEL.md#L60-L62) | „Decyzje architektury… bez przesądzania” | „Serwer jest autorytetem dla nagród, ekwipunku i postępu”, HTTPS + uwierzytelnianie docelowo [spec §14 L612–625](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L612-L625) | wpisać jako rozstrzygnięte; tabela §4 (serwer: „tak”) jest zgodna |
+| [CHARACTER_PROGRESSION.md L113](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/CHARACTER_PROGRESSION.md#L113) | „Propozycja: bez utraty poziomu… 2% EXP” | „Zatwierdzone założenia… Kara śmierci: 2% EXP” [spec §7 L354–360](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L354-L360) | zmienić „Propozycja” na „zatwierdzone” |
+| [OPEN_QUESTIONS_PLAN.md L41](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/OPEN_QUESTIONS_PLAN.md#L41) i dalej | plan S1–S13 | ETAP I–V [spec §18 L727–801](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L727-L801) | dopisać mapowanie S1–S13 → ETAP I–V |
+| [ITEMS_COMBAT_SPEC.md L39](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/ITEMS_COMBAT_SPEC.md#L39) | rękawice = wariant tekstury rąk FPP | „Zmiana rękawic powinna aktualizować wygląd wirtualnych dłoni” [spec §9 L440](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L440) | **zgodne** z główną spec. (wariant tekstury wystarcza); streszczenie 03:37 mówi o „opancerzonych rękawicach” — model z detalami w ETAPIE II (#91) |
+| docs/design/README.md | brak odnośnika | — | dodać odnośnik do specyfikacji i tego pliku po scaleniu #96 |
 
-## 5. tools/qa/perf-budgets.json i docs/qa/DEVICE-ACCEPTANCE-LOOP-V0.md
+## 3. Sprawdzone i zgodne
 
-| Miejsce | Obecnie | Spec | Typ | Potrzebna zmiana |
-|---|---|---|---|---|
-| `perf-budgets.json` L3, L37–40 | „PROTOTYPE GATE”, `ArEncounterPrototype`: `minFpsAvg` 24, `maxFrameP95Ms` 55 | 30 FPS w walce na A31 z combo | K | dodać bramkę produktu (np. `ArCombat`, `minFpsAvg` 30) mierzoną podczas combo; obecną zostawić jako regresyjną. Uwaga: A31 na kandydacie 1 miał 29,3–29,9 fps w AR bez combo (#31, komentarz 6320633550) |
-| DEVICE-ACCEPTANCE L57 (L12) | fpsAvg ≥ 24, p95 ≤ 55 ms | 30 FPS | K | jak wyżej |
-| DEVICE-ACCEPTANCE całość | pętla v0 L1–L15 + F | test 26 kroków; dowód: commit, ID buildu, PASS/FAIL, logi, wideo/zrzuty, problemy i kto naprawia | D | dodać protokół 26 kroków (nowy plik QA, issue ETAP 1); zasady z §1 (UNVERIFIED, slot, prywatność) zachować — są zgodne ze specem |
-| DEVICE-ACCEPTANCE §1 | „UNVERIFIED rule” | „Nie oznaczaj testu jako PASS… wyłącznie na symulatorze lub w testach czystego C#” | zgodne | bez zmian |
-
-## 6. docs/design/ITEMS_COMBAT_SPEC.md
-
-| Miejsce | Obecnie | Spec | Typ | Potrzebna zmiana |
-|---|---|---|---|---|
-| L39 | `Gloves` = wariant tekstury rąk FPP | „opancerzone rękawice”; zmiana ekwipunku zmienia model | K | rękawice jako osobny model (mesh) z wariantami; tekstura sama nie wystarcza |
-| L134, L139 | starter: „istniejący miecz FPP (#36)”, „obecne rękawice FPP (#36)” | pełny miecz (ostrze, jelec, rękojeść, głowica), finalne modele | D | wskazać finalne modele z ETAP 2 (#34/#36) |
-| L149–157 | NPC v1 ≤ 10 000 trójkątów, 1024², 1 LOD; ręce FPP 1 LOD; broń LOD opcjonalny | „Każdy model wymaga … LOD”; Kowal 10–20 tys., 2K, LOD0/1/2 | K | NPC: Kowal 10–20k / 2048² / LOD0–2 (zgodne z METINAR-009 §1.1); LOD wymagany dla każdego modelu (dla dłoni FPP i broni: decyzja techniczna grafika, ile poziomów) |
-| L141 | „Wędrowny Handlarz” | streszczenie: „Wędrowny Kupiec” | N | sprawdzić w tekście dosłownym; do tego czasu bez zmiany (ta sama nazwa w MOBS_NPC L93, #38, #45, #50) |
-
-## 7. docs/design/MOBS_NPC.md
-
-| Miejsce | Obecnie | Spec | Typ | Potrzebna zmiana |
-|---|---|---|---|---|
-| L11 | Trujący Pająk: Idle, Walk, Attack, Hit, Death (+ Aggro) | „6 animacji” | D | ustalić listę 6 klipów (przydział ETAP 1/2: idle, ruch, zamach/telegraf, atak, trafienie, śmierć) |
-| L94, L98 | Kowal: hartowanie, przekucie; animacje NPC z pipeline'u | „pełny NPC 3D z animacjami, ulepszanie +1 do +10 bez niszczenia przy porażce” | D | dopisać wymóg pełnego modelu 3D z animacjami i budżet Kowala (10–20k, 2K, LOD0–2); +1…+10 bez niszczenia jest już w ITEMS_COMBAT_SPEC L14, L84 (zgodne) |
-| L67 | spawn 2,5 m od kamery | — (spec nie podaje odległości) | zgodne | bez zmian |
-| L87 | „Spawny ustala serwer (#22), klient tylko wyświetla” | wykluczenia z buforami, ostrożna walidacja | zgodne | bez zmian; w etapie 1 klient bez serwera (patrz #55) |
-
-## 8. docs/design/CLASSES_SKILLS.md
-
-| Miejsce | Obecnie | Spec | Typ | Potrzebna zmiana |
-|---|---|---|---|---|
-| L14 | „tarcza (tylko Bastion)” | 1H: „lewa ma tarczę i wykonuje gesty”; zestaw startowy ma już puklerz (ITEMS §7) | K | tarcza dla każdego wojownika z bronią 1H; Bastion daje umiejętności tarczy |
-| §3 L79 | AURA = gest obu rąk z wybranym wzmocnieniem klasy | Aura: 7 kroków, niebiesko-złoty efekt, bez obrażeń przy aktywacji | D | dopisać sekwencję wizualną; wzmocnienie klasy pozostaje skutkiem (bez obrażeń) |
-| klasy, ścieżki, 56 umiejętności, stopnie | 4 klasy × 2 ścieżki, 14 umiejętności, Wprawa→Szczyt | to samo | zgodne | bez zmian |
-
-## 9. docs/design/MODES_DATA_MODEL.md, ECONOMY.md, OPEN_QUESTIONS_PLAN.md, design/README.md
-
-| Miejsce | Obecnie | Spec | Typ | Potrzebna zmiana |
-|---|---|---|---|---|
-| MODES L32 | `ExpCurve` `expToNext[1..59]` | maks. poziom 99 | K | `[1..99]` (kod `ExpCurve` ma już poziomy 1–99, OPEN_QUESTIONS L47) |
-| MODES L57–58 | „W trybie offline/prototypu profil może być zapisany lokalnie (JSON), oznaczony jako niezweryfikowany” | „Zapis OBOWIĄZKOWY… zamknięcie, restart, ponowne uruchomienie telefonu i ponowne logowanie” | K | zapis lokalny obowiązkowy w etapie 1 + synchronizacja później (#71, #39); przy ponownym logowaniu stan z serwera |
-| MODES §4 | serwer „do decyzji” dla nagród/łupu | „Nagrody nie mogą opierać się wyłącznie na deklaracjach klienta” | K | kolumna „Docelowo serwer” dla wyniku spotkania, EXP, talarów, łupu = rozstrzygnięte (tak) |
-| MODES §1 | tryby mapy/AR | tryb A: obrót, zoom, bez joysticka, symulacja oddzielona od nagród produkcyjnych | D | dopisać obrót/zoom mapy i flagę „symulacja = bez nagród produkcyjnych” |
-| ECONOMY L9 | nazwa waluty „do decyzji (Q7)” | waluta: talary (spec, test kroku 18) | K | wpisać „talary (rozstrzygnięte)” |
-| OPEN_QUESTIONS §2 L41–58 | plan S1–S13 „propozycje” | etapy 1–6 | D | dodać mapowanie S1–S13 → etapy 1–6 (np. S2–S4 + zapis + audio = etap 1; S7 + combo = etap 2; S6/S9 = etap 3; S10/S11 = etap 4; S8 = etap 5) |
-| design/README | lista dokumentów | nowa specyfikacja | D | dodać odnośnik do specyfikacji 2026-10-23 i tego pliku |
-
-## 10. Inne dokumenty (zgodne, informacyjnie)
-
-- `docs/METINAR-009-ASSET-PIPELINE.md` §1.1–1.2: NPC 10–20k / 2048², 30 fps w AR — **zgodne** ze specem; foldery
-  `Characters`, `Weapons`, `Animations`, `Materials`, `Textures` istnieją w `client/Assets/MetinAR/` na `main`.
-- `docs/AUTONOMOUS_WORKFLOW.md` L100, L107, L248 (bez `ACCESS_BACKGROUND_LOCATION`, dowód z urządzenia, GPS tylko na pierwszym planie) — **zgodne**.
+- Klasy, ścieżki, 2 + 6 + 6 = 14 umiejętności, 56 razem, ścieżka od poz. 10, kolejność Wojownik → Slajter → Ninja → Szaman: [CLASSES_SKILLS.md L14](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/CLASSES_SKILLS.md#L14) ↔ [spec §6 L256–319](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L256-L319).
+- Aura = wzmocnienie klasy, bez obrażeń: [CLASSES_SKILLS.md L79](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/CLASSES_SKILLS.md#L79) ↔ [spec §5 L252–254](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L252-L254).
+- Ciężkie Cięcie (przytrzymaj ATAK 0,6 s): [CLASSES_SKILLS.md L104](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/CLASSES_SKILLS.md#L104) ↔ [spec §4 L179](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L179).
+- Poziom 10 w 3–4 h, ~250 h do 99: [CHARACTER_PROGRESSION.md L87](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/CHARACTER_PROGRESSION.md#L87), [CHARACTER_PROGRESSION.md L92](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/CHARACTER_PROGRESSION.md#L92) ↔ [spec §7 L323–360](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L323-L360).
+- Ekwipunek 24 → 56 miejsc, 10 slotów + 2 szybkie: [ITEMS_COMBAT_SPEC.md L113](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/ITEMS_COMBAT_SPEC.md#L113), [ITEMS_COMBAT_SPEC.md L31](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/ITEMS_COMBAT_SPEC.md#L31) ↔ [spec §9 L392–409](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L392-L409). (Kod: `InventoryPanel` ma 16 pól — luka implementacji, nie dokumentu.)
+- 5 rzadkości: [ITEMS_COMBAT_SPEC.md L73](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/ITEMS_COMBAT_SPEC.md#L73) ↔ [spec §9 L426–434](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L426-L434).
+- Hartowanie +1…+10, bez niszczenia, spadek o 1 od +6, Olej Kowalski chroni: [ITEMS_COMBAT_SPEC.md L84–92](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/ITEMS_COMBAT_SPEC.md#L84-L92) ↔ [spec §10 L450–461](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L450-L461).
+- Trujący Pająk poz. 5, 120 HP: [ITEMS_COMBAT_SPEC.md L140](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/ITEMS_COMBAT_SPEC.md#L140) ↔ [spec §11 L497](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L497).
+- „Wędrowny Handlarz”: [ITEMS_COMBAT_SPEC.md L141](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/ITEMS_COMBAT_SPEC.md#L141) ↔ [spec §11 L506](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L506).
+- Tabela „co docelowo wymaga serwera”: [MODES_DATA_MODEL.md L64–73](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/e1bdf800f87d25f98d9363fb9fe45248fad822aa/docs/design/MODES_DATA_MODEL.md#L64-L73) ↔ [spec §14 L612–627](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L612-L627).
