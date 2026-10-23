@@ -40,4 +40,12 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/PrimaryStats.cs" Link="Production/PrimaryStats.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/Gameplay/SkillTierRules.cs" Link="Production/SkillTierRules.cs" />
   </ItemGroup>
+
+  <!-- METINAR-039 (#82): engine-free warrior combo (ArEncounter folder, no UnityEngine) + the FPP blade/box test it uses. -->
+  <ItemGroup>
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/FppHitGeometry.cs" Link="Production/ArEncounter/FppHitGeometry.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/FppCombatTimeline.cs" Link="Production/ArEncounter/FppCombatTimeline.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/WarriorComboConfig.cs" Link="Production/ArEncounter/WarriorComboConfig.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/WarriorComboMachine.cs" Link="Production/ArEncounter/WarriorComboMachine.cs" />
+  </ItemGroup>
 </Project>

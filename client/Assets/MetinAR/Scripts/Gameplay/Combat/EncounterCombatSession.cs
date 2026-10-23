@@ -19,6 +19,8 @@ namespace MetinAR.Gameplay.Combat
         public CombatHitStatus Status;
         public int SwingId;
         public bool WeakPoint;
+        /// <summary>Skill/combo coefficient used for this hit (1.0 = basic attack; #82 combo hits use their per-hit value).</summary>
+        public double Coefficient = 1.0;
         public DamageResult Damage;
         public int HpBefore;
         public int HpAfter;
@@ -92,13 +94,21 @@ namespace MetinAR.Gameplay.Combat
         /// <summary>Builds the <see cref="DamageRequest"/> of a basic attack (coef 1.0) against this mob.</summary>
         public DamageRequest BuildBasicAttack(DerivedStats attacker, bool weakPoint)
         {
+            return BuildAttack(attacker, weakPoint, 1.0);
+        }
+
+        /// <summary>Same as <see cref="BuildBasicAttack"/> with a skill/combo coefficient (#82 combo hit or charged skill).</summary>
+        public DamageRequest BuildAttack(DerivedStats attacker, bool weakPoint, double coefficient)
+        {
             if (attacker == null) throw new ArgumentNullException(nameof(attacker));
+            if (double.IsNaN(coefficient) || double.IsInfinity(coefficient) || coefficient <= 0)
+                throw new ArgumentOutOfRangeException(nameof(coefficient), coefficient, "Coefficient must be finite and > 0.");
             return new DamageRequest
             {
                 AttackerLevel = attacker.Level,
                 TargetLevel = Mob.Level,
                 Power = attacker.Atk,
-                Coefficient = 1.0,
+                Coefficient = coefficient,
                 Kind = DamageKind.Physical,
                 Type = DamageType.Physical,
                 AttackerAccuracy = attacker.Accuracy,
@@ -116,10 +126,21 @@ namespace MetinAR.Gameplay.Combat
         /// <summary>Handles one geometric FPP hit (the blade intersected the mob's hit volume during swing <paramref name="swingId"/>).</summary>
         public CombatHitReport RegisterHit(int swingId, bool weakPoint = false)
         {
+            return RegisterHit(swingId, weakPoint, 1.0);
+        }
+
+        /// <summary>
+        /// Same as <see cref="RegisterHit(int, bool)"/> with a per-hit coefficient (combo step multiplier, #82).
+        /// Every combo step has its own swing id, so each step can hit the mob once.
+        /// </summary>
+        public CombatHitReport RegisterHit(int swingId, bool weakPoint, double coefficient)
+        {
+            if (double.IsNaN(coefficient) || double.IsInfinity(coefficient) || coefficient <= 0)
+                throw new ArgumentOutOfRangeException(nameof(coefficient), coefficient, "Coefficient must be a positive finite number.");
             int level = _player.Level;
             var report = new CombatHitReport
             {
-                SwingId = swingId, WeakPoint = weakPoint, HpBefore = MobHp, HpAfter = MobHp, MaxHp = Mob.MaxHp,
+                SwingId = swingId, WeakPoint = weakPoint, Coefficient = coefficient, HpBefore = MobHp, HpAfter = MobHp, MaxHp = Mob.MaxHp,
                 PlayerLevelBefore = level, PlayerLevelAfter = level,
             };
             if (MobDefeated)
@@ -136,7 +157,7 @@ namespace MetinAR.Gameplay.Combat
 
             SwingsResolved++;
             DerivedStats attacker = _attackerStatsForLevel(level);
-            DamageResult result = _resolver.Resolve(BuildBasicAttack(attacker, weakPoint), _random);
+            DamageResult result = _resolver.Resolve(BuildAttack(attacker, weakPoint, coefficient), _random);
             report.Status = CombatHitStatus.Resolved;
             report.Damage = result;
             if (result.Landed)
