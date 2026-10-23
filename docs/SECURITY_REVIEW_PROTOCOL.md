@@ -9,20 +9,33 @@
 3. In personal account settings, review PATs, SSH keys, authorized OAuth apps, passkeys/2FA and security logs. Never copy keys into an issue.
 4. Check the repository's **Insights → Traffic**. Traffic has limited historical coverage and shows counts, not reliable clone identities; it cannot establish that no one copied source.
 
-## GitHub Pro branch protection
+## GitHub Pro main protection — prepared for import
 
-GitHub Pro on a personal account supports private-repository rulesets. Configure the ruleset through the GitHub web UI (the linked app cannot write administrative rulesets):
+**Repository owner must activate the ruleset once through the GitHub Settings UI.**
+The GitHub connector used for code reviews cannot write repository rulesets or manage third-party app installations.
 
-- **Settings → Rules → Rulesets → New branch ruleset**
-- Rule targets the exact branch **main**.
-- Keep enforcement active after verifying the status-check names in a successful run.
-- Block **force pushes** and **branch deletion**.
-- Require pull requests and successful status checks for code changes.
-- Select checks that run on every PR: Geo Core, Gameplay Core, Asset Pipeline, QA Static and Secret Scan. Inspect their exact GitHub check names before selecting them.
-- **Do not require a path-filtered workflow** (e.g. Server Tests) on PRs where that workflow does not run, or it will block merges forever.
-- If working alone, do not enable mandatory approval by a second reviewer until a second trusted reviewer is available; a PR author cannot approve their own PR.
+1. Download the verified [MetinAR protected-main JSON](../tools/security/metinar-main-ruleset.json) onto your device (open the file, use **Raw / Download**).
+2. Open [MetinAR Rulesets settings](https://github.com/mromanowski832-ctrl/MetinAR-2026/settings/rules), select **New ruleset → Import a ruleset**, and select the downloaded JSON.
+3. Confirm the target is **refs/heads/main**, enforcement is **Active**, and there are no bypass entries.
+4. Check that deletion and force-push are blocked, all changes require a pull request, and review threads must be resolved.
+5. Confirm **zero required approving reviews** while working as a solo developer. This is not a bypass: PR + successful automated checks are still mandatory. Add a real independent reviewer before increasing the approval requirement.
+6. Verify the exact required check names below appear for a PR on the latest commit. Do not create the rule if any check name remains unknown or duplicated; check the current Actions runs.
+7. Click **Create**, then verify that [Rulesets](https://github.com/mromanowski832-ctrl/MetinAR-2026/settings/rules) shows the new **active** ruleset. A JSON committed in the repository is **not** an active ruleset until imported and created.
 
-Protecting main does not retroactively remove secrets from Git history or prevent an authorized collaborator from cloning source.
+**Eight required GitHub Actions check names** in the import:
+
+- `Geo Core`
+- `Gameplay Core`
+- `Asset Pipeline`
+- `pure .NET tests (all test projects)`
+- `QA tooling (PowerShell lint + tests)`
+- `repo hygiene + docs links`
+- `PR metadata`
+- `Secret patterns in Git history and changes`
+
+Do **not** require the path-filtered `server-tests` workflow: it does not run on every PR. The three core test jobs used to all report generic `test`; their check names have been made unique in the accompanying CI change.
+
+The imported ruleset enables strict up-to-date checks, so a PR can require another run after `main` moves. It prevents force-push and deletion of `main` but does **not** stop authorized users or apps from reading/cloning project code. Keep app and collaborator access minimal.
 
 ## Verification matrix
 
