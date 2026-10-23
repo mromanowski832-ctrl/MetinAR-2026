@@ -64,8 +64,8 @@ Spawn → Approach → Engage ⇄ (Telegraph → Attack → Recover) → Death
                     ↘ Stagger / Stun ↗        ↘ Flee (tylko bestie, HP < 15%, 1×)
 ```
 
-- `Spawn`: pojawienie się 2,5 m od kamery na wykrytym podłożu (zgodnie z METINAR-006).
-- `Approach`: podejście na dystans walki 1,2 m (zasięg ostrza FPP ~0,94 m + margines).
+- `Spawn`: pojawienie się 1,10–3,0 m od kamery na wykrytym podłożu (PROTOTYPE, #31/#97; METINAR-006).
+- `Approach`: mob sam podchodzi do gracza (#97: gracz w AR nie chodzi) na dystans walki `d_stop = R_h − m + f` = 1,21 − 0,20 + 0,31 ≈ 1,32 m (zasięg poziomy ostrza FPP `R_h` przy `SwordScale` 0,75, margines `m`, przód bryły trafienia `f` = 0,345 × skala 0,9); nigdy bliżej niż `d_min` 1,10 m (zbyt blisko — mob płynnie się odsuwa); prędkość 0,6 m/s (maks. 0,8), ≤ 0,04 m na klatkę. Wartości w `ArNoWalkSettings` (PROTOTYPE).
 - `Telegraph`: wyraźna zapowiedź ataku 0,6–0,9 s (animacja + dźwięk), okno na BLOK/UNIK/Ripostę.
 - `Attack`: obrażenia w jednej klatce zdarzenia animacji, jeśli gracz nie zablokował/uniknął.
 - `Recover`: 0,5–0,8 s **okno odsłonięcia** (bonus dla Ciosu w Splot itp.).

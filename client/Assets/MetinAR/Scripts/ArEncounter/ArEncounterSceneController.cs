@@ -9,8 +9,10 @@ using UnityEngine.XR.ARSubsystems;
 namespace MetinAR.ArEncounter
 {
     /// <summary>
-    /// AR encounter prototype: scan → detect horizontal ground → place ONE stationary test monster on the
-    /// real ground (anchored), with unsupported / failure states and a path back to the world map.
+    /// AR encounter prototype: scan → detect horizontal ground → place ONE test monster on the real ground (anchored),
+    /// with unsupported / failure states and a path back to the world map. #97: the player never walks in AR — the mob
+    /// comes to the camera by itself (<see cref="ArNoWalkEncounter"/>), stops at the blade-derived stand-off distance and
+    /// is restored camera-relative after a tracking reset.
     /// The pure decision logic lives in <see cref="ArEncounterStateMachine"/>; this adapter feeds it
     /// AR Foundation data each frame. GPS is not used inside the encounter.
     /// Placement interaction (centre reticle + "Postaw potwora" confirm button) is a PROTOTYPE, not final design.
@@ -59,6 +61,10 @@ namespace MetinAR.ArEncounter
         [SerializeField]
         private ArPlacementSettings _placementSettings = ArPlacementSettings.CreatePrototypeDefaults();
 
+        /// <summary>#97 PROTOTYPE values of the no-walk AR combat (stand-off margin, d_min, speeds, step limit).</summary>
+        [SerializeField]
+        private ArNoWalkSettings _noWalkSettings = new ArNoWalkSettings();
+
         [SerializeField]
         private string _worldMapScenePath = ArEncounterScenes.WorldMapScenePath;
 
@@ -69,6 +75,9 @@ namespace MetinAR.ArEncounter
         private float _notTrackingSeconds;
         private bool _availabilityCheckStarted;
         private ArTrackingRecovery _recovery;
+        private ArNoWalkEncounter _noWalk;
+        private ArMobMotion _loggedMotion = ArMobMotion.Holding;
+        private bool _loggedInReach;
         private int _anchorGeneration;
         private string _loggedTargetPlane;
         private bool _loggedTargetAccepted;
@@ -170,11 +179,33 @@ namespace MetinAR.ArEncounter
         /// <summary>Horizontal distance from the camera to the mob's hit footprint (NaN before placement).</summary>
         public float FootprintDistance { get; private set; } = float.NaN;
 
-        /// <summary>„Podejdź – x,x m” is shown (#31 decision 18:58).</summary>
-        public bool ApproachPromptVisible { get; private set; }
+        /// <summary>#97: no-walk combat logic of the placed mob (approach, pause on loss, camera-relative restore).</summary>
+        public ArNoWalkEncounter NoWalk => _noWalk;
 
-        /// <summary>Current approach prompt text, empty while hidden.</summary>
-        public string ApproachPromptText { get; private set; } = string.Empty;
+        /// <summary>#97 d_stop: stand-off distance derived from the blade geometry (R_h − m + f, never below d_min).</summary>
+        public float MobStopDistance => _noWalk != null ? (float)_noWalk.Approach.StopDistanceMeters : float.NaN;
+
+        /// <summary>What the placed mob is doing on its own (#97).</summary>
+        public ArMobMotion MobMotion { get; private set; } = ArMobMotion.Holding;
+
+        /// <summary>Horizontal distance the mob moved by itself in the last frame (#97 no-teleport check).</summary>
+        public float LastMobStepMeters { get; private set; }
+
+        /// <summary>Largest single-frame self-move of the mob so far, including camera-relative restores (#97 no-teleport check).</summary>
+        public float MaxMobStepMeters { get; private set; }
+
+        /// <summary>Restarts the <see cref="MaxMobStepMeters"/> statistic (smoke tests measure one scenario at a time).</summary>
+        public void ResetMobStepStats()
+        {
+            LastMobStepMeters = 0f;
+            MaxMobStepMeters = 0f;
+        }
+
+        /// <summary>
+        /// Lets the mob walk to the camera (#97, default on). Editor smoke tests that hold the mob at a fixed pose to test
+        /// anchoring or hit geometry turn it off; production never does.
+        /// </summary>
+        public bool MobApproachEnabled { get; set; } = true;
 
         /// <summary>METINAR-020: hit → damage → mob HP → death → EXP/talary (added at runtime in Awake).</summary>
         public ArEncounterCombat Combat { get; private set; }
@@ -207,6 +238,24 @@ namespace MetinAR.ArEncounter
         {
             _machine = new ArEncounterStateMachine(_placementSettings);
             _recovery = new ArTrackingRecovery(_machine.Settings.trackingLostResetSeconds);
+            _noWalkSettings = _noWalkSettings ?? new ArNoWalkSettings();
+            double stop = ArMobStandoff.StopDistance(FppCombatController.BladeReachMeters, _noWalkSettings, ArEncounterFraming.MobVisualScale, out bool stopClamped);
+            _noWalk = new ArNoWalkEncounter(_noWalkSettings, _recovery, stop);
+            string standoff = "[ArEncounter] no-walk standoff d_stop=" + stop.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                              + " bladeReach=" + FppCombatController.BladeReachMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                              + " margin=" + _noWalkSettings.reachMarginMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                              + " front=" + ArMobStandoff.HitFrontOffsetMeters(ArEncounterFraming.MobVisualScale).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                              + " d_min=" + _noWalkSettings.minDistanceMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                              + " approachFrom=" + _noWalk.Approach.ApproachStartMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                              + " maxStep=" + _noWalkSettings.MaxStepMeters.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
+            if (stopClamped)
+            {
+                Debug.LogWarning(standoff + " CLAMPED to d_min (blade reach too short for the margin)");
+            }
+            else
+            {
+                Debug.Log(standoff);
+            }
             _stateHistory.Add(_machine.State);
             _machine.StateChanged += OnMachineStateChanged;
 
@@ -348,8 +397,8 @@ namespace MetinAR.ArEncounter
             if (_machine.State == ArEncounterState.Placed)
             {
                 HidePlaneVisuals();
-                UpdateTrackingRecovery();
-                UpdateApproachPrompt();
+                UpdateNoWalk();
+                UpdateReachDiagnostics();
                 LogAnchorDiagnostics();
             }
 
@@ -357,27 +406,71 @@ namespace MetinAR.ArEncounter
         }
 
         /// <summary>
-        /// #31 v0 A31 P0-2 + MANAGER DECISION 18:50. When the AR session stops tracking (VIO reset) the camera pose freezes
-        /// while the camera image keeps moving, so a drawn mob looks glued to the phone. The mob is hidden and combat paused
-        /// at once; after <see cref="ArPlacementSettings.trackingLostResetSeconds"/> (prototype 15 s) the ARSession is reset.
-        /// The mob object and its fight (HP, once-only reward) survive; when tracking is back it is anchored again on new ground.
+        /// #31 v0 A31 P0-2 + MANAGER DECISION 18:50, #97. When the AR session stops tracking (VIO reset) the camera pose
+        /// freezes while the camera image keeps moving, so a drawn mob looks glued to the phone. The mob is hidden, its
+        /// movement and combat are paused at once; after <see cref="ArPlacementSettings.trackingLostResetSeconds"/>
+        /// (prototype 15 s) the ARSession is reset. The mob object and its fight (HP, once-only reward) survive; when
+        /// tracking is back it is restored at the same camera-relative distance and bearing (#97, no reticle re-placement).
+        /// While usable, the mob walks to / backs off to the stand-off distance by itself (#97, no player walking).
         /// </summary>
-        private void UpdateTrackingRecovery()
+        private void UpdateNoWalk()
         {
-            if (SpawnedMob == null || _recovery == null)
+            if (SpawnedMob == null || _noWalk == null)
             {
                 return;
             }
 
             bool tracking = LastSessionStatus == ArSessionStatus.SessionTracking;
-            ArRecoveryAction action = _recovery.Tick(true, tracking, Time.unscaledDeltaTime);
-            if (action == ArRecoveryAction.ResetSession)
+            Transform mobT = SpawnedMob.transform;
+            ArNoWalkFrame frame;
+            if (_arCamera == null)
             {
-                ResetSessionKeepingMob();
+                // No camera: keep the #31 loss/reset behaviour, the mob cannot know where to walk.
+                ArRecoveryAction action = _recovery.Tick(true, tracking, Time.unscaledDeltaTime);
+                if (action == ArRecoveryAction.ResetSession) ResetSessionKeepingMob();
+                frame = new ArNoWalkFrame(ArNoWalkAction.None, YawPose(mobT), false, _recovery.MobUsable, _recovery.MobUsable, ArMobMotion.Paused, 0.0);
             }
-            else if (action == ArRecoveryAction.Relocate)
+            else
             {
-                TryRelocateMob();
+                bool alive = Combat == null || Combat.Session == null || !Combat.Session.MobDefeated;
+                frame = _noWalk.Tick(tracking, YawPose(_arCamera.transform), YawPose(mobT), Time.unscaledDeltaTime, MobApproachEnabled && alive);
+                if (frame.Action == ArNoWalkAction.ResetSession)
+                {
+                    ResetSessionKeepingMob();
+                }
+                else if (frame.Action == ArNoWalkAction.Restore)
+                {
+                    RestoreMobCameraRelative(frame);
+                }
+                else if (frame.MobMoved)
+                {
+                    mobT.SetPositionAndRotation(new Vector3((float)frame.MobPose.X, mobT.position.y, (float)frame.MobPose.Z),
+                                                Quaternion.Euler(0f, (float)frame.MobPose.YawDegrees, 0f));
+                }
+            }
+
+            LastMobStepMeters = (float)frame.StepMeters;
+            MaxMobStepMeters = Mathf.Max(MaxMobStepMeters, LastMobStepMeters);
+            MobMotion = frame.Motion;
+            double cruise = _noWalkSettings.approachSpeedMetersPerSecond;
+            SpawnedMob.SetGait(_noWalk.Approach.TravelledMeters, frame.Motion == ArMobMotion.Approaching || frame.Motion == ArMobMotion.Retreating
+                ? (float)(_noWalk.Approach.Speed / cruise) : 0f);
+            if (MobMotion != _loggedMotion)
+            {
+                Vector3 c = _arCamera != null ? _arCamera.transform.position : mobT.position;
+                Vector3 m = mobT.position;
+                Debug.Log("[ArEncounter] mob motion " + _loggedMotion + "->" + MobMotion
+                          + " d=" + ArEncounterFraming.HorizontalDistance(c.x, c.z, m.x, m.z).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                          + " d_stop=" + MobStopDistance.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                          + " maxStep=" + MaxMobStepMeters.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)
+                          + " " + FightState());
+                if (MobMotion == ArMobMotion.Holding && (_loggedMotion == ArMobMotion.Approaching || _loggedMotion == ArMobMotion.Retreating))
+                {
+                    // The mob moved on purpose: the anchor probe measures drift from its new resting pose.
+                    ResetAnchorProbe();
+                }
+
+                _loggedMotion = MobMotion;
             }
 
             bool visible = _recovery.MobUsable;
@@ -391,8 +484,16 @@ namespace MetinAR.ArEncounter
 
                 Debug.Log("[ArEncounter] mob " + (visible
                     ? "shown (tracking)"
-                    : "hidden (" + (IsRelocatingMob ? "waiting for new ground after reset" : "tracking lost") + ": " + LastSessionStatus + ")"));
+                    : "hidden (" + (IsRelocatingMob ? "waiting for tracking after reset" : "tracking lost") + ": " + LastSessionStatus + ")"));
             }
+        }
+
+        private static ArYawPose YawPose(Transform t)
+        {
+            Vector3 p = t.position;
+            Vector3 f = Vector3.ProjectOnPlane(t.forward, Vector3.up);
+            double yaw = f.sqrMagnitude > 1e-8f ? Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg : t.eulerAngles.y;
+            return new ArYawPose(p.x, p.y, p.z, yaw);
         }
 
         private string FightState()
@@ -432,48 +533,45 @@ namespace MetinAR.ArEncounter
             }
         }
 
-        private void TryRelocateMob()
+        /// <summary>
+        /// #97 rule 7: after a session reset, tracking is back. The mob is put at the same horizontal distance and bearing
+        /// relative to the camera (and the same height below it) as in the last tracked frame, distance clamped to
+        /// [d_min, 3.0 m], then anchored with a free world anchor. No reticle, no new plane: the player does not re-place
+        /// or walk. HP and the reward state are untouched (the fight object is never recreated).
+        /// </summary>
+        private void RestoreMobCameraRelative(ArNoWalkFrame frame)
         {
-            if (!_frame.HasTarget || string.IsNullOrEmpty(_frame.TargetPlaneId) || !IsFrameTargetSuitable())
-            {
-                return;
-            }
-
-            Vector3 p = _frame.TargetPose.position;
-            if (!IsFarEnough(p) || !IsNearEnough(p) || !IsPlaneHeightAcceptable(p))
-            {
-                return;
-            }
-
-            var pose = new Pose(p, FacingCamera(p));
             Transform mob = SpawnedMob.transform;
+            var pose = new Pose(new Vector3((float)frame.MobPose.X, (float)frame.MobPose.Y, (float)frame.MobPose.Z),
+                                Quaternion.Euler(0f, (float)frame.MobPose.YawDegrees, 0f));
             mob.SetPositionAndRotation(pose.position, pose.rotation);
             MobAnchorKind = "session";
             if (_anchorManager != null && _anchorManager.enabled && _anchorManager.subsystem != null)
             {
                 MobAnchorKind = "pending";
-                AnchorMobAtWorldPose(mob, pose, _frame.TargetPlane);
+                AnchorMobAtWorldPose(mob, pose, null);
             }
 
-            _recovery.MarkRelocated();
+            _noWalk.MarkRestored();
             ResetAnchorProbe();
-            Vector3 c = _arCamera != null ? _arCamera.transform.position : p;
-            Debug.Log("[ArSession] relocated mob at " + pose.position.ToString("F2")
-                      + " planeBelowCam=" + ArEncounterFraming.PlaneDropBelowCamera(c.y, p.y).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
-                      + " d=" + ArEncounterFraming.HorizontalDistance(c.x, c.z, p.x, p.z).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+            Vector3 c = _arCamera != null ? _arCamera.transform.position : pose.position;
+            ArCameraRelativePose rel = _noWalk.LastRelativePose;
+            Debug.Log("[ArSession] restored mob camera-relative at " + pose.position.ToString("F2")
+                      + " d=" + ArEncounterFraming.HorizontalDistance(c.x, c.z, pose.position.x, pose.position.z).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                      + " recordedD=" + (rel.IsValid ? rel.DistanceMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) : "n/a")
+                      + " bearing=" + (rel.IsValid ? rel.BearingDegrees.ToString("F0", System.Globalization.CultureInfo.InvariantCulture) : "n/a")
+                      + " planeBelowCam=" + ArEncounterFraming.PlaneDropBelowCamera(c.y, pose.position.y).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                       + " anchor=" + MobAnchorKind + " resets=" + _recovery.ResetCount + " " + FightState());
         }
 
         /// <summary>
-        /// #31 decision 18:58: v0 mob stands still, the player walks up. „Podejdź – x,x m” while the usable, undefeated mob
-        /// is out of attack reach; hidden in reach, after the kill and while tracking is lost („Szukam otoczenia…” wins).
-        /// Logs <c>[ArEncounter] approach prompt shown|hidden …</c> on every visibility change.
+        /// Distance-only attack reach (#31) as a diagnostic: logs <c>[ArEncounter] reach in|out …</c> on every change.
+        /// #97 removed the „Podejdź – x,x m” prompt — the mob walks into reach by itself.
         /// </summary>
-        private void UpdateApproachPrompt()
+        private void UpdateReachDiagnostics()
         {
             if (SpawnedMob == null || _arCamera == null)
             {
-                SetApproachPrompt(false, float.NaN, "no-mob");
                 return;
             }
 
@@ -483,26 +581,17 @@ namespace MetinAR.ArEncounter
             FootprintDistance = FppCombat != null ? FppCombat.HorizontalDistanceToHitFootprint(SpawnedMob) : float.NaN;
             InAttackReach = FppCombat != null && !float.IsNaN(FootprintDistance)
                             && !ArApproachPrompt.IsOutOfReach(FootprintDistance, FppCombatController.BladeReachMeters);
-            bool defeated = Combat != null && Combat.Session != null && Combat.Session.MobDefeated;
-            bool show = ArApproachPrompt.ShouldShow(true, MobUsable, defeated, InAttackReach, ApproachDistance);
-            string reason = !MobUsable ? "tracking" : defeated ? "defeated" : InAttackReach ? "in-reach" : "out-of-reach";
-            SetApproachPrompt(show, ApproachDistance, reason);
-        }
-
-        private void SetApproachPrompt(bool show, float distance, string reason)
-        {
-            ApproachPromptText = show ? ArApproachPrompt.Format(distance) : string.Empty;
-            if (show == ApproachPromptVisible)
+            if (InAttackReach == _loggedInReach)
             {
                 return;
             }
 
-            ApproachPromptVisible = show;
-            Debug.Log("[ArEncounter] approach prompt " + (show ? "shown" : "hidden")
-                      + " reason=" + reason
-                      + " d=" + (float.IsNaN(distance) ? "n/a" : distance.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))
+            _loggedInReach = InAttackReach;
+            Debug.Log("[ArEncounter] reach " + (InAttackReach ? "in" : "out")
+                      + " d=" + ApproachDistance.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                       + " toFootprint=" + (float.IsNaN(FootprintDistance) ? "n/a" : FootprintDistance.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))
-                      + " bladeReach=" + FppCombatController.BladeReachMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+                      + " bladeReach=" + FppCombatController.BladeReachMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                      + " motion=" + MobMotion);
         }
 
         private bool IsFrameTargetSuitable()
@@ -670,7 +759,7 @@ namespace MetinAR.ArEncounter
                 PlacementTargetTooClose,
                 !MobUsable,
                 PlacementTargetTooFar,
-                ApproachPromptVisible ? ApproachPromptText : null);
+                MobMotion);
         }
 
         /// <summary>Placement target at least the minimum ground distance from the AR camera (true without a camera).</summary>

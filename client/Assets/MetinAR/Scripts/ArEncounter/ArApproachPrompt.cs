@@ -1,28 +1,16 @@
 using System;
-using System.Globalization;
 
 namespace MetinAR.ArEncounter
 {
     /// <summary>
-    /// #31 decision 18:58 (+ correction 19:00): in v0 the mob stands still and the player walks up to it. While the placed,
-    /// visible, undefeated mob is outside attack reach the HUD shows „Podejdź – 2,4 m” (horizontal camera-to-mob distance,
-    /// one decimal). Hidden in reach, after the kill (lead confirmed) and while tracking is lost („Szukam otoczenia…” has
-    /// priority). Attack reach is DISTANCE ONLY, independent of where the phone aims: the horizontal distance from the camera
-    /// to the mob's hit footprint versus the blade's horizontal reach, both taken from existing geometry (no new constant).
-    /// The aimed blade sweep stays for hits only. Engine-free.
+    /// Attack-reach geometry of the AR encounter (#31, kept by #97). Attack reach is DISTANCE ONLY, independent of where the
+    /// phone aims: the horizontal distance from the camera to the mob's hit footprint versus the blade's horizontal reach,
+    /// both taken from the sword/hit geometry. #97 removed the v0 walk-up prompt („Podejdź – x,x m”, formerly
+    /// <c>Prefix</c>/<c>Format</c>/<c>ShouldShow</c>): the player no longer walks in AR, the mob comes into reach by itself
+    /// (<see cref="ArMobApproach"/>, stand-off from <see cref="ArMobStandoff"/>). The class name is kept to limit churn. Engine-free.
     /// </summary>
     public static class ArApproachPrompt
     {
-        public const string Prefix = "Podejdź – ";
-
-        /// <summary>„Podejdź – 2,4 m” (Polish decimal comma, rounded half away from zero); empty for a non-finite or negative distance.</summary>
-        public static string Format(double meters)
-        {
-            if (double.IsNaN(meters) || double.IsInfinity(meters) || meters < 0) return string.Empty;
-            double rounded = Math.Round(meters, 1, MidpointRounding.AwayFromZero);
-            return Prefix + rounded.ToString("0.0", CultureInfo.InvariantCulture).Replace('.', ',') + " m";
-        }
-
         /// <summary>
         /// Blade's horizontal reach from the camera, independent of aim: the largest camera-local length of the sampled blade
         /// points (base/tip over the ATAK hit window). For any camera pitch/yaw the horizontal reach cannot exceed it, and at
@@ -58,13 +46,6 @@ namespace MetinAR.ArEncounter
         {
             if (double.IsNaN(distanceToFootprintMeters) || double.IsNaN(bladeReachMeters)) return false;
             return distanceToFootprintMeters > bladeReachMeters;
-        }
-
-        /// <summary>True only for a placed, usable (tracking, anchored) and undefeated mob that is out of attack reach.</summary>
-        public static bool ShouldShow(bool placed, bool mobUsable, bool mobDefeated, bool inAttackReach, double meters)
-        {
-            return placed && mobUsable && !mobDefeated && !inAttackReach
-                   && !double.IsNaN(meters) && !double.IsInfinity(meters) && meters >= 0;
         }
     }
 }

@@ -126,7 +126,7 @@ namespace MetinAR.ArEncounter
         /// #31 decision 18:58 correction: the blade's horizontal reach from the camera, independent of aim — derived from the
         /// SAME animated sword pose and blade segment as the hit sweep (<see cref="FppHandsView.SwordPose"/>,
         /// <see cref="FppHandsView.BladeBase"/>/<see cref="FppHandsView.BladeTip"/>, ATAK hit window), via
-        /// <see cref="ArApproachPrompt.BladeReach"/>. No new constant. Used for the „Podejdź” prompt only.
+        /// <see cref="ArApproachPrompt.BladeReach"/>. No new constant. Used for the reach diagnostic and the #97 stand-off distance (<see cref="ArMobStandoff"/>).
         /// </summary>
         public static float BladeReachMeters
         {

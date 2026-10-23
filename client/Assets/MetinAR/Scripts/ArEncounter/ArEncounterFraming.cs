@@ -18,8 +18,11 @@ namespace MetinAR.ArEncounter
     /// </summary>
     public static class ArEncounterFraming
     {
-        /// <summary>Minimum horizontal (ground) distance from the AR camera to the placement target.</summary>
-        public const double MinPlacementDistanceMeters = 1.5;
+        /// <summary>
+        /// Minimum horizontal (ground) distance from the AR camera to the placement target. #97 (PROTOTYPE): 1.10 m = d_min
+        /// of <see cref="ArNoWalkSettings.minDistanceMeters"/> — the mob is never closer than this, placed or walking.
+        /// </summary>
+        public const double MinPlacementDistanceMeters = 1.10;
 
         /// <summary>v0 maximum horizontal spawn distance (#31 decision 18:58, PROTOTYPE 3.0 m).</summary>
         public const double MaxPlacementDistanceMeters = 3.0;

@@ -38,6 +38,12 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArAnchorProbe.cs" Link="Production/ArAnchorProbe.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArTrackingRecovery.cs" Link="Production/ArTrackingRecovery.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArApproachPrompt.cs" Link="Production/ArApproachPrompt.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArNoWalkSettings.cs" Link="Production/ArNoWalkSettings.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArMobApproach.cs" Link="Production/ArMobApproach.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArCameraRelativePose.cs" Link="Production/ArCameraRelativePose.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArNoWalkEncounter.cs" Link="Production/ArNoWalkEncounter.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArEncounterStatusText.cs" Link="Production/ArEncounterStatusText.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArMobGait.cs" Link="Production/ArMobGait.cs" />
   </ItemGroup>
 </Project>
 

@@ -98,7 +98,7 @@ No Metin2 or third-party proprietary assets.
 | Starting | availability check / session not running yet | "Uruchamianie AR..." |
 | Scanning | session running, no suitable horizontal plane | "Skanuj teren…", place button disabled |
 | ReadyToPlace | a horizontal, upward-facing, tracking plane ≥ 0.3 × 0.3 m, not subsumed | reticle + enabled "Postaw potwora" |
-| Placed | exactly one mob spawned; further taps return `AlreadyPlaced` | plane visuals hidden; "Szukam otoczenia…" when tracking degrades (mob hidden, combat paused; ARSession reset after 15 s, #31); „Podejdź – x,x m” while out of attack reach (v0 walk-up, #31 18:58) |
+| Placed | exactly one mob spawned; further taps return `AlreadyPlaced` | plane visuals hidden; "Szukam otoczenia…" when tracking degrades (mob hidden, combat paused; ARSession reset after 15 s, #31); out of attack reach the mob walks to the stand-off distance by itself, „… nadchodzi.” (#97; the v0 „Podejdź – x,x m” prompt is removed) |
 | Unsupported | device has no AR support (terminal, no crash) | "AR niedostępne" panel + back to map |
 | Failed | session did not start within 20 s or reported an error; recovers if the session starts | "Błąd sesji AR" panel + back to map |
 
