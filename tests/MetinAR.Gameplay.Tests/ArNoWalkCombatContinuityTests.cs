@@ -64,6 +64,12 @@ namespace MetinAR.Gameplay.Tests
             Assert.Equal(1, encounter.RestoreCount);
             Assert.Equal(stop, ArYawPose.HorizontalDistance(camAfter, mob), 9);
             Assert.Equal(75, session.MobHp);
+            // Lead decision 04:42 (#97 Q2): swings land again only after combatResumeStableSeconds of stable tracking.
+            int settle = (int)System.Math.Ceiling(settings.combatResumeStableSeconds / dt);
+            for (int i = 0; i < settle - 1; i++) Frame(true, camAfter, true);
+            Assert.Equal(75, session.MobHp);
+            Assert.Equal(5, session.HitsLanded);
+            Frame(true, camAfter, false);
             for (int i = 0; i < 9; i++) Frame(true, camAfter, true);
             Assert.True(session.MobDefeated);
             Assert.Equal(14, session.HitsLanded);

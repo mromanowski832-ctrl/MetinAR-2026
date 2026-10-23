@@ -204,11 +204,37 @@ namespace MetinAR.ArEncounter
             MaxMobStepMeters = 0f;
         }
 
+#if UNITY_EDITOR
+        /// <summary>The approach can be switched off only in the Editor (smoke-test seam), never in a player build.</summary>
+        public const bool MobApproachTestSeamAvailable = true;
+#else
+        public const bool MobApproachTestSeamAvailable = false;
+#endif
+
+        private bool _mobApproachTestRequest = true;
+
         /// <summary>
-        /// Lets the mob walk to the camera (#97, default on). Editor smoke tests that hold the mob at a fixed pose to test
-        /// anchoring or hit geometry turn it off; production never does.
+        /// Lets the mob walk to the camera (#97, always on in game builds — lead decision 04:42, Q9). Not serialized, not
+        /// settable: only Editor smoke tests that hold the mob at a fixed pose can turn it off via
+        /// <see cref="SetMobApproachEnabledForTests"/>; outside the Editor the request is ignored (<see cref="ArMobApproachGate"/>).
         /// </summary>
-        public bool MobApproachEnabled { get; set; } = true;
+        public bool MobApproachEnabled => ArMobApproachGate.Effective(_mobApproachTestRequest, MobApproachTestSeamAvailable);
+
+        /// <summary>Editor smoke-test seam (#97 Q9). In a player build a "false" is ignored and logged.</summary>
+        public void SetMobApproachEnabledForTests(bool enabled)
+        {
+            _mobApproachTestRequest = enabled;
+            if (!enabled && !MobApproachTestSeamAvailable)
+            {
+                Debug.LogWarning("[ArEncounter] mob approach cannot be disabled outside the Editor; request ignored");
+            }
+        }
+
+        /// <summary>
+        /// Swings may start: tracking, no pending restore, and — after any loss — tracking stable for
+        /// <see cref="ArNoWalkSettings.combatResumeStableSeconds"/> (#97 Q2, lead 04:42).
+        /// </summary>
+        public bool CombatAllowed { get; private set; } = true;
 
         /// <summary>METINAR-020: hit → damage → mob HP → death → EXP/talary (added at runtime in Awake).</summary>
         public ArEncounterCombat Combat { get; private set; }
@@ -436,7 +462,16 @@ namespace MetinAR.ArEncounter
             else
             {
                 bool alive = Combat == null || Combat.Session == null || !Combat.Session.MobDefeated;
-                frame = _noWalk.Tick(tracking, YawPose(_arCamera.transform), YawPose(mobT), Time.unscaledDeltaTime, MobApproachEnabled && alive);
+                bool settlePending = _noWalk.PlaneSettlePending;
+                double? planeY = settlePending && tracking && TryPlaneHeightUnder(mobT.position, _noWalk.RestoredY, out float py) ? py : (double?)null;
+                frame = _noWalk.Tick(tracking, YawPose(_arCamera.transform), YawPose(mobT), Time.unscaledDeltaTime, MobApproachEnabled && alive, planeY);
+                if (settlePending && !_noWalk.PlaneSettlePending)
+                {
+                    Debug.Log("[ArSession] mob settled on plane y=" + frame.MobPose.Y.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                              + " restoredY=" + _noWalk.RestoredY.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                              + " dy=" + (frame.MobPose.Y - _noWalk.RestoredY).ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+                }
+
                 if (frame.Action == ArNoWalkAction.ResetSession)
                 {
                     ResetSessionKeepingMob();
@@ -447,11 +482,13 @@ namespace MetinAR.ArEncounter
                 }
                 else if (frame.MobMoved)
                 {
-                    mobT.SetPositionAndRotation(new Vector3((float)frame.MobPose.X, mobT.position.y, (float)frame.MobPose.Z),
+                    // Y changes only while easing onto a plane found after a restore (#97 Q2), within the step limit.
+                    mobT.SetPositionAndRotation(new Vector3((float)frame.MobPose.X, (float)frame.MobPose.Y, (float)frame.MobPose.Z),
                                                 Quaternion.Euler(0f, (float)frame.MobPose.YawDegrees, 0f));
                 }
             }
 
+            CombatAllowed = frame.CombatAllowed;
             LastMobStepMeters = (float)frame.StepMeters;
             MaxMobStepMeters = Mathf.Max(MaxMobStepMeters, LastMobStepMeters);
             MobMotion = frame.Motion;
@@ -489,6 +526,48 @@ namespace MetinAR.ArEncounter
                     ? "shown (tracking)"
                     : "hidden (" + (IsRelocatingMob ? "waiting for tracking after reset" : "tracking lost") + ": " + LastSessionStatus + ")"));
             }
+        }
+
+        /// <summary>
+        /// Height of a tracked horizontal (up) plane whose extents contain <paramref name="position"/> (x/z), the one closest
+        /// to <paramref name="referenceY"/>. Used after a restore to ease the mob onto real ground (#97 Q2).
+        /// </summary>
+        private bool TryPlaneHeightUnder(Vector3 position, double referenceY, out float planeY)
+        {
+            planeY = 0f;
+            if (_planeManager == null)
+            {
+                return false;
+            }
+
+            bool found = false;
+            double best = double.MaxValue;
+            foreach (ARPlane plane in _planeManager.trackables)
+            {
+                if (plane == null || plane.alignment != PlaneAlignment.HorizontalUp || plane.trackingState != TrackingState.Tracking || plane.subsumedBy != null)
+                {
+                    continue;
+                }
+
+                Vector3 local = plane.transform.InverseTransformPoint(position);
+                Vector2 c = plane.centerInPlaneSpace;
+                Vector2 e = plane.extents;
+                if (Mathf.Abs(local.x - c.x) > e.x || Mathf.Abs(local.z - c.y) > e.y)
+                {
+                    continue;
+                }
+
+                float y = plane.transform.position.y;
+                double gap = System.Math.Abs(y - referenceY);
+                if (gap < best)
+                {
+                    best = gap;
+                    planeY = y;
+                    found = true;
+                }
+            }
+
+            return found;
         }
 
         private static ArYawPose YawPose(Transform t)

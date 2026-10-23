@@ -214,7 +214,7 @@ namespace MetinAR.Editor
                 {
                     // #97: legacy tests (T08/T09 "the mob never moves", T10b/T10c "spider held in the blade") run with the
                     // approach off; T10d/T10e switch it on for the no-walk regression.
-                    _ar.MobApproachEnabled = false;
+                    _ar.SetMobApproachEnabledForTests(false);
                 }
 
                 if (_ar != null && _pendingOverride != null)
@@ -852,7 +852,7 @@ namespace MetinAR.Editor
                 float tol = (float)_ar.NoWalk.Settings.stopToleranceMeters, maxStep = (float)_ar.NoWalk.Settings.MaxStepMeters;
                 try
                 {
-                    _ar.MobApproachEnabled = false;
+                    _ar.SetMobApproachEnabledForTests(false);
                     LocalPlayerSession.Reset();
                     combat.SeedOverride = 20261021UL;
                     combat.Bind(mob);
@@ -868,7 +868,7 @@ namespace MetinAR.Editor
 
                     // (1)(2)(3)(4) static camera, the spider walks in.
                     _ar.ResetMobStepStats();
-                    _ar.MobApproachEnabled = true;
+                    _ar.SetMobApproachEnabledForTests(true);
                     float prev = float.MaxValue, minSeen = float.MaxValue;
                     bool grew = false, sawApproach = false, nadchodzi = false;
                     float until = Time.realtimeSinceStartup + 10f;
@@ -936,7 +936,7 @@ namespace MetinAR.Editor
                 finally
                 {
                     Application.logMessageReceived -= onLog;
-                    _ar.MobApproachEnabled = false;
+                    _ar.SetMobApproachEnabledForTests(false);
                     fpp.CancelActions();
                     simCam.SetPositionAndRotation(savedSimPos, savedSimRot);
                     if (savedBounds.HasValue) SetSimulationCameraBounds(simCam, savedBounds.Value);
@@ -967,7 +967,7 @@ namespace MetinAR.Editor
                 float tol = (float)_ar.NoWalk.Settings.stopToleranceMeters, maxStep = (float)_ar.NoWalk.Settings.MaxStepMeters;
                 try
                 {
-                    _ar.MobApproachEnabled = false;
+                    _ar.SetMobApproachEnabledForTests(false);
                     yield return Frames(3);
                     Vector3 mobPos = mob.transform.position;
                     Vector3 dir = Vector3.ProjectOnPlane(_ar.ArCamera.transform.position - mobPos, Vector3.up);
@@ -977,7 +977,7 @@ namespace MetinAR.Editor
                     // Lean in to 0.9 m (below d_min): the spider backs off by itself.
                     yield return PlaceArCamera(simCam, mobPos + dir * 0.9f + Vector3.up * DeviceCameraHeight, look);
                     _ar.ResetMobStepStats();
-                    _ar.MobApproachEnabled = true;
+                    _ar.SetMobApproachEnabledForTests(true);
                     float prev = HorizontalCamMob(mob);
                     bool cameCloser = false, sawRetreat = false;
                     yield return WaitUntil(() =>
@@ -1011,7 +1011,7 @@ namespace MetinAR.Editor
                 }
                 finally
                 {
-                    _ar.MobApproachEnabled = false;
+                    _ar.SetMobApproachEnabledForTests(false);
                     simCam.SetPositionAndRotation(savedSimPos, savedSimRot);
                     if (savedBounds.HasValue) SetSimulationCameraBounds(simCam, savedBounds.Value);
                     _ar.FrameSourceOverride = savedFrameSource;

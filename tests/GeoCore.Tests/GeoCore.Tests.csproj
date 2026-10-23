@@ -44,6 +44,7 @@
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArNoWalkEncounter.cs" Link="Production/ArNoWalkEncounter.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArEncounterStatusText.cs" Link="Production/ArEncounterStatusText.cs" />
     <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArMobGait.cs" Link="Production/ArMobGait.cs" />
+    <Compile Include="../../client/Assets/MetinAR/Scripts/ArEncounter/ArReachLog.cs" Link="Production/ArReachLog.cs" />
   </ItemGroup>
 </Project>
 

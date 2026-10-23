@@ -242,8 +242,11 @@ public class ArNoWalkRegressionTests
             Assert.Equal(run.Distances[a - 1], run.Distances[i], 12);
         }
 
-        // After the short loss the approach resumes smoothly from a standstill (speed ramps from 0 again).
-        Assert.True(run.Frames[b + 2].CombatAllowed);
+        // After the short loss the approach resumes smoothly from a standstill (speed ramps from 0 again); the mob is visible
+        // at once but combat resumes only after stable tracking (lead decision 04:42, #97 Q2: combatResumeStableSeconds).
+        Assert.True(run.Frames[b + 2].MobVisible);
+        Assert.False(run.Frames[b + 2].CombatAllowed);
+        Assert.True(run.Frames[b + 1 + (int)Math.Ceiling(Settings.combatResumeStableSeconds * 60) + 1].CombatAllowed);
         Assert.Equal(ArMobMotion.Approaching, run.Frames[b + 3].Motion);
         Assert.True(run.Frames[b + 2].StepMeters < 0.02);
     }
@@ -277,8 +280,11 @@ public class ArNoWalkRegressionTests
         Assert.Equal(1, enc.RestoreCount);
 
         ArNoWalkFrame next = enc.Tick(true, cam1, restore.MobPose, 1.0 / 60, true);
-        Assert.True(next.CombatAllowed);
         Assert.True(next.MobVisible);
+        // Lead decision 04:42 (#97 Q2): combat resumes only after combatResumeStableSeconds of stable tracking.
+        Assert.False(next.CombatAllowed);
+        Run stable = Simulate(enc, cam1, next.MobPose, Settings.combatResumeStableSeconds + 2.0 / 60, 1.0 / 60);
+        Assert.True(stable.Frames.Last().CombatAllowed);
     }
 
     // ---- 6. reach = blade geometry: the stand-off is a real hit with the FPP hit volume ----

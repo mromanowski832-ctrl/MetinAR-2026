@@ -78,8 +78,12 @@ namespace MetinAR.ArEncounter
         /// <summary>d_stop (metres, horizontal camera → mob root).</summary>
         public double StopDistanceMeters { get; }
 
-        /// <summary>Distance beyond which a holding mob starts to approach (d_stop + hysteresis).</summary>
-        public double ApproachStartMeters => StopDistanceMeters + _settings.approachHysteresisMeters;
+        /// <summary>
+        /// Distance beyond which a holding mob starts to approach: d_stop + hysteresis, but (lead decision 04:42, #97 Q6) never
+        /// beyond d_stop + margin (= the blade's reach boundary R_h + f), so a holding mob is always hittable. Defaults:
+        /// hysteresis 0.15 &lt; margin 0.20 → d_stop + 0.15.
+        /// </summary>
+        public double ApproachStartMeters => StopDistanceMeters + Math.Min(_settings.approachHysteresisMeters, _settings.reachMarginMeters);
 
         public ArMobMotion Motion { get; private set; } = ArMobMotion.Holding;
 

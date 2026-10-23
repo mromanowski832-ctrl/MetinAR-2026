@@ -47,11 +47,35 @@ namespace MetinAR.ArEncounter
         /// </summary>
         public double mobVisualScale = ArEncounterFraming.DefaultMobVisualScale;
 
+        /// <summary>
+        /// Lead decision 2026-10-23 04:42 (#97 Q2): after a restore the mob is put at the recorded camera drop at once (no
+        /// waiting for a plane). If a horizontal plane later shows up under it within ± this tolerance of that height, the
+        /// mob eases onto it within the per-frame step limit (PROTOTYPE 0.15 m).
+        /// </summary>
+        public double planeSettleToleranceMeters = 0.15;
+
+        /// <summary>
+        /// Lead decision 2026-10-23 04:42 (#97 Q2, "combat resumes only at stable Tracking"): after any frame without
+        /// tracking, swings are allowed again only after this many seconds of uninterrupted Tracking (PROTOTYPE 0.5 s).
+        /// </summary>
+        public double combatResumeStableSeconds = 0.5;
+
         /// <summary>Acceleration (m/s²) implied by <see cref="approachSpeedMetersPerSecond"/> / <see cref="accelerationSeconds"/>.</summary>
         public double AccelerationMetersPerSecond2 => approachSpeedMetersPerSecond / accelerationSeconds;
 
         /// <summary>No-teleport bound: the largest distance the mob may move by itself in one frame (0.8 × 0.05 = 0.04 m).</summary>
         public double MaxStepMeters => maxSpeedMetersPerSecond * maxStepSeconds;
+
+        /// <summary>
+        /// Largest distance the mob may move by itself in a frame of <paramref name="deltaSeconds"/> (v_max × min(dt, maxStepSeconds),
+        /// 0 for an invalid dt). Lead decision 04:42 (#97 Q5): every move of a VISIBLE mob stays within this; only a hidden /
+        /// tracking-paused mob may be corrected by more in one go (the camera-relative restore).
+        /// </summary>
+        public double StepLimitMeters(double deltaSeconds)
+        {
+            if (!(deltaSeconds > 0.0) || double.IsInfinity(deltaSeconds)) return 0.0;
+            return maxSpeedMetersPerSecond * Math.Min(deltaSeconds, maxStepSeconds);
+        }
 
         /// <summary>Throws when a value is out of its sane range (finite, positive, ordered).</summary>
         public void Validate()
@@ -67,6 +91,8 @@ namespace MetinAR.ArEncounter
             Positive(maxStepSeconds, nameof(maxStepSeconds));
             Positive(maxRestoreDistanceMeters, nameof(maxRestoreDistanceMeters));
             Positive(mobVisualScale, nameof(mobVisualScale));
+            NonNegative(planeSettleToleranceMeters, nameof(planeSettleToleranceMeters));
+            NonNegative(combatResumeStableSeconds, nameof(combatResumeStableSeconds));
             if (approachSpeedMetersPerSecond > maxSpeedMetersPerSecond)
             {
                 throw new ArgumentOutOfRangeException(nameof(approachSpeedMetersPerSecond), "must be <= maxSpeedMetersPerSecond");
@@ -92,6 +118,19 @@ namespace MetinAR.ArEncounter
             {
                 throw new ArgumentOutOfRangeException(name, "must be finite and >= 0");
             }
+        }
+    }
+
+    /// <summary>
+    /// Lead decision 2026-10-23 04:42 (#97 Q9): the mob approach can be switched off ONLY through the editor test seam
+    /// (legacy smoke tests that hold the mob still). In a game build the request is ignored and the approach stays on.
+    /// </summary>
+    public static class ArMobApproachGate
+    {
+        /// <summary>Effective approach flag: a "disable" request counts only when the test seam is available.</summary>
+        public static bool Effective(bool requestedEnabled, bool testSeamAvailable)
+        {
+            return requestedEnabled || !testSeamAvailable;
         }
     }
 

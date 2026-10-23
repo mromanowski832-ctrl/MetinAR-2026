@@ -65,11 +65,30 @@ namespace MetinAR.ArEncounter
 
         public int RestoreCount { get; private set; }
 
+        /// <summary>After a restore: still waiting for a plane within tolerance of the restored height to ease onto (#97 Q2).</summary>
+        public bool PlaneSettlePending { get; private set; }
+
+        /// <summary>Height the mob was restored at (recorded camera drop), the reference of the plane tolerance.</summary>
+        public double RestoredY { get; private set; }
+
+        /// <summary>Tracking came back after a loss, but not yet for <see cref="ArNoWalkSettings.combatResumeStableSeconds"/> (#97 Q2).</summary>
+        public bool CombatResumePending { get; private set; }
+
+        /// <summary>Seconds of uninterrupted tracking since the last frame without it.</summary>
+        public double StableTrackingSeconds { get; private set; }
+
         /// <summary>
         /// One frame. <paramref name="mobCanMove"/>: approach enabled and the mob is alive (a defeated mob does not walk).
         /// </summary>
-        public ArNoWalkFrame Tick(bool tracking, ArYawPose camera, ArYawPose mob, double deltaSeconds, bool mobCanMove)
+        /// <param name="planeY">Height of a horizontal plane under the mob this frame, or null (only used after a restore).</param>
+        public ArNoWalkFrame Tick(bool tracking, ArYawPose camera, ArYawPose mob, double deltaSeconds, bool mobCanMove, double? planeY = null)
         {
+            if (!tracking)
+            {
+                CombatResumePending = true;
+                StableTrackingSeconds = 0.0;
+            }
+
             ArRecoveryAction recovery = Recovery.Tick(true, tracking, (float)deltaSeconds);
             if (recovery == ArRecoveryAction.ResetSession)
             {
@@ -87,6 +106,12 @@ namespace MetinAR.ArEncounter
                 double jump = LastRelativePose.IsValid
                     ? Math.Abs(LastRelativePose.ClampedDistance(Settings.minDistanceMeters, Settings.maxRestoreDistanceMeters) - LastRelativePose.DistanceMeters)
                     : 0.0;
+                // Lead decision 04:42 (#97 Q2): restore at once at the recorded camera drop; a plane found later may refine it.
+                PlaneSettlePending = LastRelativePose.IsValid;
+                RestoredY = restored.Y;
+                CombatResumePending = true;
+                StableTrackingSeconds = 0.0;
+                // #97 Q5: this one-time correction may exceed the step limit ONLY because the mob is hidden and combat paused.
                 return new ArNoWalkFrame(ArNoWalkAction.Restore, restored, LastRelativePose.IsValid, false, false, ArMobMotion.Paused, jump);
             }
 
@@ -96,11 +121,42 @@ namespace MetinAR.ArEncounter
                 return new ArNoWalkFrame(ArNoWalkAction.None, mob, false, false, false, ArMobMotion.Paused, 0.0);
             }
 
+            if (CombatResumePending)
+            {
+                if (deltaSeconds > 0.0 && !double.IsInfinity(deltaSeconds))
+                {
+                    StableTrackingSeconds += deltaSeconds;
+                }
+
+                if (StableTrackingSeconds >= Settings.combatResumeStableSeconds)
+                {
+                    CombatResumePending = false;
+                }
+            }
+
+            // #97 Q6: after tracking returns, a mob outside [d_min, reach] walks / backs off smoothly to d_stop (ArMobApproach).
             ArMobStep step = Approach.Tick(camera.X, camera.Z, mob.X, mob.Z, mob.YawDegrees, deltaSeconds, mobCanMove);
-            var pose = new ArYawPose(step.X, mob.Y, step.Z, step.YawDegrees);
-            bool moved = step.StepMeters > 0.0 || Math.Abs(ArMobApproach.DeltaAngle(step.YawDegrees, mob.YawDegrees)) > 1e-9;
+            double y = mob.Y;
+            double vertical = 0.0;
+            if (PlaneSettlePending && planeY.HasValue && !double.IsNaN(planeY.Value) && !double.IsInfinity(planeY.Value)
+                && Math.Abs(planeY.Value - RestoredY) <= Settings.planeSettleToleranceMeters + 1e-9)
+            {
+                // #97 Q2 + Q5: visible → ease onto the plane with what is left of this frame's step limit (no jump).
+                double budget = Math.Max(0.0, Settings.StepLimitMeters(deltaSeconds) - step.StepMeters);
+                double diff = planeY.Value - y;
+                vertical = Math.Min(Math.Abs(diff), budget);
+                y += Math.Sign(diff) * vertical;
+                if (Math.Abs(planeY.Value - y) <= 1e-9)
+                {
+                    y = planeY.Value;
+                    PlaneSettlePending = false;
+                }
+            }
+
+            var pose = new ArYawPose(step.X, y, step.Z, step.YawDegrees);
+            bool moved = step.StepMeters > 0.0 || vertical > 0.0 || Math.Abs(ArMobApproach.DeltaAngle(step.YawDegrees, mob.YawDegrees)) > 1e-9;
             LastRelativePose = ArCameraRelativePose.Capture(camera, pose);
-            return new ArNoWalkFrame(ArNoWalkAction.None, pose, moved, true, true, step.Motion, step.StepMeters);
+            return new ArNoWalkFrame(ArNoWalkAction.None, pose, moved, !CombatResumePending, true, step.Motion, step.StepMeters + vertical);
         }
 
         /// <summary>The mob was put at the restored pose and anchored again.</summary>

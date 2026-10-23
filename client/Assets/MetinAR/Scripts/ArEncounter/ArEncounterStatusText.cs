@@ -11,7 +11,8 @@ namespace MetinAR.ArEncounter
     {
         public const string Starting = "Uruchamianie AR...";
 
-        public const string Scanning = "Skanuj teren: powoli przesuwaj telefon, celując w płaskie podłoże.";
+        /// <summary>Lead decision 2026-10-23 04:42 (#97 Q7): the scan hint says to move the PHONE while standing still.</summary>
+        public const string Scanning = "Skanuj teren: poruszaj telefonem, stojąc w miejscu, i celuj w płaskie podłoże.";
 
         public const string ScanningNoTrackingSuffix = "\nBrak śledzenia — sprawdź zgodę na aparat i oświetlenie.";
 
@@ -49,6 +50,8 @@ namespace MetinAR.ArEncounter
                         return SearchingSurroundings;
                     }
 
+                    // Lead decision 04:42 (#97 Q3): approved; mobName is the display name in the nominative (e.g. "Trujący Pająk"),
+                    // and both verbs are 3rd person singular present, which do not inflect for gender.
                     return motion == ArMobMotion.Approaching
                         ? mobName + " nadchodzi."
                         : mobName + " stoi na podłożu.";

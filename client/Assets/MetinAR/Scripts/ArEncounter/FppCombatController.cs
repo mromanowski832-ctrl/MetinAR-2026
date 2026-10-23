@@ -19,7 +19,7 @@ namespace MetinAR.ArEncounter
         public event Action<ArEncounterMob, int> HitDetected;
         public bool Ready => isActiveAndEnabled && !_paused && !_unfocused && _encounter != null
             && !_encounter.IsExiting && _encounter.State == ArEncounterState.Placed
-            && _encounter.LastSessionStatus == ArSessionStatus.SessionTracking && _encounter.MobUsable
+            && _encounter.LastSessionStatus == ArSessionStatus.SessionTracking && _encounter.MobUsable && _encounter.CombatAllowed
             && _encounter.SpawnedMob != null && _encounter.ArCamera != null && _view != null;
 
         public void Initialize(ArEncounterSceneController encounter)
@@ -27,7 +27,29 @@ namespace MetinAR.ArEncounter
             _encounter = encounter;
         }
 
-        public bool RequestAttack() => Timeline.TryAttack(Ready);
+        public bool RequestAttack()
+        {
+            bool started = Timeline.TryAttack(Ready);
+            if (started) LogSwingReach();
+            return started;
+        }
+
+        /// <summary>#97 Q4 (lead 04:42): <c>[ArReach] swing pitch=NN.N deg dist=N.NN m</c> per swing, Editor/Development builds only.</summary>
+        private void LogSwingReach()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (_encounter == null || _encounter.ArCamera == null) return;
+            Transform camera = _encounter.ArCamera.transform;
+            double dist = double.NaN;
+            if (_encounter.SpawnedMob != null)
+            {
+                Vector3 c = camera.position, m = _encounter.SpawnedMob.transform.position;
+                dist = ArEncounterFraming.HorizontalDistance(c.x, c.z, m.x, m.z);
+            }
+
+            Debug.Log(ArReachLog.Swing(ArReachLog.PitchDegrees(camera.forward.y), dist));
+#endif
+        }
         public bool RequestAura() => Timeline.TryAura(Ready);
 
         private void LateUpdate()
