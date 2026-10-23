@@ -1,0 +1,26 @@
+name: audio-core-tests
+
+# METINAR-040 (#85): AudioService core (event -> clip, anti-spam, volumes, haptics switch) and the static checks of
+# the audio library asset, mixer exposed parameters and licence ledger. Pure .NET, no Unity licence.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Test audio core (METINAR-040)
+        run: dotnet test tests/MetinAR.Audio.Tests/MetinAR.Audio.Tests.csproj --configuration Release --logger "console;verbosity=normal"

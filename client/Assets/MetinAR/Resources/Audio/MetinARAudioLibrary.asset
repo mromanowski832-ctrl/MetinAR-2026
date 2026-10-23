@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bef9e6e5958146d19fd7b14ac5fb162b, type: 3}
+  m_Name: MetinARAudioLibrary
+  m_EditorClassIdentifier: 
+  _mixer: {fileID: 24100000, guid: ea672754a8a154e47b2a6351d3883b4f, type: 2}
+  _clips:
+  - id: SFX/Combat/SFX_Combat_SwordSwing_01.wav
+    clip: {fileID: 8300000, guid: 260fd40c7f624d7dbd8530427ce24d57, type: 3}
+  - id: SFX/Combat/SFX_Combat_SwordHit_01.wav
+    clip: {fileID: 8300000, guid: a6f316b70994400f9e9572260d1f172d, type: 3}
+  - id: SFX/Combat/SFX_Combat_ShieldBlock_01.wav
+    clip: {fileID: 8300000, guid: 4cb0ce543cf44832b299bbe82d6943df, type: 3}
+  - id: SFX/Combat/SFX_Combat_AuraStart_01.wav
+    clip: {fileID: 8300000, guid: c29285c02a8a487bbf6a2946a21223c9, type: 3}
+  - id: SFX/Combat/SFX_Combat_AuraLoop_01.wav
+    clip: {fileID: 8300000, guid: 17f3ec3ff0ed4897b710af1c71febd39, type: 3}
+  - id: SFX/Combat/SFX_Combat_AuraStop_01.wav
+    clip: {fileID: 8300000, guid: 2fc14240d7e849eda6f789e527e906c8, type: 3}
+  - id: SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Attack_01.wav
+    clip: {fileID: 8300000, guid: 7d0c612a6df24a8bbeb9422653ebd951, type: 3}
+  - id: SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Hit_01.wav
+    clip: {fileID: 8300000, guid: ec661d7810f84845ae4aa2069f5233e4, type: 3}
+  - id: SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Death_01.wav
+    clip: {fileID: 8300000, guid: 6c479e9c12ad4060a7f65b9ce1c65c62, type: 3}
+  - id: SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Step_01.wav
+    clip: {fileID: 8300000, guid: 13f4208aac874eb0a3a550a20e781f75, type: 3}
+  - id: SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Step_02.wav
+    clip: {fileID: 8300000, guid: abdee0b16b1f4658a998c4f1a817a55e, type: 3}
+  - id: SFX/Mobs/VenomousSpider/SFX_Mob_VenomousSpider_Step_03.wav
+    clip: {fileID: 8300000, guid: 76d692cf3bbf474fb6c244df34e1ae67, type: 3}
+  - id: SFX/Status/SFX_Status_PoisonTick_01.wav
+    clip: {fileID: 8300000, guid: 1634484c95e5494497d158a100a96d52, type: 3}
+  - id: SFX/UI/SFX_UI_CoinPickup_01.wav
+    clip: {fileID: 8300000, guid: 9f857da3f1524447a58ddd78acd7ad7e, type: 3}
+  - id: SFX/Loot/SFX_Loot_Common_01.wav
+    clip: {fileID: 8300000, guid: 5b9fff67d942452fbbc95dd2f9e07cad, type: 3}
+  - id: SFX/Stinger/SFX_Stinger_LevelUp_01.wav
+    clip: {fileID: 8300000, guid: ad6edb44452f45a2b29f8dec0416df68, type: 3}
+  - id: SFX/Item/SFX_Item_EquipMetal_01.wav
+    clip: {fileID: 8300000, guid: a9d87ca714be4bc1868fbb9f707315ca, type: 3}
+  - id: SFX/Item/SFX_Item_UnequipMetal_01.wav
+    clip: {fileID: 8300000, guid: fb201d80d25344ab87bf2d4f81e01ce5, type: 3}
+  - id: SFX/Item/SFX_Item_EquipLeather_01.wav
+    clip: {fileID: 8300000, guid: 8148e8c4669b4d5986e6b9796821e92c, type: 3}
+  - id: SFX/Item/SFX_Item_UnequipLeather_01.wav
+    clip: {fileID: 8300000, guid: dcf45afe022043a68f8b3d8184ba3080, type: 3}
+  - id: SFX/Item/SFX_Item_Potion_01.wav
+    clip: {fileID: 8300000, guid: 016dc083385549e98e2331d6ed81d153, type: 3}
+  - id: SFX/Item/SFX_Item_Antidote_01.wav
+    clip: {fileID: 8300000, guid: 37768618e689496597c6ce1874f4325c, type: 3}
+  - id: SFX/UI/SFX_UI_ShopOpen_01.wav
+    clip: {fileID: 8300000, guid: d9d54d5803b145698dbd6efb7291c0d0, type: 3}
+  - id: SFX/UI/SFX_UI_Buy_01.wav
+    clip: {fileID: 8300000, guid: 5f5fc02b77b644f99ccfb653038e1556, type: 3}
+  - id: SFX/UI/SFX_UI_Sell_01.wav
+    clip: {fileID: 8300000, guid: 354b5795e9fe4b88a444b28a4bfcd9cc, type: 3}
+  - id: SFX/UI/SFX_UI_Click_01.wav
+    clip: {fileID: 8300000, guid: ad95b6424c554aea9c47f5a97a198c32, type: 3}
+  - id: SFX/UI/SFX_UI_Denied_01.wav
+    clip: {fileID: 8300000, guid: a72956963f0644b0b656a706b58a11ae, type: 3}
