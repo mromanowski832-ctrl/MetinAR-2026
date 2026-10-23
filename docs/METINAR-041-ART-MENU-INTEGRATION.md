@@ -24,6 +24,9 @@ Unity i dodaje ich konsumentów w grze. Nie nadpisuje gałęzi autorów i nie sc
   Menu wstrzymuje zachowania mobów/ruchu testowego i interakcję z HUD-em, potem je przywraca.
   Nie zmienia `Time.timeScale`, uprawnień, obsługi lokalizacji, nazw ani indeksów scen.
   Powrót z AR nie otwiera ponownie ekranu startowego. Menu można przywołać przyciskiem menu mapy.
+- Istniejący `WorldMapPrototypeSmokeTest` uwzględnia teraz rozpoczęcie gry przyciskiem menu,
+  obecność modelu handlarza oraz nowe działające ekrany menu/ustawień i pauzę/wznowienie mapy.
+  Nie pomija menu ani nie zakłada, że stare panele atrap nadal są jego odbiorcami.
 
 Obsługa menu obejmuje `WorldMapPrototype` oraz przyszłe `WorldMapOsmPoc`. Zamiana modelu NPC jest
 podłączona do istniejącego `PrototypeNpc` w `WorldMapPrototype`; nie jest deklaracją integracji
@@ -83,6 +86,10 @@ potraktowany jako wyraźne odwołanie wcześniejszego HOLD. Pozostałe modele mo
 | Play Mode mapa → AR → powrót; pause/resume; menu/NPC | **UNVERIFIED** |
 | APK ARM64/IL2CPP, manifest i instalacja | **UNVERIFIED** |
 | A31: wygląd, dotyk, polskie glify, FPS/pamięć/termika | **UNVERIFIED** |
+
+Pierwszy commit integracji `30c2b793898e69600962bd2d62f056dbb3a69184` przeszedł na GitHubie:
+pełną kontrolę **2011 sprawdzeń / 305 importów / 315 GUID**, Asset Pipeline **366 testów**, GeoCore
+i Gameplay Core. To wynik tamtego SHA, nie bramek Unity; po korektach smoke testu trzeba sprawdzić nowy head.
 
 Kontrole dostępne bez Unity:
 

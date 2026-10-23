@@ -5,6 +5,7 @@ using System.IO;
 using System.Text;
 using MetinAR.ArEncounter;
 using MetinAR.Location;
+using MetinAR.Presentation;
 using MetinAR.UI;
 using MetinAR.WorldMap;
 using UnityEditor;
@@ -144,6 +145,7 @@ namespace MetinAR.Editor
                 yield return Frames(5);
                 IEnumerator[] tests =
                 {
+                    A0_StartupMenuEntersWorldWithProductionNpc(),
                     A_SceneLoadsAndCoreObjectsExist(),
                     H_SceneStoresAutoProvider(),
                     I_EditorResolvesAutoToMock(),
@@ -162,6 +164,7 @@ namespace MetinAR.Editor
                 };
                 string[] names =
                 {
+                    "A0_StartupMenuEntersWorldWithProductionNpc",
                     "A_SceneLoadsAndCoreObjectsExist",
                     "H_SceneStoresAutoProvider",
                     "I_EditorResolvesAutoToMock",
@@ -211,6 +214,36 @@ namespace MetinAR.Editor
 
                     yield return current;
                 }
+            }
+
+            private IEnumerator A0_StartupMenuEntersWorldWithProductionNpc()
+            {
+                GameFrontend frontend = FindFirstObjectByType<GameFrontend>();
+                Check(frontend != null && frontend.IsOpen && frontend.CurrentPage == "home", "startup menu missing");
+                if (frontend == null) yield break;
+                PrototypeMob mob = FindFirstObjectByType<PrototypeMob>(FindObjectsInactive.Include);
+                EditorMockMovement movement = FindFirstObjectByType<EditorMockMovement>(FindObjectsInactive.Include);
+                Check(mob != null && !mob.enabled, "startup menu did not pause mob behaviour");
+                Check(movement != null && !movement.enabled, "startup menu did not pause test movement");
+                PrototypeNpc npc = FindFirstObjectByType<PrototypeNpc>(FindObjectsInactive.Include);
+                NpcModelPresenter npcView = npc != null ? npc.GetComponent<NpcModelPresenter>() : null;
+                Check(npcView != null && npcView.Model != null, "production merchant model missing");
+
+                // Keep this runner in the map, just as test A does; actual AR navigation is tested separately.
+                ArEncounterLauncher launcher = FindFirstObjectByType<ArEncounterLauncher>();
+                if (launcher != null) launcher.OpenSceneOnRequest = false;
+                Button start = null;
+                foreach (Button button in frontend.GetComponentsInChildren<Button>(true))
+                {
+                    TMPro.TMP_Text label = button.GetComponentInChildren<TMPro.TMP_Text>(true);
+                    if (label != null && label.text == "Rozpocznij przygodę") { start = button; break; }
+                }
+                Check(start != null, "startup menu has no start action");
+                start?.onClick.Invoke();
+                yield return Frames(2);
+                Check(!frontend.IsOpen, "start action did not enter world");
+                Check(mob != null && mob.enabled, "start action did not resume mob behaviour");
+                Check(movement != null && movement.enabled, "start action did not resume movement");
             }
 
             private IEnumerator A_SceneLoadsAndCoreObjectsExist()
@@ -676,8 +709,6 @@ namespace MetinAR.Editor
                     ("EQ", _bar.EqButton, _controller.InventoryPanel.gameObject),
                     ("Postać", _bar.CharacterButton, _controller.CharacterPanel.gameObject),
                     ("Skille", _bar.SkillsButton, _controller.SkillsPanel.gameObject),
-                    ("Ustawienia", _bar.SettingsButton, _controller.SettingsPanel.gameObject),
-                    ("Menu", _bar.HamburgerButton, _controller.HamburgerPanel.gameObject),
                 };
                 GameObject[] all = Array.ConvertAll(cases, c => c.panel);
 
@@ -700,6 +731,24 @@ namespace MetinAR.Editor
                     closeButton?.onClick.Invoke();
                     yield return Frames(2);
                     Check(!c.panel.activeSelf, c.label + " close button did not close panel");
+                }
+
+                GameFrontend frontend = FindFirstObjectByType<GameFrontend>();
+                Check(frontend != null, "integrated frontend missing");
+                if (frontend == null) yield break;
+                foreach (var c in new (string page, Button button)[]
+                         { ("settings", _bar.SettingsButton), ("home", _bar.HamburgerButton) })
+                {
+                    c.button.onClick.Invoke();
+                    yield return Frames(2);
+                    Check(frontend.IsOpen && frontend.CurrentPage == c.page, c.page + " did not open in frontend");
+                    Check(!_mob.enabled && !_movement.enabled, "modal menu did not pause map behaviours");
+                    Check(!_controller.SettingsPanel.gameObject.activeSelf && !_controller.HamburgerPanel.gameObject.activeSelf,
+                        "old placeholder panel is still active behind frontend");
+                    foreach (GameObject panel in all) Check(!panel.activeSelf, "map panel left open behind menu: " + panel.name);
+                    frontend.CloseMenu();
+                    yield return Frames(2);
+                    Check(!frontend.IsOpen && _mob.enabled && _movement.enabled, "closing menu did not restore map");
                 }
             }
 
@@ -740,3 +789,4 @@ namespace MetinAR.Editor
         }
     }
 }
+
