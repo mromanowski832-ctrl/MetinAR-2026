@@ -436,7 +436,8 @@ def _u2b(p):
 
 class SwordSpec:
     def __init__(self, name, hilt_bottom, hilt_top, guard_y, blade_base, blade_tip, width_base, width_mid, thick_base, thick_tip,
-                 ricasso, wing_x, wing_rise, pommel_y, pommel_scale, mid_ring=None, lugs=False):
+                 ricasso, wing_x, wing_rise, pommel_y, pommel_scale, mid_ring=None, lugs=False,
+                 guard_style="wings", pommel_style="petal", blade_shape="straight"):
         self.__dict__.update(locals())
         del self.__dict__["self"]
 
@@ -449,6 +450,12 @@ GS_BLADE_BASE, GS_BLADE_TIP = 0.14, 1.30
 GS_LEFT_GRIP = -0.15
 SWORD_2H = SwordSpec("SM_Weapon_FppGreatsword", GS_HILT_BOTTOM, GS_HILT_TOP, GS_GUARD_Y, GS_BLADE_BASE, GS_BLADE_TIP,
                      0.046, 0.038, 0.0080, 0.0042, 0.245, 0.165, 0.070, GS_POMMEL_Y, 1.18, mid_ring=(-0.080, -0.068), lugs=True)
+
+# second 1H sword (#91 K6): same drawn hilt (radius/length), so the V3 grip contacts and FX sockets are identical;
+# own silhouette: leaf blade, straight crossguard with drooping round-section arms, wheel pommel.
+SWORD_1H_B = SwordSpec("SM_Weapon_FppSword02", M.HILT_BOTTOM, M.HILT_TOP, M.GUARD_Y, C.MODEL_BLADE_BASE.y, C.MODEL_BLADE_TIP.y,
+                       0.0300, 0.0330, 0.0060, 0.0032, 0.165, 0.100, -0.010, M.POMMEL_Y, 1.0,
+                       guard_style="cross", pommel_style="wheel", blade_shape="leaf")
 
 GREATSWORD_SOCKETS = {
     "Socket_GripR": (0.0, 0.0, 0.0),
@@ -463,6 +470,8 @@ GREATSWORD_SOCKETS = {
 PROXIES = {
     "SM_Weapon_FppSword": {"hilt": [M.HILT_BOTTOM - 0.010, M.HILT_TOP, 0.0165], "guard": [0.125, 0.096, 0.160, 0.024],
                            "blade": [0.13, 0.94, 0.0335, 0.0066], "pommel": [-0.236, -0.172, 0.026]},
+    "SM_Weapon_FppSword02": {"hilt": [M.HILT_BOTTOM - 0.010, M.HILT_TOP, 0.0165], "guard": [0.110, 0.100, 0.150, 0.020],
+                             "blade": [0.13, 0.94, 0.0390, 0.0064], "pommel": [-0.236, -0.172, 0.030]},
     "SM_Weapon_FppGreatsword": {"hilt": [GS_HILT_BOTTOM - 0.010, GS_HILT_TOP, 0.0165], "guard": [0.172, 0.100, 0.196, 0.028],
                                 "blade": [0.14, 1.30, 0.046, 0.0085], "pommel": [-0.320, -0.236, 0.030]},
 }
@@ -499,6 +508,10 @@ def _blade(b, sp):
             return sp.width_base * (0.78 + 0.22 * (y - sp.ricasso) / 0.012)
         if y <= tip_start:
             k = (y - sp.ricasso) / (tip_start - sp.ricasso)
+            if sp.blade_shape == "leaf":  # narrow waist after the ricasso, swelling at ~65 % of the length
+                return sp.width_base * (1.0 - 0.10 * math.sin(math.pi * min(1.0, k / 0.35))) * (k < 0.35) + \
+                    (k >= 0.35) * (sp.width_base * 0.9 + (sp.width_mid * 1.12 - sp.width_base * 0.9) * math.sin(math.pi * 0.5 * min(1.0, (k - 0.35) / 0.35))
+                                   - (sp.width_mid * 0.30) * max(0.0, (k - 0.70) / 0.30) ** 2)
             return sp.width_base + (sp.width_mid - sp.width_base) * k + 0.0016 * math.sin(math.pi * k)
         k = (y - tip_start) / (y1 - tip_start)
         return sp.width_mid * max(0.0, 1.0 - k ** 1.7) ** 0.62
@@ -542,7 +555,37 @@ def _blade(b, sp):
                   REG_GUARD, {}, _u2b((0, 0, 1)))
 
 
+def _guard_cross(b, sp):
+    """Straight crossguard: small square block, round-section arms drooping towards the blade-side ends, ball finials."""
+    g = sp.guard_y
+    ys = [g - 0.012, g - 0.008, g + 0.008, g + 0.014]
+    rr = [(0.016, 0.012), (0.022, 0.016), (0.022, 0.016), (0.015, 0.011)]
+    rings = [[b.vert(_u2b((math.cos(a) * rr[i][0], y, math.sin(a) * rr[i][1])), {}, REG_SGOLD, i / 3, k / 8)
+              for k, a in ((k, math.pi / 8 + 2 * math.pi * k / 8) for k in range(8))] for i, y in enumerate(ys)]
+    b.grid(rings, [_u2b((0, y, 0)) for y in ys], closed=True)
+    for end, y in ((0, ys[0] - 0.003), (-1, ys[-1] + 0.004)):
+        b.fan(rings[end], b.vert(_u2b((0, y, 0)), {}, REG_SGOLD, 0.5, 0.5), _u2b((0, g, 0)))
+    for sgn in (-1, 1):
+        ctrl = [(0.018, g), (0.045, g + 0.001), (0.070, g + 0.003), (0.088, g + 0.007), (sp.wing_x, g + 0.013)]
+        pts = catmull([Vector((sgn * x, y, 0.0)) for x, y in ctrl], 2)
+        frames = frames_along(pts, (0.0, 0.0, 1.0))
+        n, sides = len(frames), 8
+        rings = []
+        for i, (p, t, nr, bn) in enumerate(frames):
+            k = i / (n - 1)
+            r = 0.0085 - 0.0025 * k
+            rings.append([b.vert(_u2b(p + nr * (math.cos(2 * math.pi * j / sides) * r) + bn * (math.sin(2 * math.pi * j / sides) * r)),
+                                 {}, REG_GUARD, k, j / sides) for j in range(sides)])
+        b.grid(rings, [_u2b(f[0]) for f in frames], closed=True)
+        p, t, *_ = frames[-1]
+        dome(b, _u2b(p + t * 0.002), _u2b(t), 0.0090, 0.0090, 8, REG_SGOLD, {}, ring_frac=0.8)
+    for sgn in (-1, 1):  # one gem per face of the block
+        dome(b, _u2b((0, g, sgn * 0.0150)), _u2b((0, 0, sgn)), 0.0070, 0.0040, 8, REG_GEM, {})
+
+
 def _guard(b, sp):
+    if sp.guard_style == "cross":
+        return _guard_cross(b, sp)
     g = sp.guard_y
     s2 = sp.wing_x / 0.118  # size factor vs the 1H guard
     # central block (gold, faceted octagon)
@@ -629,7 +672,29 @@ def _hilt(b, sp):
         b.grid(rings, [_u2b((0, y, 0)) for y, _ in prof], closed=True)
 
 
+def _pommel_wheel(b, sp):
+    """Wheel (disc) pommel, axis across the blade plane, with a raised boss and a short neck."""
+    top = sp.hilt_bottom - 0.004
+    yc, R, half = top - 0.030, 0.028, 0.0095
+    sides = 20
+    rings = []
+    prof = [(-half, 0.70), (-half, 0.96), (-half * 0.6, 1.0), (half * 0.6, 1.0), (half, 0.96), (half, 0.70)]
+    for i, (z, f) in enumerate(prof):
+        rings.append([b.vert(_u2b((math.cos(a) * R * f, yc + math.sin(a) * R * f, z)), {}, REG_SGOLD, i / 5, j / sides)
+                      for j, a in ((j, 2 * math.pi * j / sides) for j in range(sides))])
+    b.grid(rings, [_u2b((0, yc, z)) for z, _ in prof], closed=True)
+    for end, sgn in ((0, -1), (-1, 1)):
+        b.fan(rings[end], b.vert(_u2b((0, yc, sgn * (half + 0.0015))), {}, REG_SGOLD, 0.5, 0.5), _u2b((0, yc, 0)))
+        dome(b, _u2b((0, yc, sgn * (half + 0.0005))), _u2b((0, 0, sgn)), 0.0090, 0.0040, 8, REG_GEM, {})
+    ys = [top + 0.002, top - 0.004]  # neck
+    rings = [[b.vert(_u2b((math.cos(a) * 0.0130, y, math.sin(a) * 0.0130)), {}, REG_SGOLD, i, j / 10)
+              for j, a in ((j, 2 * math.pi * j / 10) for j in range(10))] for i, y in enumerate(ys)]
+    b.grid(rings, [_u2b((0, y, 0)) for y in ys], closed=True)
+
+
 def _pommel(b, sp):
+    if sp.pommel_style == "wheel":
+        return _pommel_wheel(b, sp)
     k = sp.pommel_scale
     top = sp.hilt_bottom - 0.004
     prof = [(0.000, 0.0138), (-0.008, 0.0162), (-0.016, 0.0235), (-0.025, 0.0275), (-0.034, 0.0245), (-0.041, 0.0170),
@@ -673,6 +738,10 @@ def _sword(sp, sockets):
 
 def build_sword():
     return _sword(SWORD_1H, M.SWORD_SOCKETS)
+
+
+def build_sword_b():
+    return _sword(SWORD_1H_B, M.SWORD_SOCKETS)
 
 
 def build_greatsword():

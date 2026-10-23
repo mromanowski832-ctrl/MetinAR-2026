@@ -147,7 +147,26 @@ def check_frame(rig, arms, sword, weapon, classes, hang, margin=0.0):
     return res
 
 
-def check_states(rig, arms, sword, actions, states, attach, margin=0.0):
+CENTRE_BOX = 0.20  # central screen box, fraction of the half-extent in both axes (portrait framing: keep clear)
+
+
+def centre_blocked(rig, vfov_deg, aspect, n=5):
+    """Fraction of rays through the central screen box (camera at the origin, Unity +Z forward) hitting the buckler."""
+    to_s = _socket_inv(rig)
+    ty = math.tan(math.radians(vfov_deg) / 2)
+    tx = ty * aspect
+    hit = 0
+    for i in range(n):
+        for j in range(n):
+            nx = CENTRE_BOX * (-1 + 2 * i / (n - 1))
+            ny = CENTRE_BOX * (-1 + 2 * j / (n - 1))
+            d = Vector((nx * tx, ny * ty, 1.0))
+            if any(part_at(to_s(C.S @ (d * (0.10 + 0.005 * k)))) for k in range(180)):
+                hit += 1
+    return hit / (n * n)
+
+
+def check_states(rig, arms, sword, actions, states, attach, margin=0.0, vfov=None, aspect=None):
     """Every frame of every buckler state; attach(sword, rig) places the sword on its socket. Returns a report dict."""
     import fpp_anim as A
     classes = vertex_classes(arms)
@@ -163,11 +182,16 @@ def check_states(rig, arms, sword, actions, states, attach, margin=0.0):
         tot = {}
         worst = {}
         per = []
+        centre = (0.0, None)
         for f in range(frames + 1):
             sc.frame_set(f + 1)
             attach(sword, rig)
             bpy.context.view_layer.update()
             r = check_frame(rig, arms, sword, "SM_Weapon_FppSword", classes, K.shield_hang(st, f / C.FPS), margin)
+            if vfov:
+                cb = centre_blocked(rig, vfov, aspect)
+                if cb > centre[0]:
+                    centre = (cb, round(f / C.FPS, 2))
             if any(r.values()):
                 per.append((f, {k: v for k, v in r.items() if v}))
             for k, v in r.items():
@@ -175,6 +199,7 @@ def check_states(rig, arms, sword, actions, states, attach, margin=0.0):
                 if v and k not in worst:
                     worst[k] = round(f / C.FPS, 2)
         report["states"][st] = {"frames": frames + 1, "hits": tot, "first_hit_s": worst,
-                                "errors": sum(tot.values()), "hit_frames": per}
+                                "errors": sum(tot.values()), "hit_frames": per,
+                                "centre_box_blocked_max": round(centre[0], 3), "centre_box_blocked_at_s": centre[1]}
     report["errors"] = sum(s["errors"] for s in report["states"].values())
     return report

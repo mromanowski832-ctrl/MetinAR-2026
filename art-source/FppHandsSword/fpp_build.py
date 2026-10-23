@@ -70,6 +70,10 @@ def checkpoint():
         "shoulders_unity": {k: [round(v, 3) for v in M.SHOULDERS[k][0]] for k in M.SHOULDERS},
         "shoulder_reach_max_min": {k: [round(M.SHOULDERS[k][1], 3), round(M.SHOULDERS[k][2], 3)] for k in M.SHOULDERS},
     }
+    if os.environ.get("FPP_NO_RENDER"):
+        with open(os.path.join(OUT, "build_report_91.json"), "w") as fh:
+            json.dump(report, fh, indent=2)
+        return
     R.setup(samples=24)
     R.lights()
     R.render(R.fpp_camera(), os.path.join(OUT, "cp_fpp_rest.png"), R.A31_PORTRAIT_RES)
@@ -310,3 +314,267 @@ def full():
 
 if STAGE == "full":
     full()
+
+
+# ---------------------------------------------------------------- #91 final build (gear arms, 3 weapons, all clips)
+WEAPONS_91 = [  # (folder/asset id, builder, painter scale)
+    ("FppSword", "build_sword"),
+    ("FppSword02", "build_sword_b"),
+    ("FppGreatsword", "build_greatsword"),
+]
+STATE_WEAPON_91 = {"1H": "SM_Weapon_FppSword", "2H": "SM_Weapon_FppGreatsword"}
+BUDGET_PLAYER = {"triangles": 10000, "bones": 40, "materials": 2, "texture": 1024}  # AssetPipelineRules Player
+BUDGET_WEAPON = {"triangles": 3000, "bones": 0, "materials": 1, "texture": 1024}    # AssetPipelineRules Weapon
+
+
+def left_gripping(state, t):
+    import fpp_combo as K
+    if state in ("AuraActivate", K.AURA_1H):
+        return C.left_grip_blend("Aura", t) >= 0.5
+    if K.weapon_of(state) == "2H":
+        return True
+    return False
+
+
+def contacts_91(arms, rig, sword_objs, actions):
+    """Per clip: hand vertices inside the weapon proxies (both hands), and the left-socket distance to the drawn hilt
+    on frames where the left hand is NOT on the hilt (left_grip_blend == 0 / buckler hand / V3 Attack)."""
+    import fpp_anim as A
+    import fpp_combo as K
+    import fpp_gear as G
+    from mathutils import Vector
+    sets = A.hand_vertex_sets(arms)
+    out = {}
+    for state, act in actions.items():
+        weapon = STATE_WEAPON_91[K.weapon_of(state)] if state not in ("Idle", "Attack", "AuraActivate") else "SM_Weapon_FppSword"
+        hb, ht, _ = G.PROXIES[weapon]["hilt"]
+        A.rest_pose(rig)
+        rig.animation_data.action = act
+        pen = {"R": 0, "L": 0}
+        free = (9.0, None)
+        for f in range(1, int(act.frame_range[1]) + 1):
+            t = (f - 1) / C.FPS
+            bpy.context.scene.frame_set(f)
+            g = socket_world(rig, "B_Socket_Sword") @ C.SWORD_SCALE_MATRIX
+            inv = g.inverted()
+            ev = arms.evaluated_get(bpy.context.evaluated_depsgraph_get())
+            me = ev.to_mesh()
+            for side, key in ((1, "R"), (-1, "L")):
+                for i in sets[side]:
+                    if G.proxy_hit(weapon, C.S @ (inv @ (ev.matrix_world @ me.vertices[i].co))):
+                        pen[key] += 1
+            ev.to_mesh_clear()
+            if not left_gripping(state, t) and (state not in ("AuraActivate", K.AURA_1H) or C.left_grip_blend("Aura", t) <= 1e-6):
+                a = g @ C.to_blender_point(Vector((0.0, hb, 0.0)))
+                b = g @ C.to_blender_point(Vector((0.0, ht, 0.0)))
+                lp = socket_world(rig, "B_Socket_GripL").translation
+                ab = b - a
+                k = min(1.0, max(0.0, (lp - a).dot(ab) / ab.dot(ab)))
+                d = (a + ab * k - lp).length
+                if d < free[0]:
+                    free = (d, round(t, 2))
+        out[state] = {"weapon": weapon, "penetrating_vertices": pen,
+                      "left_free_min_hilt_distance_m": None if free[1] is None else round(free[0], 4),
+                      "left_free_min_at_s": free[1]}
+    return out
+
+
+def final91():
+    import fpp_anim as A
+    import fpp_buckler as BK
+    import fpp_combo as K
+    import fpp_gear as G
+    import fpp_texture as T
+    reset()
+    root = os.path.join(OUT, "Assets")
+    arms_dir = os.path.join(root, "Characters", "Player", "FppArms")
+    renders = os.path.join(OUT, "renders")
+    for d in (renders, os.path.join(arms_dir, "Models"), os.path.join(arms_dir, "Animations")):
+        os.makedirs(d, exist_ok=True)
+    report = {"issue": "#91", "contract_id": C.CONTRACT_ID, "sword_scale": C.SWORD_SCALE, "fps": C.FPS,
+              "triangles": {}, "vertices": {}, "materials": {}, "textures": {}, "budget": {}}
+
+    # ---- weapons: build, texture, export one at a time (socket empty names must be unique in the scene)
+    swords = {}
+    for wid, fn in WEAPONS_91:
+        wdir = os.path.join(root, "Weapons", wid)
+        os.makedirs(os.path.join(wdir, "Models"), exist_ok=True)
+        obj, empties = getattr(G, fn)()
+        T.unwrap(obj)
+        tex = T.make_textures(obj, wid, os.path.join(wdir, "Textures"), T.paint_sword, pos_scale=1.0 / 0.95, bump=(0.35, 0.0015))
+        obj.data.materials.append(T.final_material("M_" + wid, tex, emission_strength=2.0))
+        select_only([obj] + empties)
+        bpy.ops.export_scene.fbx(filepath=os.path.join(wdir, "Models", obj.name + ".fbx"), object_types={"MESH", "EMPTY"},
+                                 bake_anim=False, mesh_smooth_type="OFF", use_triangles=True, use_tspace=False,
+                                 use_mesh_modifiers=False, **FBX_COMMON)
+        for e in empties:
+            e.name = e.name + "__" + wid
+        swords[obj.name] = obj
+        tris = fm.triangle_count(obj)
+        report["triangles"][obj.name] = tris
+        report["vertices"][obj.name] = len(obj.data.vertices)
+        report["materials"][obj.name] = 1
+        report["textures"][wid] = sorted(os.path.basename(p) for p in tex.values())
+        report["budget"][obj.name] = {"triangles": [tris, BUDGET_WEAPON["triangles"]], "materials": [1, 1],
+                                      "texture": [T.SIZE, BUDGET_WEAPON["texture"]],
+                                      "ok": tris <= BUDGET_WEAPON["triangles"]}
+
+    # ---- arms: glove + sleeve textured separately, joined into one skinned mesh with two material slots
+    glove, sleeve = G.build_arms_parts()
+    T.unwrap(glove)
+    T.unwrap(sleeve)
+    gtex = T.make_textures(glove, "FppArms_" + G.GLOVE_ID, os.path.join(arms_dir, "Textures"), T.paint_arms, pos_scale=1.0 / 0.8,
+                           bump=(0.45, 0.0015))
+    stex = T.make_textures(sleeve, "FppArms", os.path.join(arms_dir, "Textures"), T.paint_arms, pos_scale=1.0 / 0.8,
+                           bump=(0.45, 0.0015))
+    glove.data.materials.append(T.final_material("M_FppArms_" + G.GLOVE_ID, gtex, emission_strength=1.5))
+    sleeve.data.materials.append(T.final_material("M_FppArms", stex))
+    tri_glove, tri_sleeve = fm.triangle_count(glove), fm.triangle_count(sleeve)
+    select_only([glove, sleeve])
+    bpy.ops.object.join()
+    arms = glove
+    arms.name = "SK_Player_FppArms"
+    arms.data.name = "SK_Player_FppArms"
+    rig = M.build_armature()
+    M.bind(arms, rig)
+    bpy.context.view_layer.update()
+    tris = fm.triangle_count(arms)
+    report["triangles"]["SK_Player_FppArms"] = tris
+    report["triangles_parts"] = {"Glove_" + G.GLOVE_ID: tri_glove, "Sleeve": tri_sleeve}
+    report["vertices"]["SK_Player_FppArms"] = len(arms.data.vertices)
+    report["materials"]["SK_Player_FppArms"] = [m.name for m in arms.data.materials]
+    report["textures"]["FppArms"] = sorted(os.path.basename(p) for p in list(gtex.values()) + list(stex.values()))
+    report["bones"] = len(rig.data.bones)
+    report["bone_names"] = [b.name for b in rig.data.bones]
+    report["budget"]["SK_Player_FppArms"] = {"triangles": [tris, BUDGET_PLAYER["triangles"]], "bones": [len(rig.data.bones), BUDGET_PLAYER["bones"]],
+                                             "materials": [len(arms.data.materials), BUDGET_PLAYER["materials"]],
+                                             "texture": [T.SIZE, BUDGET_PLAYER["texture"]],
+                                             "ok": tris <= BUDGET_PLAYER["triangles"] and len(rig.data.bones) <= BUDGET_PLAYER["bones"]
+                                             and len(arms.data.materials) <= BUDGET_PLAYER["materials"]}
+
+    # ---- clips
+    actions, clip_stats, signs = A.build_actions(rig, arms)
+    report["clips"] = clip_stats
+    report["socket_vs_pr32_blender"] = socket_samples(rig, {k: actions[k] for k in ("Idle", "Attack", "AuraActivate")})
+    report["attack_hilt_left_socket"] = hilt_left_clearance(rig, actions["Attack"])
+    report["contacts"] = contacts_91(arms, rig, swords, actions)
+    sword1 = swords["SM_Weapon_FppSword"]
+    bstates = [s for s in K.all_states() if K.has_buckler(s)]
+    import fpp_render as Rr
+    asp = Rr.A31_PORTRAIT_RES[0] / Rr.A31_PORTRAIT_RES[1]
+    buck = {}
+    for margin in (0.0, 0.02):
+        r = BK.check_states(rig, arms, sword1, actions, bstates, attach_sword_world, margin, Rr.A31_PORTRAIT_VFOV, asp)
+        for st in r["states"].values():
+            st.pop("hit_frames", None)
+        buck["margin_%dmm" % round(margin * 1000)] = r
+    report["buckler_check"] = buck
+
+    # ---- clip reference (Unity builder/check + #82 proposal). JsonUtility layout (lists, no dicts):
+    # per clip the baked socket frames in prefab-root (= AR camera) Unity space, every frame, for the Unity
+    # import check (FppArtAssetCheck compares the imported clips against these: <= 2 mm / 1 deg).
+    def unity_frame(m):
+        p = C.S @ m.translation
+        q = (C.S @ m.to_3x3() @ C.S).to_quaternion()
+        return [round(p.x, 5), round(p.y, 5), round(p.z, 5), round(q.x, 6), round(q.y, 6), round(q.z, 6), round(q.w, 6)]
+
+    ref = {"contract_id": C.CONTRACT_ID, "fps": C.FPS,
+           "buckler_asset": "PF_Weapon_StarterBuckler (PR #63, referenced, not part of this branch); child of B_Socket_ShieldL, identity, scale 1",
+           "clips": []}
+    v3 = ("Idle", "Attack", "AuraActivate")
+    for st, s in clip_stats.items():
+        act = actions[st]
+        A.rest_pose(rig)
+        rig.animation_data.action = act
+        samples = []
+        for f in range(1, int(act.frame_range[1]) + 1):
+            sc0 = bpy.context.scene
+            sc0.frame_set(f)
+            samples.append({"t": round((f - 1) / C.FPS, 4), "sword": unity_frame(socket_world(rig, "B_Socket_Sword")),
+                            "gripL": unity_frame(socket_world(rig, "B_Socket_GripL")),
+                            "shieldL": unity_frame(socket_world(rig, "B_Socket_ShieldL"))})
+        ref["clips"].append({"state": st, "file": "A_FppArms_%s.fbx" % st, "frames": s["frames"], "seconds": s["seconds"],
+                             "loop": s["loop"], "weapon": s["weapon"],
+                             "buckler": (st not in v3) and K.has_buckler(st),
+                             "leftGrips": st in ("AuraActivate", K.AURA_1H) or (st not in v3 and K.weapon_of(st) == "2H"),
+                             "events": [{"id": e, "time": round(t, 4)} for e, t in s["events"]],
+                             "samples": samples})
+    with open(os.path.join(OUT, "clip_reference.json"), "w") as fh:
+        json.dump(ref, fh, separators=(",", ":"))
+
+    # ---- export arms + clips
+    A.rest_pose(rig)
+    rig.animation_data.action = None
+    A.rest_pose(rig)
+    select_only([rig, arms])
+    bpy.ops.export_scene.fbx(filepath=os.path.join(arms_dir, "Models", "SK_Player_FppArms.fbx"), object_types={"ARMATURE", "MESH"},
+                             bake_anim=False, mesh_smooth_type="OFF", use_triangles=True, use_tspace=False, use_mesh_modifiers=False,
+                             **FBX_COMMON)
+    sc = bpy.context.scene
+    for state, act in actions.items():
+        A.rest_pose(rig)
+        rig.animation_data.action = act
+        sc.frame_start, sc.frame_end = 1, int(act.frame_range[1])
+        select_only([rig])
+        bpy.ops.export_scene.fbx(filepath=os.path.join(arms_dir, "Animations", "A_FppArms_%s.fbx" % state), object_types={"ARMATURE"},
+                                 bake_anim=True, bake_anim_use_all_bones=True, bake_anim_use_nla_strips=False,
+                                 bake_anim_use_all_actions=False, bake_anim_force_startend_keying=True, bake_anim_step=1.0,
+                                 bake_anim_simplify_factor=0.0, **FBX_COMMON)
+    rig.animation_data.action = None
+    A.rest_pose(rig)
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "FppHandsSword91_work.blend"))
+
+    # ---- renders (preview): weapon per clip, optional #63 buckler reference on B_Socket_ShieldL
+    buckler = None
+    bdir = os.environ.get("FPP_BUCKLER_MODEL")
+    if bdir:
+        from mathutils import Matrix
+        sys.path.insert(0, bdir)
+        import buckler_model
+        buckler = buckler_model.build()
+        buckler.data.transform(Matrix.Rotation(math.pi, 4, "Z"))
+        buckler.data.materials.clear()
+        buckler.data.materials.append(preview_material("M_PrevBuckler_ref63", (0.33, 0.21, 0.11), 0.0, 0.6))
+    if os.environ.get("FPP_NO_RENDER"):
+        with open(os.path.join(OUT, "build_report_91.json"), "w") as fh:
+            json.dump(report, fh, indent=2)
+        return
+    R.setup(samples=24)
+    R.lights()
+    cam = R.fpp_camera()
+    shots = []
+    for st, s in clip_stats.items():
+        n = 3 if s["frames"] > 40 else 2
+        shots += [(st, 1 + round((s["frames"] - 1) * i / (n - 1))) for i in range(n)]
+    for state, f in shots:
+        A.rest_pose(rig)
+        rig.animation_data.action = actions[state]
+        sc.frame_set(f)
+        two = K.weapon_of(state) == "2H" and state not in ("Idle", "Attack", "AuraActivate")
+        for name, o in swords.items():
+            o.hide_render = name != ("SM_Weapon_FppGreatsword" if two else "SM_Weapon_FppSword")
+        attach_sword_world(swords["SM_Weapon_FppGreatsword" if two else "SM_Weapon_FppSword"], rig)
+        if buckler is not None:
+            buckler.hide_render = state in ("Idle", "Attack", "AuraActivate") or not K.has_buckler(state)
+            buckler.matrix_world = socket_world(rig, "B_Socket_ShieldL")
+        R.render(cam, os.path.join(renders, "fpp_portrait_%s_f%03d.png" % (state, f - 1)), R.A31_PORTRAIT_RES)
+    # second sword: idle + one attack frame
+    for state, f in (("ShieldIdle", 1), ("Attack1H_03", 31)):
+        A.rest_pose(rig)
+        rig.animation_data.action = actions[state]
+        sc.frame_set(f)
+        for name, o in swords.items():
+            o.hide_render = name != "SM_Weapon_FppSword02"
+        attach_sword_world(swords["SM_Weapon_FppSword02"], rig)
+        if buckler is not None:
+            buckler.hide_render = False
+            buckler.matrix_world = socket_world(rig, "B_Socket_ShieldL")
+        R.render(cam, os.path.join(renders, "fpp_portrait_Sword02_%s_f%03d.png" % (state, f - 1)), R.A31_PORTRAIT_RES)
+
+    with open(os.path.join(OUT, "build_report_91.json"), "w") as fh:
+        json.dump(report, fh, indent=2)
+    print("REPORT91", json.dumps({k: report[k] for k in ("triangles", "budget", "bones")}))
+
+
+if STAGE == "final91":
+    final91()

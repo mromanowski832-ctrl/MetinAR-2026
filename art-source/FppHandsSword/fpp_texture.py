@@ -215,9 +215,22 @@ def paint_arms(baked):
     smooth = np.where(clo, 0.12, smooth)
     height = np.where(clo, 0.5 + 0.1 * weave, height)
 
+    # #91 gear regions (fpp_gear): REG_STRAP = dark tanned strap leather, REG_ENERGY = cuff gem (emissive blue)
+    strap = reg == 6
+    sc = mix(np.array([0.045, 0.028, 0.018]), np.array([0.11, 0.07, 0.042]), np.clip(grain, 0, 1) * 0.7)
+    color = np.where(strap[..., None], sc, color)
+    smooth = np.where(strap, 0.38, smooth)
+    height = np.where(strap, 0.52 + 0.08 * (grain - 0.5), height)
+    energy = reg == 5
+    ec = mix(np.array([0.05, 0.18, 0.75]), np.array([0.55, 0.85, 1.0]), sstep(0.6, 1.0, n1))
+    color = np.where(energy[..., None], ec, color)
+    smooth = np.where(energy, 0.92, smooth)
+    emis = np.where(energy[..., None], np.array([0.15, 0.45, 1.0]) * 0.8, np.zeros(P.shape, np.float32))
+
     empty = reg <= 0
     color = np.where(empty[..., None], LEATHER, color)
-    return np.clip(color, 0, 1), np.clip(metal, 0, 1), np.clip(smooth, 0, 1), None, np.clip(height, 0, 1)
+    emis_out = np.clip(emis, 0, 1) if energy.any() else None
+    return np.clip(color, 0, 1), np.clip(metal, 0, 1), np.clip(smooth, 0, 1), emis_out, np.clip(height, 0, 1)
 
 
 def paint_sword(baked):

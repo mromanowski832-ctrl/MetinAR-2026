@@ -3,7 +3,7 @@
 blender -b --factory-startup --python art-source/FppHandsSword/fpp_motion_preview.py -- <out_dir> [state,state,...] [frames_per_clip]
 
 FPP_BUCKLER_MODEL=<dir containing PR #63 buckler_model.py> shows the referenced buckler (PR #63, not part of this
-branch; read-only) on B_Socket_ShieldL in every buckler state.
+branch; read-only) on B_Socket_ShieldL in every buckler state. FPP_SWORD_1H=B previews the second 1H sword (SM_Weapon_FppSword02).
 """
 import os
 import sys
@@ -31,7 +31,7 @@ os.makedirs(OUT, exist_ok=True)
 def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.context.scene.render.fps = C.FPS
-    sword, _ = G.build_sword()
+    sword, _ = (G.build_sword_b if os.environ.get("FPP_SWORD_1H") == "B" else G.build_sword)()  # FPP_SWORD_1H=B -> SM_Weapon_FppSword02
     gsword, _ = G.build_greatsword()
     glove, sleeve = G.build_arms_parts()
     glove.data.materials.append(B.preview_material("M_PrevGlove", (0.10, 0.07, 0.05), 0.0, 0.55))

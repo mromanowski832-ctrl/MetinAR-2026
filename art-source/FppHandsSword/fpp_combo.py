@@ -153,10 +153,10 @@ SHIELD_REST_POS = Vector((-0.235, -0.285, 0.400))
 SHIELD_REST_FRONT = Vector((-0.30, 0.10, 0.95)).normalized()
 SHIELD_REST_HANDLE = Vector((0.20, 0.98, 0.0)).normalized()
 # BLOCK (ShieldBlock*): buckler raised in front of the face-left, boss to the front, right hand pulled back and low
-SHIELD_BLOCK_POS = Vector((-0.085, -0.135, 0.355))
+SHIELD_BLOCK_POS = Vector((-0.135, -0.205, 0.360))  # buckler edge stays out of the central 20 % screen box (portrait)
 SHIELD_BLOCK_FRONT = Vector((0.12, 0.12, 0.985)).normalized()
 SHIELD_BLOCK_HANDLE = Vector((0.30, 0.95, 0.0)).normalized()
-BLOCK_R_POS = C.REST_POSITION + Vector((0.065, -0.070, -0.060))
+BLOCK_R_POS = C.REST_POSITION + Vector((0.050, -0.055, -0.050))
 BLOCK_R_BLADE = rot_world((1, 0, 0), -15.0, rot_world((0, 0, 1), -28.0, REST_BLADE))
 BLOCK_R_HAND = rot_world((1, 0, 0), -15.0, rot_world((0, 0, 1), -28.0, REST_HAND))
 
@@ -250,7 +250,7 @@ def _rb(t, off=(0.0, 0.0, 0.0)):
 # ---- buckler-only clips (1H). ShieldBlock = raise (ends on the held block), ShieldBlockHold = loop, ShieldBlockEnd = back
 CLIPS.update({
     "ShieldBlock": dict(weapon="1H", seconds=0.20, hit=None, combo=None, keys=[_r1(0.00), _rb(0.10), _rb(0.20)],
-                        left_keys=[_ls(0.00), _lb(0.12, (0.0, 0.006, 0.004)), _lb(0.20)]),
+                        left_keys=[_ls(0.00), _lb(0.12, (-0.004, -0.002, 0.006)), _lb(0.20)]),
     "ShieldBlockHold": dict(weapon="1H", seconds=1.00, hit=None, combo=None, loop=True,
                             keys=[_rb(0.00), _rb(0.50, (0.0, -0.003, 0.0)), _rb(1.00)],
                             left_keys=[_lb(0.00), _lb(0.50, (0.002, -0.004, 0.002)), _lb(1.00)]),
