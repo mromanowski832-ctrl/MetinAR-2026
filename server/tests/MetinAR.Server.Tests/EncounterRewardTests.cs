@@ -1,6 +1,9 @@
 using System.Net;
 using System.Text.Json.Nodes;
+using MetinAR.Server.Persistence;
+using MetinAR.Server.SaveGames;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace MetinAR.Server.Tests;
@@ -32,11 +35,15 @@ public class EncounterRewardTests
         Assert.Equal(12L, (long)save["currency"]!["talers"]!);
         Assert.Equal("potion_hp_s", (string)save["inventory"]!["stacks"]![0]!["definitionId"]!);
         Assert.Equal(0, (int)save["inventory"]!["stacks"]![0]!["slotIndex"]!);
+        // No separate material bag (#71 decision 4): materials are ordinary inventory stacks.
+        Assert.Null(save["materials"]);
+        Assert.Equal("ore_shard", (string)save["inventory"]!["stacks"]![1]!["definitionId"]!);
+        Assert.Equal(1, (int)save["inventory"]!["stacks"]![1]!["slotIndex"]!);
+        Assert.Equal(3, (int)save["inventory"]!["stacks"]![1]!["quantity"]!);
         JsonNode bootSlot = save["inventory"]!["items"]![0]!;
-        Assert.Equal(1, (int)bootSlot["slotIndex"]!);
+        Assert.Equal(2, (int)bootSlot["slotIndex"]!);
         string instanceId = (string)bootSlot["item"]!["instanceId"]!;
         Assert.Equal(instanceId, (string)applied["granted"]!["items"]![0]!["instanceId"]!);
-        Assert.Equal(3, (int)save["materials"]![0]!["quantity"]!);
         JsonNode result = save["encounterResults"]!.AsArray().Single()!;
         Assert.Equal(id, (string)result["encounterId"]!);
         Assert.Equal("server", (string)result["source"]!);
@@ -142,28 +149,185 @@ public class EncounterRewardTests
         Assert.Equal(3, (int)body["saveGame"]!["character"]!["level"]!); // 500 EXP → level 3 per exp_curve.csv
     }
 
-    [Fact]
-    public async Task Reward_WhenBagIsFull_OverflowsIntoTheLootStash()
+    /// <summary>Write a save straight to the store (revision 1), e.g. a full bag the HTTP API cannot produce quickly.</summary>
+    private static async Task SeedSaveAsync(MetinArServerFactory factory, HttpClient client, string playerId, Func<SaveGameDocument, SaveGameDocument> change)
     {
-        using var factory = new MetinArServerFactory(settings: new Dictionary<string, string> { ["PrototypeSaveGameDefaults:InventoryCapacity"] = "1" });
+        (_, JsonObject initial) = await client.GetSaveAsync(playerId);
+        SaveGameDocument document = change(SaveGameJson.Deserialize<SaveGameDocument>(initial.ToJsonString())) with { Revision = 1 };
+        ISaveGameStore store = factory.Services.GetRequiredService<ISaveGameStore>();
+        (SaveWriteStatus status, _) = await store.ReplaceAsync(document, 0, factory.Clock.GetUtcNow(), CancellationToken.None);
+        Assert.Equal(SaveWriteStatus.Written, status);
+    }
+
+    private static SaveGameDocument FullBag(SaveGameDocument d) => d with
+    {
+        Inventory = d.Inventory with
+        {
+            Stacks = Enumerable.Range(0, SaveGameRules.InventoryStartCapacity)
+                .Select(i => new SaveSlottedStackEntry { SlotIndex = i, DefinitionId = "potion_hp_s", Quantity = 50 }).ToArray(),
+        },
+    };
+
+    [Fact]
+    public async Task Reward_QuantityAboveTheStackLimit_IsSplitIntoFullStacks()
+    {
+        using var factory = new MetinArServerFactory();
         using HttpClient client = await factory.CreateClient().WithPlayerAsync("rw-p5");
         (string id, string nonce) = await client.CompletedEncounterAsync("rw-p5", "seed-mob-0001");
-        object[] items =
-        [
-            new { definitionId = "starter_boots", itemLevel = 1, rarity = "common" },
-            new { definitionId = "starter_gloves", itemLevel = 1, rarity = "common" },
-        ];
 
-        HttpResponseMessage ok = await client.RewardAsync(id, "rw-p5", nonce, SaveGameTestHelpers.Claim(items: items, stacks: OnePotion));
+        HttpResponseMessage ok = await client.RewardAsync(id, "rw-p5", nonce,
+            SaveGameTestHelpers.Claim(stacks: [new { definitionId = "potion_hp_s", quantity = 60 }]));
         string text = await ok.Content.ReadAsStringAsync();
 
         Assert.True(ok.StatusCode == HttpStatusCode.OK, text);
-        JsonNode save = JsonNode.Parse(text)!["saveGame"]!;
-        // Grant order is stacks, then items: the potion takes the only bag slot, both items overflow to the stash.
-        Assert.Equal("potion_hp_s", (string)save["inventory"]!["stacks"]![0]!["definitionId"]!);
-        Assert.Empty(save["inventory"]!["items"]!.AsArray());
-        Assert.Equal(2, save["inventory"]!["lootStash"]!["items"]!.AsArray().Count);
-        Assert.Empty(save["inventory"]!["lootStash"]!["stacks"]!.AsArray());
+        JsonArray stacks = JsonNode.Parse(text)!["saveGame"]!["inventory"]!["stacks"]!.AsArray();
+        // potion_hp_s stacks to 50 (items_starter.csv, ITEMS_COMBAT_SPEC §2).
+        Assert.Equal([50, 10], stacks.Select(n => (int)n!["quantity"]!));
+        Assert.Equal([0, 1], stacks.Select(n => (int)n!["slotIndex"]!));
+    }
+
+    [Fact]
+    public async Task Reward_WhenBagIsFull_GoesToTheLootStashFor24Hours_ThenIsLost()
+    {
+        using var factory = new MetinArServerFactory();
+        using HttpClient client = await factory.CreateClient().WithPlayerAsync("rw-p7");
+        await SeedSaveAsync(factory, client, "rw-p7", FullBag);
+        (string id, string nonce) = await client.CompletedEncounterAsync("rw-p7", "seed-mob-0001");
+        object[] items = [new { definitionId = "starter_boots", itemLevel = 1, rarity = "common" }];
+
+        HttpResponseMessage ok = await client.RewardAsync(id, "rw-p7", nonce,
+            SaveGameTestHelpers.Claim(items: items, stacks: [new { definitionId = "potion_hp_s", quantity = 60 }], materials: OneOre));
+        string text = await ok.Content.ReadAsStringAsync();
+
+        Assert.True(ok.StatusCode == HttpStatusCode.OK, text);
+        JsonNode inventory = JsonNode.Parse(text)!["saveGame"]!["inventory"]!;
+        Assert.Equal(24, inventory["stacks"]!.AsArray().Count);
+        Assert.All(inventory["stacks"]!.AsArray(), n => Assert.Equal(50, (int)n!["quantity"]!));
+        JsonArray stashStacks = inventory["lootStash"]!["stacks"]!.AsArray();
+        Assert.Equal([50, 10, 3], stashStacks.Select(n => (int)n!["quantity"]!));
+        Assert.Equal("ore_shard", (string)stashStacks[2]!["definitionId"]!);
+        JsonNode stashItem = inventory["lootStash"]!["items"]!.AsArray().Single()!;
+        Assert.Equal("starter_boots", (string)stashItem["item"]!["definitionId"]!);
+        string expires = (string)stashItem["expiresAtUtc"]!;
+        Assert.Equal("2026-10-21T00:00:00.000Z", expires); // DefaultNow + 24 h
+        Assert.All(stashStacks, n => Assert.Equal(expires, (string)n!["expiresAtUtc"]!));
+
+        factory.Clock.Advance(TimeSpan.FromHours(23));
+        Assert.Equal(4, CountStash((await client.GetSaveAsync("rw-p7")).SaveGame));
+
+        factory.Clock.Advance(TimeSpan.FromHours(1));
+        (string etag, JsonObject expired) = await client.GetSaveAsync("rw-p7");
+        Assert.Equal(0, CountStash(expired));
+
+        // The next write stores the pruned stash; the client sending the GET view back is not a stash change.
+        HttpResponseMessage put = await client.PutSaveAsync("rw-p7", expired, etag);
+        Assert.True(put.StatusCode == HttpStatusCode.OK, await put.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Put_MovingAWholeEntryFromTheLootStashIntoTheBag_IsAccepted()
+    {
+        using var factory = new MetinArServerFactory();
+        using HttpClient client = await factory.CreateClient().WithPlayerAsync("rw-p11");
+        DateTimeOffset expires = factory.Clock.GetUtcNow().AddHours(24);
+        await SeedSaveAsync(factory, client, "rw-p11", d => d with
+        {
+            Inventory = d.Inventory with
+            {
+                LootStash = new SaveLootStash
+                {
+                    Stacks = [new SaveStashStackEntry { DefinitionId = "ore_shard", Quantity = 7, ExpiresAtUtc = expires }],
+                    Items = [],
+                },
+            },
+        });
+        (string etag, JsonObject save) = await client.GetSaveAsync("rw-p11");
+        save["inventory"]!["lootStash"]!["stacks"] = new JsonArray();
+        save["inventory"]!["stacks"] = new JsonArray(new JsonObject { ["slotIndex"] = 0, ["definitionId"] = "ore_shard", ["quantity"] = 7 });
+
+        HttpResponseMessage put = await client.PutSaveAsync("rw-p11", save, etag);
+
+        Assert.True(put.StatusCode == HttpStatusCode.OK, await put.Content.ReadAsStringAsync());
+    }
+
+    private static int CountStash(JsonNode save) =>
+        save["inventory"]!["lootStash"]!["stacks"]!.AsArray().Count + save["inventory"]!["lootStash"]!["items"]!.AsArray().Count;
+
+    [Fact]
+    public async Task Reward_WhenBagAndLootStashAreFull_Returns409RewardNoSpace_AndNothingIsRecorded()
+    {
+        using var factory = new MetinArServerFactory();
+        using HttpClient client = await factory.CreateClient().WithPlayerAsync("rw-p8");
+        DateTimeOffset expires = factory.Clock.GetUtcNow().AddHours(20);
+        await SeedSaveAsync(factory, client, "rw-p8", d => FullBag(d) with
+        {
+            Inventory = FullBag(d).Inventory with
+            {
+                LootStash = new SaveLootStash
+                {
+                    Stacks = Enumerable.Range(0, SaveGameRules.LootStashSlots)
+                        .Select(_ => new SaveStashStackEntry { DefinitionId = "antidote", Quantity = 50, ExpiresAtUtc = expires }).ToArray(),
+                    Items = [],
+                },
+            },
+        });
+        (string id, string nonce) = await client.CompletedEncounterAsync("rw-p8", "seed-mob-0001");
+        object claim = SaveGameTestHelpers.Claim(exp: 10, items: OneBoots);
+
+        HttpResponseMessage full = await client.RewardAsync(id, "rw-p8", nonce, claim);
+
+        Assert.Equal(HttpStatusCode.Conflict, full.StatusCode);
+        Assert.Equal("REWARD_NO_SPACE", await full.CodeAsync());
+        (string etag, JsonObject save) = await client.GetSaveAsync("rw-p8");
+        Assert.Equal("\"1\"", etag);
+        Assert.Equal(0L, (long)save["character"]!["totalExp"]!);
+
+        // EXP and talers alone need no space and are still granted.
+        HttpResponseMessage expOnly = await client.RewardAsync(id, "rw-p8", nonce, SaveGameTestHelpers.Claim(exp: 10));
+        Assert.True(expOnly.StatusCode == HttpStatusCode.OK, await expOnly.Content.ReadAsStringAsync());
+    }
+
+    [Theory]
+    [InlineData("stacks", "no_such_item")]
+    [InlineData("stacks", "starter_boots")]
+    [InlineData("stacks", "ore_shard")]
+    [InlineData("materials", "potion_hp_s")]
+    [InlineData("items", "potion_hp_s")]
+    [InlineData("items", "no_such_item")]
+    public async Task Reward_DefinitionIdNotInTheCatalogOrInTheWrongList_Returns400(string list, string definitionId)
+    {
+        using var factory = new MetinArServerFactory();
+        using HttpClient client = await factory.CreateClient().WithPlayerAsync("rw-p9");
+        (string id, string nonce) = await client.CompletedEncounterAsync("rw-p9", "seed-mob-0001");
+        object[] stack = [new { definitionId, quantity = 1 }];
+        object[] item = [new { definitionId, itemLevel = 1, rarity = "common" }];
+        object claim = list switch
+        {
+            "stacks" => SaveGameTestHelpers.Claim(stacks: stack),
+            "materials" => SaveGameTestHelpers.Claim(materials: stack),
+            _ => SaveGameTestHelpers.Claim(items: item),
+        };
+
+        HttpResponseMessage r = await client.RewardAsync(id, "rw-p9", nonce, claim);
+
+        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+        var problem = await r.JsonAsync();
+        Assert.True(problem.GetProperty("errors").TryGetProperty($"claim.{list}[0].definitionId", out _), problem.ToString());
+    }
+
+    [Fact]
+    public async Task Reward_LevelUp_GrantsTwoStatPointsAndOneSkillPointPerLevel()
+    {
+        using var factory = new MetinArServerFactory();
+        using HttpClient client = await factory.CreateClient().WithPlayerAsync("rw-p10");
+        (string id, string nonce) = await client.CompletedEncounterAsync("rw-p10", "seed-mob-0001");
+
+        HttpResponseMessage ok = await client.RewardAsync(id, "rw-p10", nonce, SaveGameTestHelpers.Claim(exp: 500));
+        JsonNode save = JsonNode.Parse(await ok.Content.ReadAsStringAsync())!["saveGame"]!;
+
+        Assert.Equal(3, (int)save["character"]!["level"]!);
+        Assert.Equal(4, (int)save["stats"]!["freeStatPoints"]!);
+        Assert.Equal(2, (int)save["skills"]!["freeSkillPoints"]!);
     }
 
     [Fact]

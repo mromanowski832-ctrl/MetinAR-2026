@@ -16,10 +16,11 @@ builder.Services.AddOptions<EncounterRules>()
     .Bind(builder.Configuration.GetSection(EncounterRules.SectionName))
     .Validate(r => !r.Validate().Any(), "EncounterRules configuration is invalid (see EncounterRules.Validate).")
     .ValidateOnStart();
+ItemCatalog itemCatalog = ItemCatalog.LoadEmbedded();
 builder.Services.AddOptions<PrototypeSaveGameDefaults>()
     .Bind(builder.Configuration.GetSection(PrototypeSaveGameDefaults.SectionName))
-    .Validate(d => SaveGameRules.ClassIds.Contains(d.ClassId) && d.InventoryCapacity is >= 1 and <= SaveGameRules.SchemaMaxListItems
-        && (d.StarterWeaponDefinitionId.Length == 0 || SaveGameValidator.IsId(d.StarterWeaponDefinitionId)),
+    .Validate(d => SaveGameRules.ClassIds.Contains(d.ClassId) && SaveGameRules.IsValidCapacity(d.InventoryCapacity)
+        && (d.StarterWeaponDefinitionId.Length == 0 || itemCatalog.Find(d.StarterWeaponDefinitionId) is { IsStackable: false }),
         "PrototypeSaveGameDefaults configuration is invalid.")
     .ValidateOnStart();
 builder.Services.AddOptions<SaveGameLimits>()
@@ -40,6 +41,8 @@ builder.Services.AddSingleton<IPlayerStore>(sp => sp.GetRequiredService<SqliteGa
 builder.Services.AddSingleton<IWorldStore>(sp => sp.GetRequiredService<SqliteGameStore>());
 builder.Services.AddSingleton<IEncounterStore>(sp => sp.GetRequiredService<SqliteGameStore>());
 builder.Services.AddSingleton(ExpCurveTable.LoadEmbedded());
+builder.Services.AddSingleton(itemCatalog);
+builder.Services.AddSingleton(CharacterRules.LoadEmbedded(itemCatalog));
 builder.Services.AddSingleton<SaveGameMigrator>();
 builder.Services.AddSingleton<ISaveGameStore, SqliteSaveGameStore>();
 

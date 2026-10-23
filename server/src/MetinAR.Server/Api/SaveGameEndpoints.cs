@@ -54,7 +54,7 @@ public static partial class Endpoints
     private static partial Regex StrongEtagPattern();
 
     internal static async Task<IResult> GetSaveGameAsync(
-        HttpContext http, string playerId, IPlayerStore players, ISaveGameStore saves, ExpCurveTable curve,
+        HttpContext http, string playerId, IPlayerStore players, ISaveGameStore saves, ExpCurveTable curve, CharacterRules character,
         IOptions<PrototypeSaveGameDefaults> defaults, TimeProvider time, ILoggerFactory loggers, CancellationToken ct)
     {
         if (!Validation.IsValidId(playerId))
@@ -76,12 +76,14 @@ public static partial class Endpoints
             return failure;
         }
 
-        SaveGameDocument document = stored?.Document ?? SaveGameRules.CreateInitial(profile, defaults.Value, curve);
+        // Expired loot-stash entries are lost (#71 decision 7): filtered on read, dropped from storage on the next write.
+        SaveGameDocument document = SaveGameRules.PruneExpiredStash(
+            stored?.Document ?? SaveGameRules.CreateInitial(profile, defaults.Value, curve, character), UtcTimestamp.Normalize(time.GetUtcNow()));
         return SaveGameOk(http, document, time);
     }
 
     internal static async Task<IResult> PutSaveGameAsync(
-        HttpContext http, string playerId, IPlayerStore players, ISaveGameStore saves, ExpCurveTable curve,
+        HttpContext http, string playerId, IPlayerStore players, ISaveGameStore saves, ExpCurveTable curve, CharacterRules character,
         SaveGameMigrator migrator, IOptions<PrototypeSaveGameDefaults> defaults, IOptions<SaveGameLimits> limits,
         TimeProvider time, ILoggerFactory loggers, CancellationToken ct)
     {
@@ -115,7 +117,7 @@ public static partial class Endpoints
         }
 
         incoming = incoming! with { Profile = incoming.Profile is null ? null! : incoming.Profile with { DisplayName = incoming.Profile.DisplayName?.Trim()! } };
-        SaveGameValidator.Validate(incoming, curve, errors);
+        SaveGameValidator.Validate(incoming, curve, character.Catalog, errors);
         if (errors.HasErrors)
         {
             return ApiErrors.Validation(http, errors.ToDictionary());
@@ -155,12 +157,16 @@ public static partial class Endpoints
             return failure;
         }
 
-        SaveGameDocument current = stored?.Document ?? SaveGameRules.CreateInitial(profile, defaults.Value, curve);
+        DateTimeOffset now = UtcTimestamp.Normalize(time.GetUtcNow());
+        SaveGameDocument current = SaveGameRules.PruneExpiredStash(
+            stored?.Document ?? SaveGameRules.CreateInitial(profile, defaults.Value, curve, character), now);
         if (current.Revision != expectedRevision)
         {
             return RevisionConflict(http, current.Revision);
         }
 
+        // Both sides are pruned at the same instant, so loot that expired while the client was offline is gone from both.
+        incoming = SaveGameRules.PruneExpiredStash(incoming, now);
         IReadOnlyList<string> changed = SaveGameRules.ServerOwnedChanges(current, incoming);
         if (changed.Count > 0)
         {
@@ -170,15 +176,15 @@ public static partial class Endpoints
                 extensions: new Dictionary<string, object?> { ["fields"] = changed });
         }
 
-        DateTimeOffset now = UtcTimestamp.Normalize(time.GetUtcNow());
-        SaveGameDocument next = incoming with { Revision = expectedRevision + 1, UpdatedAtUtc = now, Mode = SaveGameRules.ModeServer };
+        // Current HP/MP are client-reported but never above the class max (#71 decision 6): clamped, not rejected.
+        SaveGameDocument next = character.ClampVitals(incoming with { Revision = expectedRevision + 1, UpdatedAtUtc = now, Mode = SaveGameRules.ModeServer });
         (SaveWriteStatus status, long currentRevision) = await saves.ReplaceAsync(next, expectedRevision, now, ct).ConfigureAwait(false);
         return status == SaveWriteStatus.RevisionConflict ? RevisionConflict(http, currentRevision) : SaveGameOk(http, next, time);
     }
 
     internal static async Task<IResult> ClaimEncounterRewardAsync(
         HttpContext http, ClaimEncounterRewardRequest? body, IEncounterStore encounters, IPlayerStore players, ISaveGameStore saves,
-        ExpCurveTable curve, IOptions<PrototypeSaveGameDefaults> defaults, IOptions<SaveGameLimits> limitOptions,
+        ExpCurveTable curve, CharacterRules character, IOptions<PrototypeSaveGameDefaults> defaults, IOptions<SaveGameLimits> limitOptions,
         TimeProvider time, ILoggerFactory loggers, CancellationToken ct)
     {
         SaveGameLimits limits = limitOptions.Value;
@@ -194,7 +200,7 @@ public static partial class Endpoints
             Validation.Id(errors, "encounterId", body.EncounterId);
             Validation.Id(errors, "playerId", body.PlayerId);
             Validation.Nonce(errors, "nonce", body.Nonce);
-            claim = ValidateClaim(body.Claim, limits, errors, overCaps);
+            claim = ValidateClaim(body.Claim, limits, character.Catalog, errors, overCaps);
         }
 
         if (errors.HasErrors)
@@ -249,14 +255,14 @@ public static partial class Endpoints
 
         DateTimeOffset now = UtcTimestamp.Normalize(time.GetUtcNow());
         string claimJson = SaveGameJson.Serialize(claim!);
-        SaveGameDocument initial = SaveGameRules.CreateInitial(profile, defaults.Value, curve);
+        SaveGameDocument initial = SaveGameRules.CreateInitial(profile, defaults.Value, curve, character);
         RewardStoreResult result;
         try
         {
             result = await saves.ApplyRewardAsync(
                 encounter.Id, encounter.PlayerId, claimJson, initial,
-                (document, nextRevision) => SaveGameRules.ApplyReward(document, claim!, encounter, nextRevision, now, curve,
-                    limits.MaxEncounterResultsInDocument, Guid.NewGuid),
+                (document, nextRevision) => SaveGameRules.ApplyReward(SaveGameRules.PruneExpiredStash(document, now), claim!, encounter,
+                    nextRevision, now, curve, character, limits.MaxEncounterResultsInDocument, Guid.NewGuid),
                 now, ct).ConfigureAwait(false);
         }
         catch (SaveGameIntegrityException)
@@ -289,7 +295,7 @@ public static partial class Endpoints
             SaveGame: result.Document));
     }
 
-    private static RewardClaim? ValidateClaim(RewardClaimDto? claim, SaveGameLimits limits, ValidationErrors errors, ValidationErrors overCaps)
+    private static RewardClaim? ValidateClaim(RewardClaimDto? claim, SaveGameLimits limits, ItemCatalog catalog, ValidationErrors errors, ValidationErrors overCaps)
     {
         if (claim is null)
         {
@@ -316,7 +322,31 @@ public static partial class Endpoints
         Amount("claim.exp", claim.Exp, limits.MaxRewardExpPerEncounter);
         Amount("claim.talers", claim.Talers, limits.MaxRewardTalersPerEncounter);
 
-        List<SaveStackEntry> Stacks(string field, IReadOnlyList<RewardClaimStackDto>? list)
+        // Catalog membership (#71 decision 8): stacks must be stackable non-material items, materials must be catalog
+        // materials, items must be non-stacking catalog items. Quantities above a stack limit are split by ApplyReward.
+        void Definition(string field, string? definitionId, bool? stackable, bool? material)
+        {
+            if (!SaveGameValidator.IsId(definitionId))
+            {
+                return;
+            }
+
+            ItemDefinition? definition = catalog.Find(definitionId);
+            if (definition is null)
+            {
+                errors.Add(field, $"Unknown item '{definitionId}' (not in the item catalog).");
+            }
+            else if (stackable is bool s && definition.IsStackable != s)
+            {
+                errors.Add(field, s ? $"'{definitionId}' does not stack; claim it under items." : $"'{definitionId}' stacks; claim it under stacks or materials.");
+            }
+            else if (material is bool m && (definition.Category == ItemCatalog.CategoryMaterial) != m)
+            {
+                errors.Add(field, m ? $"'{definitionId}' is not a material; claim it under stacks." : $"'{definitionId}' is a material; claim it under materials.");
+            }
+        }
+
+        List<SaveStackEntry> Stacks(string field, IReadOnlyList<RewardClaimStackDto>? list, bool material)
         {
             var result = new List<SaveStackEntry>();
             if (list is null)
@@ -345,6 +375,7 @@ public static partial class Endpoints
                 }
 
                 SaveGameValidator.Id(errors, path + ".definitionId", s.DefinitionId);
+                Definition(path + ".definitionId", s.DefinitionId, stackable: true, material: material);
                 if (s.Quantity is null or < 1)
                 {
                     errors.Add(path + ".quantity", "Must be >= 1.");
@@ -362,8 +393,8 @@ public static partial class Endpoints
             return result;
         }
 
-        List<SaveStackEntry> stacks = Stacks("claim.stacks", claim.Stacks);
-        List<SaveStackEntry> materials = Stacks("claim.materials", claim.Materials);
+        List<SaveStackEntry> stacks = Stacks("claim.stacks", claim.Stacks, material: false);
+        List<SaveStackEntry> materials = Stacks("claim.materials", claim.Materials, material: true);
         var items = new List<RewardClaimItem>();
         if (claim.Items is null)
         {
@@ -391,6 +422,7 @@ public static partial class Endpoints
                 }
 
                 SaveGameValidator.Id(errors, path + ".definitionId", item.DefinitionId);
+                Definition(path + ".definitionId", item.DefinitionId, stackable: false, material: null);
                 if (item.ItemLevel is null or < 1 or > 99)
                 {
                     errors.Add(path + ".itemLevel", "Must be 1-99.");

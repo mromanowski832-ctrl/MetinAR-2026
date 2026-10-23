@@ -8,7 +8,7 @@ Status: prototype, local development only. Issue: #17. Code: [`server/`](../serv
 
 > **Updated by METINAR-071 (#71):** additive SaveGame v1 endpoints (`GET`/`PUT /api/v1/player/{playerId}/savegame`
 > with revision/ETag concurrency, and `POST /api/v1/encounters/reward`, idempotent by `encounterId`) plus migration `0004`.
-> The full contract, local file format and open questions are in [METINAR-071-SAVEGAME-CONTRACT.md](METINAR-071-SAVEGAME-CONTRACT.md).
+> SaveGame v1 has 150 server tests in total. The full contract, local file format and the settled questions (§11) are in [METINAR-071-SAVEGAME-CONTRACT.md](METINAR-071-SAVEGAME-CONTRACT.md).
 
 This is a separate backend workspace. It doesn't touch the Unity client, AR encounter, hand tracking/sword,
 GPS provider core, the map provider work or the 3D asset pipeline. The Unity client doesn't call it yet;

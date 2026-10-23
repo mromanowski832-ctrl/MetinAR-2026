@@ -1,4 +1,4 @@
-METINAR-SAVE 1 sha256=b9bb4b2bffcf4f95439e9f224855e9744db5fac22598fa05292b9c607edf7878 bytes=3237
+METINAR-SAVE 1 sha256=3e018897964cbece58ba377f847a5f654804abd0fa8343e2a1a49d640dfd2d60 bytes=3248
 {
   "schemaVersion": 1,
   "mode": "local",
@@ -19,15 +19,15 @@ METINAR-SAVE 1 sha256=b9bb4b2bffcf4f95439e9f224855e9744db5fac22598fa05292b9c607e
   },
   "stats": {
     "allocated": {
-      "might": 0,
+      "might": 1,
       "finesse": 0,
       "spirit": 0,
-      "vigor": 0
+      "vigor": 1
     },
-    "freeStatPoints": 0
+    "freeStatPoints": 2
   },
   "skills": {
-    "freeSkillPoints": 0,
+    "freeSkillPoints": 1,
     "progress": [
       {
         "skillId": "warrior_heavy_slash",
@@ -54,6 +54,11 @@ METINAR-SAVE 1 sha256=b9bb4b2bffcf4f95439e9f224855e9744db5fac22598fa05292b9c607e
         "slotIndex": 0,
         "definitionId": "potion_hp_s",
         "quantity": 3
+      },
+      {
+        "slotIndex": 2,
+        "definitionId": "ore_shard",
+        "quantity": 4
       }
     ],
     "items": [
@@ -97,12 +102,6 @@ METINAR-SAVE 1 sha256=b9bb4b2bffcf4f95439e9f224855e9744db5fac22598fa05292b9c607e
   "currency": {
     "talers": 145
   },
-  "materials": [
-    {
-      "definitionId": "ore_shard",
-      "quantity": 4
-    }
-  ],
   "quests": [
     {
       "questId": "quest-placeholder-01",

@@ -5,7 +5,7 @@
   "description": "One player's saved progress. The same document is stored by the Unity client in its local save file (mode = local) and served/stored by the server (mode = server). See docs/METINAR-071-SAVEGAME-CONTRACT.md. Unknown fields are rejected everywhere (additionalProperties: false); a new field means a new schemaVersion.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "mode", "playerId", "revision", "updatedAtUtc", "profile", "character", "stats", "skills", "inventory", "equipment", "currency", "materials", "quests", "exploration", "encounterResults"],
+  "required": ["schemaVersion", "mode", "playerId", "revision", "updatedAtUtc", "profile", "character", "stats", "skills", "inventory", "equipment", "currency", "quests", "exploration", "encounterResults"],
   "properties": {
     "schemaVersion": { "const": 1, "description": "Contract version. Readers migrate older versions forward step by step and refuse newer ones." },
     "mode": { "enum": ["local", "server"], "description": "local = written by the client without server confirmation (unverified, must be shown as 'tryb lokalny'); server = this exact state was confirmed by the server at `revision`." },
@@ -78,17 +78,17 @@
       "additionalProperties": false,
       "required": ["capacity", "stacks", "items", "lootStash"],
       "properties": {
-        "capacity": { "type": "integer", "minimum": 1, "maximum": 200 },
-        "stacks": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/slottedStack" } },
+        "capacity": { "enum": [24, 32, 40, 48, 56], "description": "Bag places: 24 at start, +8 per bag expansion (Sakwa), max 56 (ITEMS_COMBAT_SPEC §5)." },
+        "stacks": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/slottedStack" }, "description": "Consumables, materials and other stackable items (there is no separate material bag). quantity must not exceed the item's stack limit from the design item tables (e.g. 50 consumables, 99 materials); the server checks this." },
         "items": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/slottedItem" } },
         "lootStash": {
           "type": "object",
           "additionalProperties": false,
           "required": ["stacks", "items"],
-          "description": "Overflow when the inventory is full (ITEMS_COMBAT_SPEC §5 'skrytka łupu'), so a reward is never lost.",
+          "description": "Loot that did not fit the bag (ITEMS_COMBAT_SPEC §5 'skrytka łupu', 8 places, 24 h). stacks + items together hold at most 8 entries; each entry expires at expiresAtUtc and expired loot is lost. Only the server adds entries; a client may only take whole entries out (into the bag).",
           "properties": {
-            "stacks": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/stack" } },
-            "items": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/itemInstance" } }
+            "stacks": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/stashStack" } },
+            "items": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/stashItem" } }
           }
         }
       }
@@ -100,7 +100,6 @@
       "required": ["talers"],
       "properties": { "talers": { "type": "integer", "minimum": 0 } }
     },
-    "materials": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/stack" }, "description": "Material bag, definitionId unique." },
     "quests": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/questState" }, "description": "questId unique. Quest design is not decided yet." },
     "exploration": {
       "type": "object",
@@ -152,6 +151,25 @@
         "slotIndex": { "type": "integer", "minimum": 0 },
         "definitionId": { "$ref": "#/$defs/id" },
         "quantity": { "type": "integer", "minimum": 1, "maximum": 999999 }
+      }
+    },
+    "stashStack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["definitionId", "quantity", "expiresAtUtc"],
+      "properties": {
+        "definitionId": { "$ref": "#/$defs/id" },
+        "quantity": { "type": "integer", "minimum": 1, "maximum": 999999 },
+        "expiresAtUtc": { "$ref": "#/$defs/utc" }
+      }
+    },
+    "stashItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item", "expiresAtUtc"],
+      "properties": {
+        "item": { "$ref": "#/$defs/itemInstance" },
+        "expiresAtUtc": { "$ref": "#/$defs/utc" }
       }
     },
     "itemInstance": {

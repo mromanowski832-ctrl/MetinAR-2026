@@ -1,9 +1,9 @@
 namespace MetinAR.Server.SaveGames;
 
 /// <summary>
-/// Starting values of a player's first SaveGame. PLACEHOLDERS, NOT game-design decisions (#71 open questions):
-/// class choice has no UI yet (the S2 client is a warrior), capacity 24 is the ITEMS_COMBAT_SPEC §5 proposal and the
-/// starter sword matches the client's StarterLoadout. Override via the <c>PrototypeSaveGameDefaults</c> section.
+/// Starting values of a player's first SaveGame (#71 decision 7, production lead 2026-10-23): class warrior with
+/// starter_sword (there is no class-choice UI yet) and a 24-place bag (ITEMS_COMBAT_SPEC §5; 24..56 in steps of 8).
+/// Override via the <c>PrototypeSaveGameDefaults</c> section; the starter weapon must be a non-stacking catalog item.
 /// </summary>
 public sealed class PrototypeSaveGameDefaults
 {

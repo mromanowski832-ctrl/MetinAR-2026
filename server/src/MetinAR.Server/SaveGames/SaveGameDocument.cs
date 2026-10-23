@@ -31,8 +31,6 @@ public sealed record SaveGameDocument
 
     public required SaveCurrency Currency { get; init; }
 
-    public required IReadOnlyList<SaveStackEntry> Materials { get; init; }
-
     public required IReadOnlyList<SaveQuestState> Quests { get; init; }
 
     public required SaveExploration Exploration { get; init; }
@@ -130,11 +128,31 @@ public sealed record SaveInventory
     public required SaveLootStash LootStash { get; init; }
 }
 
+/// <summary>
+/// Overflow for loot that did not fit the bag (ITEMS_COMBAT_SPEC §5: 8 places, 24 h). Every entry takes one place and
+/// expires at <c>expiresAtUtc</c>; expired loot is lost (#71 decision 7). Only the server adds entries.
+/// </summary>
 public sealed record SaveLootStash
 {
-    public required IReadOnlyList<SaveStackEntry> Stacks { get; init; }
+    public required IReadOnlyList<SaveStashStackEntry> Stacks { get; init; }
 
-    public required IReadOnlyList<SaveItemInstance> Items { get; init; }
+    public required IReadOnlyList<SaveStashItem> Items { get; init; }
+}
+
+public sealed record SaveStashStackEntry
+{
+    public required string DefinitionId { get; init; }
+
+    public required int Quantity { get; init; }
+
+    public required DateTimeOffset ExpiresAtUtc { get; init; }
+}
+
+public sealed record SaveStashItem
+{
+    public required SaveItemInstance Item { get; init; }
+
+    public required DateTimeOffset ExpiresAtUtc { get; init; }
 }
 
 public sealed record SaveStackEntry

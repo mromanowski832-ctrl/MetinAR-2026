@@ -7,7 +7,8 @@ namespace MetinAR.Server.SaveGames;
 
 /// <summary>
 /// Structural + semantic validation of a SaveGame v1 document, equivalent to docs/contracts/savegame.v1.schema.json
-/// plus the cross-field rules the schema cannot express (derived level, unique ids/slots, slot range). Implemented in
+/// plus the cross-field rules the schema cannot express (derived level, unique ids/slots, slot range, item catalog
+/// membership and per-item stack limits, loot-stash places). Implemented in
 /// code on purpose: no JSON Schema runtime dependency (see the contract doc, "Walidacja").
 /// System.Text.Json enforces `required` members but not nullability, so every reference is null-checked here.
 /// </summary>
@@ -28,10 +29,11 @@ public static partial class SaveGameValidator
 
     public static bool IsUuid(string? value) => value is not null && UuidPattern().IsMatch(value);
 
-    public static void Validate(SaveGameDocument document, ExpCurveTable curve, ValidationErrors errors)
+    public static void Validate(SaveGameDocument document, ExpCurveTable curve, ItemCatalog catalog, ValidationErrors errors)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(curve);
+        ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(errors);
 
         if (document.SchemaVersion != SaveGameMigrator.LatestVersion)
@@ -85,22 +87,17 @@ public static partial class SaveGameValidator
         var instanceIds = new HashSet<string>(StringComparer.Ordinal);
         if (Required(errors, "inventory", document.Inventory))
         {
-            Inventory(errors, document.Inventory, instanceIds);
+            Inventory(errors, document.Inventory, instanceIds, catalog);
         }
 
         if (Required(errors, "equipment", document.Equipment))
         {
-            Equipment(errors, document.Equipment, instanceIds);
+            Equipment(errors, document.Equipment, instanceIds, catalog);
         }
 
         if (Required(errors, "currency", document.Currency) && document.Currency.Talers < 0)
         {
             errors.Add("currency.talers", "Must be >= 0.");
-        }
-
-        if (Required(errors, "materials", document.Materials))
-        {
-            Stacks(errors, "materials", document.Materials, SaveGameRules.SchemaMaxListItems, requireUniqueDefinition: true);
         }
 
         if (Required(errors, "quests", document.Quests))
@@ -205,12 +202,12 @@ public static partial class SaveGameValidator
         }
     }
 
-    private static void Inventory(ValidationErrors errors, SaveInventory inventory, HashSet<string> instanceIds)
+    private static void Inventory(ValidationErrors errors, SaveInventory inventory, HashSet<string> instanceIds, ItemCatalog catalog)
     {
-        bool capacityOk = inventory.Capacity is >= 1 and <= SaveGameRules.SchemaMaxListItems;
+        bool capacityOk = SaveGameRules.IsValidCapacity(inventory.Capacity);
         if (!capacityOk)
         {
-            errors.Add("inventory.capacity", $"Must be 1-{SaveGameRules.SchemaMaxListItems}.");
+            errors.Add("inventory.capacity", CapacityRule);
         }
 
         var slots = new HashSet<int>();
@@ -236,8 +233,7 @@ public static partial class SaveGameValidator
                 if (Required(errors, path, s))
                 {
                     Slot(path + ".slotIndex", s.SlotIndex);
-                    Id(errors, path + ".definitionId", s.DefinitionId);
-                    Quantity(errors, path + ".quantity", s.Quantity);
+                    CatalogStack(errors, path, s.DefinitionId, s.Quantity, catalog);
                 }
             }
         }
@@ -252,30 +248,50 @@ public static partial class SaveGameValidator
                 if (Required(errors, path, s))
                 {
                     Slot(path + ".slotIndex", s.SlotIndex);
-                    Item(errors, path + ".item", s.Item, instanceIds);
+                    Item(errors, path + ".item", s.Item, instanceIds, catalog);
                 }
             }
         }
 
         if (Required(errors, "inventory.lootStash", inventory.LootStash))
         {
-            if (Required(errors, "inventory.lootStash.stacks", inventory.LootStash.Stacks))
+            SaveLootStash stash = inventory.LootStash;
+            if (Required(errors, "inventory.lootStash.stacks", stash.Stacks))
             {
-                Stacks(errors, "inventory.lootStash.stacks", inventory.LootStash.Stacks, SaveGameRules.SchemaMaxListItems, requireUniqueDefinition: false);
+                MaxItems(errors, "inventory.lootStash.stacks", stash.Stacks.Count, SaveGameRules.LootStashSlots);
+                for (int i = 0; i < stash.Stacks.Count; i++)
+                {
+                    string path = $"inventory.lootStash.stacks[{i}]";
+                    SaveStashStackEntry? s = stash.Stacks[i];
+                    if (Required(errors, path, s))
+                    {
+                        CatalogStack(errors, path, s.DefinitionId, s.Quantity, catalog);
+                    }
+                }
             }
 
-            if (Required(errors, "inventory.lootStash.items", inventory.LootStash.Items))
+            if (Required(errors, "inventory.lootStash.items", stash.Items))
             {
-                MaxItems(errors, "inventory.lootStash.items", inventory.LootStash.Items.Count, SaveGameRules.SchemaMaxListItems);
-                for (int i = 0; i < inventory.LootStash.Items.Count; i++)
+                MaxItems(errors, "inventory.lootStash.items", stash.Items.Count, SaveGameRules.LootStashSlots);
+                for (int i = 0; i < stash.Items.Count; i++)
                 {
-                    Item(errors, $"inventory.lootStash.items[{i}]", inventory.LootStash.Items[i], instanceIds);
+                    string path = $"inventory.lootStash.items[{i}]";
+                    SaveStashItem? s = stash.Items[i];
+                    if (Required(errors, path, s))
+                    {
+                        Item(errors, path + ".item", s.Item, instanceIds, catalog);
+                    }
                 }
+            }
+
+            if (stash.Stacks is not null && stash.Items is not null && stash.Stacks.Count + stash.Items.Count > SaveGameRules.LootStashSlots)
+            {
+                errors.Add("inventory.lootStash", $"At most {SaveGameRules.LootStashSlots} entries in total (ITEMS_COMBAT_SPEC §5).");
             }
         }
     }
 
-    private static void Equipment(ValidationErrors errors, IReadOnlyList<SaveEquippedItem> equipment, HashSet<string> instanceIds)
+    private static void Equipment(ValidationErrors errors, IReadOnlyList<SaveEquippedItem> equipment, HashSet<string> instanceIds, ItemCatalog catalog)
     {
         MaxItems(errors, "equipment", equipment.Count, SaveGameRules.EquipmentSlots.Count);
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -297,11 +313,11 @@ public static partial class SaveGameValidator
                 errors.Add(path + ".slot", "Duplicate equipment slot.");
             }
 
-            Item(errors, path + ".item", e.Item, instanceIds);
+            Item(errors, path + ".item", e.Item, instanceIds, catalog);
         }
     }
 
-    private static void Item(ValidationErrors errors, string path, SaveItemInstance? item, HashSet<string> instanceIds)
+    private static void Item(ValidationErrors errors, string path, SaveItemInstance? item, HashSet<string> instanceIds, ItemCatalog catalog)
     {
         if (!Required(errors, path, item))
         {
@@ -317,7 +333,7 @@ public static partial class SaveGameValidator
             errors.Add(path + ".instanceId", "Duplicate instanceId (an item exists exactly once across inventory, stash and equipment).");
         }
 
-        Id(errors, path + ".definitionId", item.DefinitionId);
+        CatalogItem(errors, path + ".definitionId", item.DefinitionId, catalog);
         Range(errors, path + ".itemLevel", item.ItemLevel, 1, 99);
         Rarity(errors, path + ".rarity", item.Rarity);
         Range(errors, path + ".temper", item.Temper, 0, 10);
@@ -544,6 +560,59 @@ public static partial class SaveGameValidator
             }
 
             Quantity(errors, $"{path}[{i}].quantity", s.Quantity);
+        }
+    }
+
+    public const string CapacityRule = "Must be 24, 32, 40, 48 or 56 (24 at start, +8 per bag expansion, max 56).";
+
+    /// <summary>A stack of a catalog item that stacks; quantity 1 to the item's stack limit.</summary>
+    internal static void CatalogStack(ValidationErrors errors, string path, string? definitionId, int quantity, ItemCatalog catalog, string? requiredCategory = null)
+    {
+        Id(errors, path + ".definitionId", definitionId);
+        if (!IsId(definitionId))
+        {
+            return;
+        }
+
+        ItemDefinition? definition = catalog.Find(definitionId);
+        if (definition is null)
+        {
+            errors.Add(path + ".definitionId", $"Unknown item '{definitionId}' (not in the item catalog).");
+        }
+        else if (!definition.IsStackable)
+        {
+            errors.Add(path + ".definitionId", $"'{definitionId}' does not stack; it must be an item instance.");
+        }
+        else if (requiredCategory is not null && definition.Category != requiredCategory)
+        {
+            errors.Add(path + ".definitionId", $"'{definitionId}' is not a {requiredCategory}.");
+        }
+        else
+        {
+            Range(errors, path + ".quantity", quantity, 1, definition.StackLimit);
+            return;
+        }
+
+        Quantity(errors, path + ".quantity", quantity);
+    }
+
+    /// <summary>An item instance: a catalog item that does not stack.</summary>
+    internal static void CatalogItem(ValidationErrors errors, string field, string? definitionId, ItemCatalog catalog)
+    {
+        Id(errors, field, definitionId);
+        if (!IsId(definitionId))
+        {
+            return;
+        }
+
+        ItemDefinition? definition = catalog.Find(definitionId);
+        if (definition is null)
+        {
+            errors.Add(field, $"Unknown item '{definitionId}' (not in the item catalog).");
+        }
+        else if (definition.IsStackable)
+        {
+            errors.Add(field, $"'{definitionId}' stacks (limit {definition.StackLimit}); it must be a stack, not an item instance.");
         }
     }
 

@@ -17,11 +17,11 @@
     "mpCurrent": 40
   },
   "stats": {
-    "allocated": { "might": 0, "finesse": 0, "spirit": 0, "vigor": 0 },
-    "freeStatPoints": 0
+    "allocated": { "might": 1, "finesse": 0, "spirit": 0, "vigor": 1 },
+    "freeStatPoints": 2
   },
   "skills": {
-    "freeSkillPoints": 0,
+    "freeSkillPoints": 1,
     "progress": [
       {
         "skillId": "warrior_heavy_slash",
@@ -39,7 +39,8 @@
   "inventory": {
     "capacity": 24,
     "stacks": [
-      { "slotIndex": 0, "definitionId": "potion_hp_s", "quantity": 3 }
+      { "slotIndex": 0, "definitionId": "potion_hp_s", "quantity": 3 },
+      { "slotIndex": 2, "definitionId": "ore_shard", "quantity": 4 }
     ],
     "items": [
       {
@@ -72,9 +73,6 @@
     }
   ],
   "currency": { "talers": 145 },
-  "materials": [
-    { "definitionId": "ore_shard", "quantity": 4 }
-  ],
   "quests": [
     {
       "questId": "quest-placeholder-01",

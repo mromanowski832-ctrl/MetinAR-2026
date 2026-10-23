@@ -34,6 +34,18 @@ public static class SaveGameRules
     public const int SchemaMaxRewardEntries = 10;
     public const int MaxStackQuantity = 999_999;
 
+    /// <summary>Bag: 24 places at start, +8 per Sakwa, at most 56 (ITEMS_COMBAT_SPEC §5, OPEN_QUESTIONS Q17).</summary>
+    public const int InventoryStartCapacity = 24;
+    public const int InventoryCapacityStep = 8;
+    public const int InventoryMaxCapacity = 56;
+
+    /// <summary>Loot stash: 8 places, 24 h (ITEMS_COMBAT_SPEC §5); one place per entry, no merging.</summary>
+    public const int LootStashSlots = 8;
+    public static readonly TimeSpan LootStashLifetime = TimeSpan.FromHours(24);
+
+    public static bool IsValidCapacity(int capacity) =>
+        capacity is >= InventoryStartCapacity and <= InventoryMaxCapacity && (capacity - InventoryStartCapacity) % InventoryCapacityStep == 0;
+
     public static IReadOnlyList<string> ClassIds { get; } = ["warrior", "ninja", "shaman", "slajter"];
 
     public static IReadOnlyList<string> SkillTierIds { get; } = ["practice", "proficiency", "artistry", "apex"];
@@ -46,14 +58,17 @@ public static class SaveGameRules
     /// <summary>
     /// The virtual revision-0 save of a player who has no stored SaveGame yet ("v0" = the pre-#71 player_profiles row):
     /// EXP and current HP/MP come from the legacy profile, everything else from <see cref="PrototypeSaveGameDefaults"/>.
-    /// Deterministic, so repeated GETs return the same document (including the starter item id).
+    /// A legacy level above 1 gets the level-up points it earned (2 stat + 1 skill point per level-up), and HP/MP are
+    /// clamped to the class max. Deterministic, so repeated GETs return the same document (including the starter item id).
     /// </summary>
-    public static SaveGameDocument CreateInitial(PlayerProfile profile, PrototypeSaveGameDefaults defaults, ExpCurveTable curve)
+    public static SaveGameDocument CreateInitial(PlayerProfile profile, PrototypeSaveGameDefaults defaults, ExpCurveTable curve, CharacterRules character)
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(defaults);
         ArgumentNullException.ThrowIfNull(curve);
+        ArgumentNullException.ThrowIfNull(character);
         long totalExp = Math.Clamp(profile.Experience, 0, curve.TotalExpToMaxLevel);
+        int level = curve.LevelForTotalExp(totalExp);
         var equipment = new List<SaveEquippedItem>();
         if (!string.IsNullOrEmpty(defaults.StarterWeaponDefinitionId))
         {
@@ -73,7 +88,7 @@ public static class SaveGameRules
             });
         }
 
-        return new SaveGameDocument
+        var initial = new SaveGameDocument
         {
             SchemaVersion = SaveGameMigrator.LatestVersion,
             Mode = ModeServer,
@@ -85,15 +100,15 @@ public static class SaveGameRules
             {
                 ClassId = defaults.ClassId,
                 PathId = null,
-                Level = curve.LevelForTotalExp(totalExp),
+                Level = level,
                 TotalExp = totalExp,
                 HpCurrent = Math.Max(0, profile.CurrentHp),
                 MpCurrent = Math.Max(0, profile.CurrentMp),
             },
-            Stats = new SaveStats { Allocated = new SavePrimaryStats { Might = 0, Finesse = 0, Spirit = 0, Vigor = 0 }, FreeStatPoints = 0 },
+            Stats = new SaveStats { Allocated = new SavePrimaryStats { Might = 0, Finesse = 0, Spirit = 0, Vigor = 0 }, FreeStatPoints = (level - 1) * CharacterRules.StatPointsPerLevel },
             Skills = new SaveSkills
             {
-                FreeSkillPoints = 0,
+                FreeSkillPoints = (level - 1) * CharacterRules.SkillPointsPerLevel,
                 Progress = [],
                 Loadout = new SaveSkillLoadout { Attack = null, Aura = null, Slot1 = null, Slot2 = null },
             },
@@ -106,16 +121,41 @@ public static class SaveGameRules
             },
             Equipment = equipment,
             Currency = new SaveCurrency { Talers = 0 },
-            Materials = [],
             Quests = [],
             Exploration = new SaveExploration { TotalMetersCredited = 0, Daily = null, DiscoveredCellIds = [] },
             EncounterResults = [],
+        };
+        return character.ClampVitals(initial);
+    }
+
+    /// <summary>Drop loot-stash entries whose <c>expiresAtUtc</c> is at or before <paramref name="now"/> (expired loot is lost).</summary>
+    public static SaveGameDocument PruneExpiredStash(SaveGameDocument document, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        SaveLootStash stash = document.Inventory.LootStash;
+        if (stash.Stacks.All(s => s.ExpiresAtUtc > now) && stash.Items.All(i => i.ExpiresAtUtc > now))
+        {
+            return document;
+        }
+
+        return document with
+        {
+            Inventory = document.Inventory with
+            {
+                LootStash = new SaveLootStash
+                {
+                    Stacks = stash.Stacks.Where(s => s.ExpiresAtUtc > now).ToList(),
+                    Items = stash.Items.Where(i => i.ExpiresAtUtc > now).ToList(),
+                },
+            },
         };
     }
 
     /// <summary>
     /// Fields a client sync (PUT) must leave unchanged (contract §7). Progression, currency, item contents and
-    /// history change only through server rules (rewards); the client may rearrange, equip, lock and rename.
+    /// history change only through server rules (rewards); the client may rearrange, equip, lock and rename, and may
+    /// take whole entries out of the loot stash (into the bag) but never add, split or re-date stash entries.
+    /// Current HP/MP are client-reported and clamped by the caller, not compared here.
     /// </summary>
     public static IReadOnlyList<string> ServerOwnedChanges(SaveGameDocument current, SaveGameDocument proposed)
     {
@@ -142,7 +182,11 @@ public static class SaveGameRules
         Check("items", ItemContents(current), ItemContents(proposed));
         Check("stackTotals", StackTotals(current), StackTotals(proposed));
         Check("currency", current.Currency, proposed.Currency);
-        Check("materials", current.Materials, proposed.Materials);
+        if (!StashIsSubsetOf(proposed.Inventory.LootStash, current.Inventory.LootStash))
+        {
+            changed.Add("inventory.lootStash");
+        }
+
         Check("quests", current.Quests, proposed.Quests);
         Check("exploration", current.Exploration, proposed.Exploration);
         Check("encounterResults", current.EncounterResults, proposed.EncounterResults);
@@ -150,10 +194,14 @@ public static class SaveGameRules
     }
 
     /// <summary>
-    /// Apply a validated claim (contract §8). EXP is capped at the max level, level is re-derived; stacks merge into
-    /// an existing inventory stack or take the lowest free slot, items get a server-minted instance id; whatever does
-    /// not fit goes to the loot stash. The result is appended to <c>encounterResults</c> (trimmed to the newest N).
-    /// Level-up stat/skill point grants are NOT applied (open question S6).
+    /// Apply a validated claim (contract §8). EXP is capped at the max level, level is re-derived and every level-up
+    /// grants 2 free stat points and 1 free skill point (CHARACTER_PROGRESSION §1.2, CLASSES_SKILLS §2). Stacks and
+    /// materials (materials are inventory stacks, ITEMS_COMBAT_SPEC §5) first top up existing bag stacks of the same item
+    /// up to the catalog stack limit, then take the lowest free slots; items get a server-minted instance id and the
+    /// lowest free slot. Whatever does not fit goes to the loot stash, one entry per place, expiring 24 h after the
+    /// grant; if the stash (8 places) is full the whole reward is rejected and nothing changes.
+    /// The result is appended to <c>encounterResults</c> (trimmed to the newest N). HP/MP are clamped (never healed).
+    /// The caller has already pruned expired stash entries.
     /// </summary>
     public static RewardApplication ApplyReward(
         SaveGameDocument current,
@@ -162,6 +210,7 @@ public static class SaveGameRules
         long newRevision,
         DateTimeOffset now,
         ExpCurveTable curve,
+        CharacterRules character,
         int maxEncounterResults,
         Func<Guid> newInstanceId)
     {
@@ -169,11 +218,16 @@ public static class SaveGameRules
         ArgumentNullException.ThrowIfNull(claim);
         ArgumentNullException.ThrowIfNull(encounter);
         ArgumentNullException.ThrowIfNull(curve);
+        ArgumentNullException.ThrowIfNull(character);
         ArgumentNullException.ThrowIfNull(newInstanceId);
+        ItemCatalog catalog = character.Catalog;
 
         long totalExp = Math.Min(curve.TotalExpToMaxLevel, current.Character.TotalExp + claim.Exp);
         long grantedExp = totalExp - current.Character.TotalExp;
+        int level = curve.LevelForTotalExp(totalExp);
+        int levelsGained = level - current.Character.Level;
         long talers = checked(current.Currency.Talers + claim.Talers);
+        DateTimeOffset expiresAt = now + LootStashLifetime;
 
         var stacks = current.Inventory.Stacks.ToList();
         var items = current.Inventory.Items.ToList();
@@ -193,20 +247,41 @@ public static class SaveGameRules
             return null;
         }
 
-        foreach (SaveStackEntry add in claim.Stacks)
+        bool StashHasRoom() => stashStacks.Count + stashItems.Count < LootStashSlots;
+        const string StashFull = "The loot stash is full (8 places).";
+
+        foreach (SaveStackEntry add in claim.Stacks.Concat(claim.Materials))
         {
-            int index = stacks.FindIndex(s => s.DefinitionId == add.DefinitionId && s.Quantity + add.Quantity <= MaxStackQuantity);
-            if (index >= 0)
+            int limit = catalog.Find(add.DefinitionId)?.StackLimit
+                ?? throw new InvalidOperationException($"Claim item '{add.DefinitionId}' was not validated against the catalog.");
+            int remaining = add.Quantity;
+            for (int i = 0; i < stacks.Count && remaining > 0; i++)
             {
-                stacks[index] = stacks[index] with { Quantity = stacks[index].Quantity + add.Quantity };
+                if (stacks[i].DefinitionId == add.DefinitionId && stacks[i].Quantity < limit)
+                {
+                    int moved = Math.Min(remaining, limit - stacks[i].Quantity);
+                    stacks[i] = stacks[i] with { Quantity = stacks[i].Quantity + moved };
+                    remaining -= moved;
+                }
             }
-            else if (FreeSlot() is int slot)
+
+            while (remaining > 0)
             {
-                stacks.Add(new SaveSlottedStackEntry { SlotIndex = slot, DefinitionId = add.DefinitionId, Quantity = add.Quantity });
-            }
-            else if (!MergeInto(stashStacks, add, uniqueDefinition: false))
-            {
-                return new RewardApplication(null, null, "The loot stash is full.");
+                int chunk = Math.Min(remaining, limit);
+                if (FreeSlot() is int slot)
+                {
+                    stacks.Add(new SaveSlottedStackEntry { SlotIndex = slot, DefinitionId = add.DefinitionId, Quantity = chunk });
+                }
+                else if (StashHasRoom())
+                {
+                    stashStacks.Add(new SaveStashStackEntry { DefinitionId = add.DefinitionId, Quantity = chunk, ExpiresAtUtc = expiresAt });
+                }
+                else
+                {
+                    return new RewardApplication(null, null, StashFull);
+                }
+
+                remaining -= chunk;
             }
         }
 
@@ -227,25 +302,16 @@ public static class SaveGameRules
             {
                 items.Add(new SaveSlottedItem { SlotIndex = slot, Item = instance });
             }
-            else if (stashItems.Count < SchemaMaxListItems)
+            else if (StashHasRoom())
             {
-                stashItems.Add(instance);
+                stashItems.Add(new SaveStashItem { Item = instance, ExpiresAtUtc = expiresAt });
             }
             else
             {
-                return new RewardApplication(null, null, "The loot stash is full.");
+                return new RewardApplication(null, null, StashFull);
             }
 
             grantedItems.Add(new SaveGrantedItem { DefinitionId = add.DefinitionId, ItemLevel = add.ItemLevel, Rarity = add.Rarity, InstanceId = instance.InstanceId });
-        }
-
-        var materials = current.Materials.ToList();
-        foreach (SaveStackEntry add in claim.Materials)
-        {
-            if (!MergeInto(materials, add, uniqueDefinition: true))
-            {
-                return new RewardApplication(null, null, "The material bag is full.");
-            }
         }
 
         var granted = new SaveRewardGrant
@@ -276,7 +342,9 @@ public static class SaveGameRules
             Mode = ModeServer,
             Revision = newRevision,
             UpdatedAtUtc = now,
-            Character = current.Character with { TotalExp = totalExp, Level = curve.LevelForTotalExp(totalExp) },
+            Character = current.Character with { TotalExp = totalExp, Level = level },
+            Stats = current.Stats with { FreeStatPoints = checked(current.Stats.FreeStatPoints + (levelsGained * CharacterRules.StatPointsPerLevel)) },
+            Skills = current.Skills with { FreeSkillPoints = checked(current.Skills.FreeSkillPoints + (levelsGained * CharacterRules.SkillPointsPerLevel)) },
             Currency = new SaveCurrency { Talers = talers },
             Inventory = current.Inventory with
             {
@@ -284,10 +352,9 @@ public static class SaveGameRules
                 Items = items,
                 LootStash = new SaveLootStash { Stacks = stashStacks, Items = stashItems },
             },
-            Materials = materials,
             EncounterResults = results,
         };
-        return new RewardApplication(next, granted, null);
+        return new RewardApplication(character.ClampVitals(next), granted, null);
     }
 
     /// <summary>UUID (RFC 4122 layout, version 8 = custom) derived from SHA-256 of the seed; lower-case.</summary>
@@ -301,21 +368,23 @@ public static class SaveGameRules
         return $"{hex[..8]}-{hex[8..12]}-{hex[12..16]}-{hex[16..20]}-{hex[20..32]}";
     }
 
-    private static bool MergeInto(List<SaveStackEntry> list, SaveStackEntry add, bool uniqueDefinition)
+    /// <summary>Every proposed stash entry must match a distinct current entry exactly (item lock flag ignored).</summary>
+    private static bool StashIsSubsetOf(SaveLootStash proposed, SaveLootStash current)
     {
-        int index = list.FindIndex(s => s.DefinitionId == add.DefinitionId);
-        if (index >= 0 && list[index].Quantity + add.Quantity <= MaxStackQuantity)
+        static List<string> Keys(SaveLootStash stash) =>
+            stash.Stacks.Select(s => "s:" + SaveGameJson.Serialize(s))
+                .Concat(stash.Items.Select(i => "i:" + SaveGameJson.Serialize(i with { Item = i.Item with { Locked = false } })))
+                .ToList();
+
+        List<string> available = Keys(current);
+        foreach (string key in Keys(proposed))
         {
-            list[index] = list[index] with { Quantity = list[index].Quantity + add.Quantity };
-            return true;
+            if (!available.Remove(key))
+            {
+                return false;
+            }
         }
 
-        if (list.Count >= SchemaMaxListItems || (uniqueDefinition && index >= 0))
-        {
-            return false;
-        }
-
-        list.Add(new SaveStackEntry { DefinitionId = add.DefinitionId, Quantity = add.Quantity });
         return true;
     }
 
@@ -323,7 +392,7 @@ public static class SaveGameRules
     {
         var all = new SortedDictionary<string, SaveItemInstance>(StringComparer.Ordinal);
         IEnumerable<SaveItemInstance> instances = document.Inventory.Items.Select(i => i.Item)
-            .Concat(document.Inventory.LootStash.Items)
+            .Concat(document.Inventory.LootStash.Items.Select(i => i.Item))
             .Concat(document.Equipment.Select(e => e.Item));
         foreach (SaveItemInstance item in instances)
         {

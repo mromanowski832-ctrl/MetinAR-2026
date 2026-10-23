@@ -266,6 +266,71 @@ public class SaveGameApiTests
     }
 
     [Fact]
+    public async Task Put_HpAndMpAboveTheClassMax_AreClampedToTheMax()
+    {
+        using var factory = new MetinArServerFactory();
+        using HttpClient client = await factory.CreateClient().WithPlayerAsync("save-p20");
+        (string etag, JsonObject save) = await client.GetSaveAsync("save-p20");
+        save["character"]!["hpCurrent"] = 9999;
+        save["character"]!["mpCurrent"] = 9999;
+
+        HttpResponseMessage put = await client.PutSaveAsync("save-p20", save, etag);
+        string text = await put.Content.ReadAsStringAsync();
+
+        Assert.True(put.StatusCode == HttpStatusCode.OK, text);
+        // Warrior level 1 (CHARACTER_PROGRESSION §1.2/§1.3): 60 + 1×14 + Krzepa 5×6 = 104 HP; 20 + 1×4 + Duch 2×5 = 34 MP.
+        Assert.Equal(104, (int)JsonNode.Parse(text)!["saveGame"]!["character"]!["hpCurrent"]!);
+        Assert.Equal(34, (int)JsonNode.Parse(text)!["saveGame"]!["character"]!["mpCurrent"]!);
+        JsonObject stored = (await client.GetSaveAsync("save-p20")).SaveGame;
+        Assert.Equal(104, (int)stored["character"]!["hpCurrent"]!);
+        Assert.Equal(34, (int)stored["character"]!["mpCurrent"]!);
+    }
+
+    [Fact]
+    public async Task Put_CapacityStackLimitAndCatalogViolations_Return400()
+    {
+        using var factory = new MetinArServerFactory();
+        using HttpClient client = await factory.CreateClient().WithPlayerAsync("save-p21");
+        (string etag, JsonObject save) = await client.GetSaveAsync("save-p21");
+        save["inventory"]!["capacity"] = 25;
+        save["inventory"]!["stacks"] = new JsonArray(
+            new JsonObject { ["slotIndex"] = 0, ["definitionId"] = "potion_hp_s", ["quantity"] = 51 },
+            new JsonObject { ["slotIndex"] = 1, ["definitionId"] = "no_such_item", ["quantity"] = 1 },
+            new JsonObject { ["slotIndex"] = 2, ["definitionId"] = "starter_boots", ["quantity"] = 1 });
+        save["equipment"]!.AsArray()[0]!["item"]!["definitionId"] = "potion_hp_s";
+
+        HttpResponseMessage put = await client.PutSaveAsync("save-p21", save, etag);
+
+        Assert.Equal(HttpStatusCode.BadRequest, put.StatusCode);
+        var errors = (await put.JsonAsync()).GetProperty("errors");
+        foreach (string field in new[]
+        {
+            "inventory.capacity", "inventory.stacks[0].quantity", "inventory.stacks[1].definitionId",
+            "inventory.stacks[2].definitionId", "equipment[0].item.definitionId",
+        })
+        {
+            Assert.True(errors.TryGetProperty(field, out _), field + " in " + errors);
+        }
+    }
+
+    [Fact]
+    public async Task Put_AddingToTheLootStash_Returns409_LootStashIsServerOwned()
+    {
+        using var factory = new MetinArServerFactory();
+        using HttpClient client = await factory.CreateClient().WithPlayerAsync("save-p22");
+        (string etag, JsonObject save) = await client.GetSaveAsync("save-p22");
+        save["inventory"]!["lootStash"]!["stacks"] = new JsonArray(
+            new JsonObject { ["definitionId"] = "potion_hp_s", ["quantity"] = 5, ["expiresAtUtc"] = "2026-10-21T00:00:00.000Z" });
+
+        HttpResponseMessage put = await client.PutSaveAsync("save-p22", save, etag);
+
+        Assert.Equal(HttpStatusCode.Conflict, put.StatusCode);
+        var problem = await put.JsonAsync();
+        Assert.Equal("SAVEGAME_SERVER_OWNED_FIELD_CHANGED", problem.GetProperty("code").GetString());
+        Assert.Contains("inventory.lootStash", problem.GetProperty("fields").EnumerateArray().Select(f => f.GetString()));
+    }
+
+    [Fact]
     public async Task Put_OversizedBody_Returns413()
     {
         using var factory = new MetinArServerFactory(settings: new Dictionary<string, string> { ["SaveGameLimits:MaxBodyBytes"] = "1024" });
