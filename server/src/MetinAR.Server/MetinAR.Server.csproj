@@ -20,6 +20,14 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Persistence/Migrations/*.sql" LogicalName="MetinAR.Server.Persistence.Migrations.%(Filename)%(Extension)" />
+    <!-- Single source of truth for the EXP curve (#71): the design table itself, shared with the Unity client. -->
+    <EmbeddedResource Include="../../../docs/design/tables/exp_curve.csv" LogicalName="MetinAR.Server.Design.exp_curve.csv" Link="Design/exp_curve.csv" />
+    <!-- Item catalog (#71 decision 8): stack limits and flat max HP/MP bonuses come from the design item table. -->
+    <EmbeddedResource Include="../../../docs/design/tables/items_starter.csv" LogicalName="MetinAR.Server.Design.items_starter.csv" Link="Design/items_starter.csv" />
+    <EmbeddedResource Include="../../../docs/design/tables/shop_starter_merchant.csv" LogicalName="MetinAR.Server.Design.shop_starter_merchant.csv" Link="Design/shop_starter_merchant.csv" />
+    <EmbeddedResource Include="../../../docs/design/tables/skill_tier_items.csv" LogicalName="MetinAR.Server.Design.skill_tier_items.csv" Link="Design/skill_tier_items.csv" />
+    <EmbeddedResource Include="../../../docs/design/tables/rarity_tiers.csv" LogicalName="MetinAR.Server.Design.rarity_tiers.csv" Link="Design/rarity_tiers.csv" />
+    <EmbeddedResource Include="../../../docs/design/tables/temper_levels.csv" LogicalName="MetinAR.Server.Design.temper_levels.csv" Link="Design/temper_levels.csv" />
   </ItemGroup>
 
   <ItemGroup>

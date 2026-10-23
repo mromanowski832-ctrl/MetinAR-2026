@@ -35,18 +35,7 @@ internal static class ServerSetup
     {
         if (exception.InnerException is JsonException json)
         {
-            const string marker = "The JSON property '";
-            int start = json.Message.IndexOf(marker, StringComparison.Ordinal);
-            if (start >= 0 && json.Message.Contains("could not be mapped", StringComparison.Ordinal))
-            {
-                start += marker.Length;
-                int end = json.Message.IndexOf('\'', start);
-                return $"Unknown field '{json.Message[start..end]}'. Only documented fields are accepted.";
-            }
-
-            return string.IsNullOrEmpty(json.Path)
-                ? "Malformed JSON body."
-                : $"Malformed JSON or wrong value type at '{json.Path}'.";
+            return DescribeJsonException(json);
         }
 
         // Query/route binding failures, e.g. lat=abc. The framework message names only the parameter.
@@ -62,5 +51,32 @@ internal static class ServerSetup
         }
 
         return "The request could not be read.";
+    }
+
+    /// <summary>Client-facing description of a JSON read failure (unknown field, missing field, wrong type).</summary>
+    public static string DescribeJsonException(JsonException json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        const string marker = "The JSON property '";
+        int start = json.Message.IndexOf(marker, StringComparison.Ordinal);
+        if (start >= 0 && json.Message.Contains("could not be mapped", StringComparison.Ordinal))
+        {
+            start += marker.Length;
+            int end = json.Message.IndexOf('\'', start);
+            return $"Unknown field '{json.Message[start..end]}'. Only documented fields are accepted.";
+        }
+
+        const string missingMarker = "missing required properties, including the following: ";
+        int missing = json.Message.IndexOf(missingMarker, StringComparison.Ordinal);
+        if (missing >= 0)
+        {
+            string names = json.Message[(missing + missingMarker.Length)..].Trim();
+            string at = string.IsNullOrEmpty(json.Path) ? string.Empty : $" at '{json.Path}'";
+            return $"Missing required field(s){at}: {names}.";
+        }
+
+        return string.IsNullOrEmpty(json.Path)
+            ? "Malformed JSON body."
+            : $"Malformed JSON or wrong value type at '{json.Path}'.";
     }
 }

@@ -6,6 +6,10 @@ Status: prototype, local development only. Issue: #17. Code: [`server/`](../serv
 > completion needs the start nonce and respects a TTL; entities can have deterministic schedules. This document is
 > updated in place. The rationale and details are in [METINAR-012-SERVER-AUTHORITY.md](METINAR-012-SERVER-AUTHORITY.md).
 
+> **Updated by METINAR-071 (#71):** additive SaveGame v1 endpoints (`GET`/`PUT /api/v1/player/{playerId}/savegame`
+> with revision/ETag concurrency, and `POST /api/v1/encounters/reward`, idempotent by `encounterId`) plus migration `0004`.
+> SaveGame v1 has 150 server tests in total. The full contract, local file format and the settled questions (§11) are in [METINAR-071-SAVEGAME-CONTRACT.md](METINAR-071-SAVEGAME-CONTRACT.md).
+
 This is a separate backend workspace. It doesn't touch the Unity client, AR encounter, hand tracking/sword,
 GPS provider core, the map provider work or the 3D asset pipeline. The Unity client doesn't call it yet;
 this document is the contract a later client integration issue will code against.
@@ -183,7 +187,7 @@ Clients parse it as UTC and never send local time. Storage uses the same text fo
 
 `200`:
 ```json
-{ "status": "ok", "serverTime": "2026-10-20T02:36:22.237Z", "apiVersion": "v1", "schemaVersion": "0003_encounter_authority_and_spawn_schedules" }
+{ "status": "ok", "serverTime": "2026-10-20T02:36:22.237Z", "apiVersion": "v1", "schemaVersion": "0004_savegame_and_reward_ledger" }
 ```
 `503` with `"status": "degraded"` when the database can't be read.
 
@@ -374,6 +378,17 @@ Clients switch on `code` only; `title`/`detail` are human text and may change.
 | 422 | `GPS_ACCURACY_INSUFFICIENT` | Fix accuracy worse than `MaxAcceptedAccuracyMeters`. Extension `maxAccuracyMeters`. |
 | 422 | `GPS_FIX_STALE` | `capturedAt` older than `MaxFixAgeSeconds` or too far in the future. Extension `maxFixAgeSeconds`. |
 | 422 | `ENCOUNTER_TOO_FAR` | Client fix farther from the entity than allowed. Extensions `distanceMeters`, `allowedMeters`. |
+| 400 | `VALIDATION_FAILED` (SaveGame) | Also used for a SaveGame rule violation or a malformed `If-Match`. See [METINAR-071 §5](METINAR-071-SAVEGAME-CONTRACT.md#5-server-api-additive-under-apiv1-d3-rule). |
+| 409 | `SAVEGAME_SERVER_OWNED_FIELD_CHANGED` | Sync tried to change server-owned values. Extension `fields`. |
+| 409 | `ENCOUNTER_NOT_COMPLETED` | Reward claimed before `POST /encounters/complete`. |
+| 409 | `REWARD_NO_SPACE` | Reward doesn't fit in the bag or the loot stash. Nothing recorded. |
+| 412 | `SAVEGAME_REVISION_CONFLICT` | `If-Match` is not the current revision. Extension `currentRevision`. |
+| 413 | `PAYLOAD_TOO_LARGE` | SaveGame body above `SaveGameLimits:MaxBodyBytes`. |
+| 422 | `SAVEGAME_SCHEMA_UNSUPPORTED` | `schemaVersion` not readable. Extensions `receivedSchemaVersion`, `supportedSchemaVersion`. |
+| 422 | `SAVEGAME_LOCAL_MODE_NOT_SYNCABLE` | `mode: "local"` sent to sync (local import is #39). |
+| 422 | `REWARD_CLAIM_REJECTED` | Claim above the prototype caps (`SaveGameLimits`). Not recorded. |
+| 428 | `SAVEGAME_PRECONDITION_REQUIRED` | `PUT savegame` without `If-Match`. |
+| 500 | `SAVEGAME_INTEGRITY_FAILED` | Stored save failed checksum/parse/consistency checks. It is left untouched and not overwritten. |
 | 500 | `INTERNAL_ERROR` | Unexpected failure. No stack trace or type names are returned. |
 
 ## 8. Persistence and migrations
@@ -381,7 +396,7 @@ Clients switch on `code` only; `title`/`detail` are human text and may change.
 - Schema and seed are versioned SQL files in `server/src/MetinAR.Server/Persistence/Migrations/`, embedded in the
   assembly and applied in filename order on startup by `SchemaMigrator`. Each runs in its own transaction and is
   recorded in `schema_migrations`. Re-running is a no-op.
-- New schema changes go in a new numbered file (next: `0004_…sql`). Applied files are never edited. `0003` rebuilds
+- New schema changes go in a new numbered file (next: `0005_…sql`; `0004` adds the SaveGame tables and the reward ledger, METINAR-071). Applied files are never edited. `0003` rebuilds
   `encounter_sessions` (SQLite can't alter CHECK constraints) and keeps METINAR-010 rows; legacy open sessions get
   `expires_at = started_at` and no nonce, so they can't be completed.
 - SQLite runs in WAL mode with foreign keys on.
@@ -397,7 +412,8 @@ Clients switch on `code` only; `title`/`detail` are human text and may change.
 | `playerId` in path/body | **No** — anyone can claim any id | accepted after format check | derived from an authenticated session/token; never from the body |
 | Client GPS (`lat/lon`, `lastKnownPosition`, `clientPosition`) | **No** | range-checked; profile position coarsened; encounter start requires a fix within the allowed distance of the server-owned entity position (capped accuracy tolerance, poor/stale fixes rejected; METINAR-012). Start coordinates are never stored or logged | speed/teleport plausibility between reports, mock-location signals, attestation |
 | Encounter outcome | **No** — complete is only "client says it's done" | recorded once via compare-and-set; needs the latest start nonce and must happen before `expiresAt`; nothing granted | server-side combat/reward validation, minimum duration |
-| Server-owned stats | n/a | client writes rejected | — |
+| Server-owned stats | n/a | client writes rejected (profile and SaveGame sync, `409`) | — |
+| Reward claim (METINAR-071) | **No**, it is a proposal | applied once per `encounterId` only after server-side completion, within prototype caps | server-computed rewards from drop tables (#56) |
 | World entities | server-authoritative | seeded via migration; flag + spawn window + deterministic schedule | spawn service with the project brief's safety rules (no roads, railways, water, buildings, private areas): see [METINAR-012 §5](METINAR-012-SERVER-AUTHORITY.md#5-future-integration-points-for-map-safety-data) |
 
 ## 10. Security baseline
@@ -441,7 +457,7 @@ touches `server/` (see [METINAR-012 §10](METINAR-012-SERVER-AUTHORITY.md#10-ci)
 
 - No authentication or real identity (by design, §10).
 - ~~Client position isn't checked against the entity at encounter start~~ done in METINAR-012 (no speed/teleport plausibility yet).
-- No rewards, XP, combat, loot or economy. `firstCompletion` is only the hook.
+- ~~No rewards~~ METINAR-071 applies a **client-proposed**, capped reward once per completed encounter. There are no server drop tables, combat or economy yet (#56).
 - `offset` paging isn't snapshot-consistent across spawn changes.
 - No dynamic spawning; the world is the static synthetic seed (plus deterministic schedules since METINAR-012).
 - Unity client integration (HTTP client, DTO mirror) is a separate future issue.

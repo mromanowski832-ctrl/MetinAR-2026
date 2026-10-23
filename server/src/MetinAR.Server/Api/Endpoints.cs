@@ -60,6 +60,8 @@ public static partial class Endpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status410Gone);
+
+        MapSaveGameApi(v1);
     }
 
     internal static async Task<IResult> HealthAsync(SqliteConnectionFactory connections, TimeProvider time, CancellationToken ct)

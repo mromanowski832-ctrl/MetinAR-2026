@@ -2,6 +2,7 @@ using MetinAR.Server;
 using MetinAR.Server.Api;
 using MetinAR.Server.Domain;
 using MetinAR.Server.Persistence;
+using MetinAR.Server.SaveGames;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -14,6 +15,21 @@ builder.Services.Configure<PrototypePlayerDefaults>(builder.Configuration.GetSec
 builder.Services.AddOptions<EncounterRules>()
     .Bind(builder.Configuration.GetSection(EncounterRules.SectionName))
     .Validate(r => !r.Validate().Any(), "EncounterRules configuration is invalid (see EncounterRules.Validate).")
+    .ValidateOnStart();
+ItemCatalog itemCatalog = ItemCatalog.LoadEmbedded();
+builder.Services.AddOptions<PrototypeSaveGameDefaults>()
+    .Bind(builder.Configuration.GetSection(PrototypeSaveGameDefaults.SectionName))
+    .Validate(d => SaveGameRules.ClassIds.Contains(d.ClassId) && SaveGameRules.IsValidCapacity(d.InventoryCapacity)
+        && (d.StarterWeaponDefinitionId.Length == 0 || itemCatalog.Find(d.StarterWeaponDefinitionId) is { IsStackable: false }),
+        "PrototypeSaveGameDefaults configuration is invalid.")
+    .ValidateOnStart();
+builder.Services.AddOptions<SaveGameLimits>()
+    .Bind(builder.Configuration.GetSection(SaveGameLimits.SectionName))
+    .Validate(l => !l.Validate().Any(), "SaveGameLimits configuration is invalid (see SaveGameLimits.Validate).")
+    .ValidateOnStart();
+builder.Services.AddOptions<LootStashOptions>()
+    .Bind(builder.Configuration.GetSection(LootStashOptions.SectionName))
+    .Validate(o => Enum.IsDefined(o.AfterExpiry), "LootStash:AfterExpiry must be Keep or Expire.")
     .ValidateOnStart();
 builder.Services.TryAddSingleton(TimeProvider.System);
 
@@ -28,6 +44,13 @@ builder.Services.AddSingleton<SqliteGameStore>();
 builder.Services.AddSingleton<IPlayerStore>(sp => sp.GetRequiredService<SqliteGameStore>());
 builder.Services.AddSingleton<IWorldStore>(sp => sp.GetRequiredService<SqliteGameStore>());
 builder.Services.AddSingleton<IEncounterStore>(sp => sp.GetRequiredService<SqliteGameStore>());
+builder.Services.AddSingleton(ExpCurveTable.LoadEmbedded());
+builder.Services.AddSingleton(itemCatalog);
+// PROPOZYCJA_DOC: MaxHp/MaxMp coefficients (CHARACTER_PROGRESSION L37-L41), Stage I working values from configuration.
+VitalsFormula vitalsFormula = builder.Configuration.GetSection(VitalsFormula.SectionName).Get<VitalsFormula>() ?? new VitalsFormula();
+builder.Services.AddSingleton(CharacterRules.LoadEmbedded(itemCatalog, vitalsFormula));
+builder.Services.AddSingleton<SaveGameMigrator>();
+builder.Services.AddSingleton<ISaveGameStore, SqliteSaveGameStore>();
 
 builder.Services.Configure<JsonOptions>(o => ServerSetup.ConfigureJson(o.SerializerOptions));
 // Malformed JSON / unbindable query values become BadHttpRequestException, which is mapped to problem+json below.

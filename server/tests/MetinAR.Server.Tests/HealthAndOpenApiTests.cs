@@ -17,7 +17,7 @@ public class HealthAndOpenApiTests
         var json = await response.JsonAsync();
         Assert.Equal("ok", json.GetProperty("status").GetString());
         Assert.Equal("v1", json.GetProperty("apiVersion").GetString());
-        Assert.Equal("0003_encounter_authority_and_spawn_schedules", json.GetProperty("schemaVersion").GetString());
+        Assert.Equal("0004_savegame_and_reward_ledger", json.GetProperty("schemaVersion").GetString());
         Assert.Equal("2026-10-20T00:00:00.000Z", json.GetProperty("serverTime").GetString());
     }
 
@@ -31,7 +31,7 @@ public class HealthAndOpenApiTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var paths = (await response.JsonAsync()).GetProperty("paths");
-        foreach (string path in new[] { "/health", "/api/v1/player/{playerId}", "/api/v1/world/nearby", "/api/v1/encounters/start", "/api/v1/encounters/complete" })
+        foreach (string path in new[] { "/health", "/api/v1/player/{playerId}", "/api/v1/world/nearby", "/api/v1/encounters/start", "/api/v1/encounters/complete", "/api/v1/player/{playerId}/savegame", "/api/v1/encounters/reward" })
         {
             Assert.True(paths.TryGetProperty(path, out _), $"OpenAPI is missing {path}");
         }

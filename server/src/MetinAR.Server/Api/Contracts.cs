@@ -73,3 +73,34 @@ public sealed record StartEncounterResponse(EncounterSessionDto Encounter, bool 
 public sealed record CompleteEncounterResponse(EncounterSessionDto Encounter, bool FirstCompletion);
 
 public sealed record HealthResponse(string Status, DateTimeOffset ServerTime, string ApiVersion, string? SchemaVersion);
+
+// ---- SaveGame (METINAR-035 / #71). Document shape: SaveGames/SaveGameDocument.cs = docs/contracts/savegame.v1.schema.json.
+
+/// <summary>GET/PUT savegame response. The same revision is sent as the strong ETag <c>"&lt;revision&gt;"</c>.</summary>
+public sealed record SaveGameResponse(long Revision, MetinAR.Server.SaveGames.SaveGameDocument SaveGame, DateTimeOffset ServerTime);
+
+public sealed record RewardClaimStackDto(string? DefinitionId, int? Quantity);
+
+public sealed record RewardClaimItemDto(string? DefinitionId, int? ItemLevel, string? Rarity);
+
+/// <summary>What the client computed for the encounter. A proposal only: the server validates and records it once.</summary>
+public sealed record RewardClaimDto(
+    long? Exp,
+    long? Talers,
+    IReadOnlyList<RewardClaimStackDto>? Stacks,
+    IReadOnlyList<RewardClaimItemDto>? Items,
+    IReadOnlyList<RewardClaimStackDto>? Materials);
+
+public sealed record ClaimEncounterRewardRequest(string? EncounterId, string? PlayerId, string? Nonce, RewardClaimDto? Claim);
+
+/// <summary>
+/// <c>applied</c>: this call applied the reward. <c>alreadyApplied</c>: an earlier call did (idempotent replay);
+/// <c>claimMatchesApplied</c> tells whether this claim equals the recorded one. <c>granted</c> is what was applied.
+/// </summary>
+public sealed record ClaimEncounterRewardResponse(
+    bool Applied,
+    bool AlreadyApplied,
+    bool ClaimMatchesApplied,
+    MetinAR.Server.SaveGames.SaveRewardGrant Granted,
+    long Revision,
+    MetinAR.Server.SaveGames.SaveGameDocument SaveGame);

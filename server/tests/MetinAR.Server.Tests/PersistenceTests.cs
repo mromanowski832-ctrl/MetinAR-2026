@@ -56,7 +56,7 @@ public class PersistenceTests
         IReadOnlyList<string> first = await migrator.MigrateAsync();
         IReadOnlyList<string> second = await migrator.MigrateAsync();
 
-        Assert.Equal(new[] { "0001_initial_schema", "0002_seed_synthetic_world", "0003_encounter_authority_and_spawn_schedules" }, first);
+        Assert.Equal(new[] { "0001_initial_schema", "0002_seed_synthetic_world", "0003_encounter_authority_and_spawn_schedules", "0004_savegame_and_reward_ledger" }, first);
         Assert.Equal(SchemaMigrator.KnownMigrations, first);
         Assert.Empty(second);
 
