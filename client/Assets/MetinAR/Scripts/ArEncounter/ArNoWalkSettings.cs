@@ -41,6 +41,12 @@ namespace MetinAR.ArEncounter
         /// <summary>Farthest distance a restored mob is put at after a tracking reset (= v0 placement maximum 3.0 m).</summary>
         public double maxRestoreDistanceMeters = ArEncounterFraming.MaxPlacementDistanceMeters;
 
+        /// <summary>
+        /// Uniform visual scale of the spawned mob (lead decision 2026-10-23 04:40: 0.9; body in frame, legs may pass the
+        /// screen edges; the owner may later ask for ~0.6). Also scales the hit column depth f in d_stop (<see cref="ArMobStandoff"/>).
+        /// </summary>
+        public double mobVisualScale = ArEncounterFraming.DefaultMobVisualScale;
+
         /// <summary>Acceleration (m/s²) implied by <see cref="approachSpeedMetersPerSecond"/> / <see cref="accelerationSeconds"/>.</summary>
         public double AccelerationMetersPerSecond2 => approachSpeedMetersPerSecond / accelerationSeconds;
 
@@ -60,6 +66,7 @@ namespace MetinAR.ArEncounter
             Positive(turnDegreesPerSecond, nameof(turnDegreesPerSecond));
             Positive(maxStepSeconds, nameof(maxStepSeconds));
             Positive(maxRestoreDistanceMeters, nameof(maxRestoreDistanceMeters));
+            Positive(mobVisualScale, nameof(mobVisualScale));
             if (approachSpeedMetersPerSecond > maxSpeedMetersPerSecond)
             {
                 throw new ArgumentOutOfRangeException(nameof(approachSpeedMetersPerSecond), "must be <= maxSpeedMetersPerSecond");
@@ -106,6 +113,17 @@ namespace MetinAR.ArEncounter
         public static double RawStopDistance(double bladeReachMeters, double marginMeters, double frontOffsetMeters)
         {
             return bladeReachMeters - marginMeters + frontOffsetMeters;
+        }
+
+        /// <summary>d_stop from the configured <see cref="ArNoWalkSettings.mobVisualScale"/> (the scale the spawned mob uses).</summary>
+        public static double StopDistance(double bladeReachMeters, ArNoWalkSettings settings, out bool clamped)
+        {
+            if (settings == null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            return StopDistance(bladeReachMeters, settings, settings.mobVisualScale, out clamped);
         }
 
         /// <summary>d_stop, never below d_min (<paramref name="clamped"/> is set when the geometry alone would put it closer).</summary>

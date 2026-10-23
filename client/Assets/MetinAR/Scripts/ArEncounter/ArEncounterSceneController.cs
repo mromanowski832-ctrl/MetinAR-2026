@@ -65,6 +65,9 @@ namespace MetinAR.ArEncounter
         [SerializeField]
         private ArNoWalkSettings _noWalkSettings = new ArNoWalkSettings();
 
+        /// <summary>Visual scale of the spawned mob, from <see cref="ArNoWalkSettings.mobVisualScale"/> (#97, lead 04:40: default 0.9).</summary>
+        public float MobVisualScale => (float)(_noWalkSettings != null ? _noWalkSettings.mobVisualScale : ArEncounterFraming.DefaultMobVisualScale);
+
         [SerializeField]
         private string _worldMapScenePath = ArEncounterScenes.WorldMapScenePath;
 
@@ -239,12 +242,12 @@ namespace MetinAR.ArEncounter
             _machine = new ArEncounterStateMachine(_placementSettings);
             _recovery = new ArTrackingRecovery(_machine.Settings.trackingLostResetSeconds);
             _noWalkSettings = _noWalkSettings ?? new ArNoWalkSettings();
-            double stop = ArMobStandoff.StopDistance(FppCombatController.BladeReachMeters, _noWalkSettings, ArEncounterFraming.MobVisualScale, out bool stopClamped);
+            double stop = ArMobStandoff.StopDistance(FppCombatController.BladeReachMeters, _noWalkSettings, out bool stopClamped);
             _noWalk = new ArNoWalkEncounter(_noWalkSettings, _recovery, stop);
             string standoff = "[ArEncounter] no-walk standoff d_stop=" + stop.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                               + " bladeReach=" + FppCombatController.BladeReachMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                               + " margin=" + _noWalkSettings.reachMarginMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
-                              + " front=" + ArMobStandoff.HitFrontOffsetMeters(ArEncounterFraming.MobVisualScale).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                              + " front=" + ArMobStandoff.HitFrontOffsetMeters(_noWalkSettings.mobVisualScale).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                               + " d_min=" + _noWalkSettings.minDistanceMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                               + " approachFrom=" + _noWalk.Approach.ApproachStartMeters.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                               + " maxStep=" + _noWalkSettings.MaxStepMeters.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
@@ -981,7 +984,7 @@ namespace MetinAR.ArEncounter
             GameObject go = Instantiate(_mobPrefab, pose.position, pose.rotation);
             go.name = _mobPrefab.name;
             // Visual size only (#31 A31 retest); level/HP/aggro come from the request and are unchanged.
-            go.transform.localScale = _mobPrefab.transform.localScale * ArEncounterFraming.MobVisualScale;
+            go.transform.localScale = _mobPrefab.transform.localScale * MobVisualScale;
             SpawnCount++;
             SpawnedMob = go.GetComponent<ArEncounterMob>();
             if (SpawnedMob == null)
@@ -1015,7 +1018,7 @@ namespace MetinAR.ArEncounter
             ResetAnchorProbe();
             Vector3 camAtSpawn = _arCamera != null ? _arCamera.transform.position : pose.position;
             Debug.Log("[ArEncounter] spawned " + Request.MobName + " at " + pose.position + " anchor=" + MobAnchorKind
-                      + " scale=" + ArEncounterFraming.MobVisualScale
+                      + " scale=" + MobVisualScale.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                       + " planeBelowCam=" + ArEncounterFraming.PlaneDropBelowCamera(camAtSpawn.y, pose.position.y).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                       + " d=" + ArEncounterFraming.HorizontalDistance(camAtSpawn.x, camAtSpawn.z, pose.position.x, pose.position.z).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                       + " range=" + _machine.Settings.minSpawnDistanceMeters.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)

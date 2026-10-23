@@ -22,6 +22,25 @@ public class ArNoWalkUnitTests
         Assert.Equal(180.0, s.turnDegreesPerSecond);
         Assert.Equal(0.04, s.MaxStepMeters, 9);
         Assert.Equal(ArEncounterFraming.MaxPlacementDistanceMeters, s.maxRestoreDistanceMeters);
+        Assert.Equal(0.9, s.mobVisualScale, 6);
+    }
+
+    [Fact]
+    public void MobVisualScale_IsConfig_Default09_AndStandoffReadsIt()
+    {
+        // Lead decision 2026-10-23 04:40: scale 0.9 stays, but in configuration (owner may ask for ~0.6).
+        var s = new ArNoWalkSettings();
+        Assert.Equal(0.9, s.mobVisualScale, 6);
+        Assert.Equal(ArEncounterFraming.DefaultMobVisualScale, s.mobVisualScale);
+        Assert.Equal(1.21 - 0.20 + 0.345 * 0.9, ArMobStandoff.StopDistance(1.21, s, out bool c1), 9);
+        Assert.False(c1);
+        s.mobVisualScale = 0.6;
+        s.Validate();
+        Assert.Equal(1.21 - 0.20 + 0.345 * 0.6, ArMobStandoff.StopDistance(1.21, s, out bool c2), 9);
+        Assert.False(c2);
+        Assert.Equal(ArMobStandoff.StopDistance(1.21, s, 0.6, out _), ArMobStandoff.StopDistance(1.21, s, out _), 12);
+        s.mobVisualScale = 0;
+        Assert.Throws<ArgumentOutOfRangeException>(() => s.Validate());
     }
 
     [Theory]

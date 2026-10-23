@@ -748,7 +748,7 @@ namespace MetinAR.Editor
                     Pose rest = FppHandsView.SwordPose(FppCombatAction.Idle, 0f);
                     Check(Vector3.Distance(combat.View.RightGrip.localPosition, rest.position) < 1e-3f && rest.position.x > 0f && rest.position.y < 0f,
                         "right grip not at the lower-right rest pose " + combat.View.RightGrip.localPosition);
-                    Check(Mathf.Abs(_ar.SpawnedMob.transform.lossyScale.x - ArEncounterFraming.MobVisualScale) < 1e-3f,
+                    Check(Mathf.Abs(_ar.SpawnedMob.transform.lossyScale.x - _ar.MobVisualScale) < 1e-3f,
                         "spider visual scale " + _ar.SpawnedMob.transform.lossyScale.x);
                     Check(_ar.SpawnedMob.Request != null && _ar.SpawnedMob.Request.Level == 5 && _ar.SpawnedMob.Request.MaxHp == 120,
                         "spider gameplay stats changed");

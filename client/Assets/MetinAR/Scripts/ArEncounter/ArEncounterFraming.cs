@@ -33,8 +33,10 @@ namespace MetinAR.ArEncounter
         /// <summary>
         /// Uniform visual scale of the spawned procedural spider. Owner retests on A31 (2026-10-21): 1.0 (~1.24 m leg span)
         /// filled the screen, 0.75 (~0.93 m) was too small; 0.9 (~1.12 m) sits between them. Visual only.
+        /// DEFAULT only: the live value is <see cref="ArNoWalkSettings.mobVisualScale"/> (lead decision 2026-10-23 04:40, #97:
+        /// keep 0.9 — body in frame, legs may pass the screen edges — but configurable; the owner may ask for ~0.6).
         /// </summary>
-        public const float MobVisualScale = 0.9f;
+        public const double DefaultMobVisualScale = 0.9;
 
         /// <summary>Unscaled nameplate HP rim width of the procedural spider prefab (metres).</summary>
         public const double NameplateReferenceWidthMeters = 0.84;

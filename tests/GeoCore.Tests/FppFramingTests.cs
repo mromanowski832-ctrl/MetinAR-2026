@@ -132,15 +132,15 @@ public class FppFramingTests
         // #97: placement minimum = d_min 1.10 m (PROTOTYPE), the mob is never closer (placed or walking).
         Assert.Equal(1.10, ArEncounterFraming.MinPlacementDistanceMeters, 9);
         // Owner retests: 1.0 filled the screen, 0.75 was too small -> strictly between them (scale unchanged by #97).
-        Assert.InRange(ArEncounterFraming.MobVisualScale, 0.8f, 0.95f);
+        Assert.InRange(ArEncounterFraming.DefaultMobVisualScale, 0.8, 0.95);
         // #97 rule 6 (safest reading: the mob must not cover the screen): the hit body (0.57 m wide unscaled) stays within
         // 60% of the estimated A31 portrait width at d_min for a phone held 1.2 m above the floor (≈ 51%).
         double halfWidth = HalfWidthAt(ArEncounterFraming.MinPlacementDistanceMeters);
-        double bodyWidth = (FppHitGeometry.ReachColumnMax.X - FppHitGeometry.BodyMin.X) * ArEncounterFraming.MobVisualScale;
+        double bodyWidth = (FppHitGeometry.ReachColumnMax.X - FppHitGeometry.BodyMin.X) * ArEncounterFraming.DefaultMobVisualScale;
         Assert.True(bodyWidth < 2 * halfWidth * 0.60);
         // OPEN QUESTION (#97, owner decision, not changed here): the whole leg span (1.24 m unscaled × 0.9) no longer fits
         // the width at d_min (≈ 110%) or d_stop 1.32 m (≈ 100%); at the #31 minimum 1.5 m it was ≈ 93%.
-        Assert.True(1.24 * ArEncounterFraming.MobVisualScale > 2 * HalfWidthAt(1.10) * 0.95);
+        Assert.True(1.24 * ArEncounterFraming.DefaultMobVisualScale > 2 * HalfWidthAt(1.10) * 0.95);
     }
 
     private static double HalfWidthAt(double groundDistance)

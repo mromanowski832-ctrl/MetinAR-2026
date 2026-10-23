@@ -29,7 +29,7 @@ namespace MetinAR.Gameplay.Tests
         public void T5_TrackingLossAndRestore_KeepMobHpAndResumeTheSameFight()
         {
             var settings = new ArNoWalkSettings();
-            double stop = ArMobStandoff.StopDistance(1.21, settings, ArEncounterFraming.MobVisualScale, out _);
+            double stop = ArMobStandoff.StopDistance(1.21, settings, out _);
             float resetAfter = ArPlacementSettings.CreatePrototypeDefaults().trackingLostResetSeconds;
             var encounter = new ArNoWalkEncounter(settings, new ArTrackingRecovery(resetAfter), stop);
             var session = EncounterCombatSession.WithStarterLoadout(Config, MobCombatProfile.VenomousSpider(Config),

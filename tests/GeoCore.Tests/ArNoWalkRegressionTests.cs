@@ -17,10 +17,9 @@ public class ArNoWalkRegressionTests
 {
     private const double UnityBladeReach = 1.21;
     private const double CameraHeight = 1.2;
-    private static readonly double Scale = ArEncounterFraming.MobVisualScale;
-
     private static readonly ArNoWalkSettings Settings = new ArNoWalkSettings();
-    private static double StopDistance => ArMobStandoff.StopDistance(UnityBladeReach, Settings, Scale, out _);
+    private static readonly double Scale = Settings.mobVisualScale;
+    private static double StopDistance => ArMobStandoff.StopDistance(UnityBladeReach, Settings, out _);
 
     private static ArYawPose Camera(double x = 0, double z = 0, double yaw = 0) => new ArYawPose(x, CameraHeight, z, yaw);
 
