@@ -2,6 +2,10 @@
 # Simulated adb for exercising Invoke-MetinARDeviceSmoke.ps1 without a phone (CI / Linux only).
 # Output is synthetic; a run against this script is NOT physical-device evidence.
 # FAKE_ADB_MODE=ok|nodevice|crash|adblost|adbblip|metinarexc|unityexc|logcatempty|logcaterr|logcatnoapp   FAKE_ADB_PACKAGE (default com.metinar.game.qa)
+# #90 session modes (Invoke-MetinARDeviceSession.ps1): session|sessionlow|sessionnocombo - a 150 s AR encounter timeline with
+# [MetinARPerf] 5 s windows, combat ([ArDamage] swing=) and combo ([Combo] step=) lines after the 60 s warm-up; the first
+# `logcat -d` returns the first 75 s, later dumps the whole timeline (exercises the de-duplicating merge).
+# sessionlow = 24 fps / p95 60 ms in combat; sessionnocombo = no [Combo] lines.
 # adblost: `adb devices` lists the phone for the first FAKE_ADB_LOST_AFTER calls (default 3), then never again.
 # adbblip: the phone is missing from `adb devices` exactly once (call number FAKE_ADB_LOST_AFTER + 1), then back.
 mode="${FAKE_ADB_MODE:-ok}"
@@ -21,8 +25,33 @@ case "$1" in
     [ "$show" = 1 ] && printf 'FAKESERIAL123\tdevice\n'
     exit 0;;
   install) echo "Performing Streamed Install"; echo "Success"; exit 0;;
+  pull) printf 'fake-mp4' > "$3"; echo "$2: 1 file pulled. (fake)"; exit 0;;
   logcat)
     if [ "$2" = "-c" ]; then exit 0; fi
+    case "$mode" in session|sessionlow|sessionnocombo)
+      lc=$(( $(cat "${state}.logcat" 2>/dev/null || echo 0) + 1 )); echo "$lc" > "${state}.logcat"
+      last=150; [ "$lc" -eq 1 ] && last=75
+      echo "--------- beginning of main"
+      echo "10-20 04:29:59.000  1500  1600 I ActivityManager: Start proc 4242:$pkg/u0a321 for top-activity"
+      echo "10-20 04:30:00.100  4242  4242 I Unity   : [MetinARPerf] v=1 event=start mainThreadRecorder=1 device=FakePhone"
+      echo "10-20 04:30:00.200  4242  4242 I Unity   : [WorldMapPrototype] AR ENCOUNTER REQUESTED (button)"
+      echo "10-20 04:30:01.000  4242  4242 I Unity   : [ArEncounter] state Starting -> Scanning"
+      echo "10-20 04:30:03.000  4242  4242 I Unity   : [ArEncounter] spawned Pajak at (0.1, -1.2, 2.0) anchor=Plane"
+      echo "10-20 04:30:04.000  4242  4242 I Unity   : GPS fix lat=52.229770 lon=21.011780 serial FAKESERIAL123"
+      for s in $(seq 5 5 $last); do
+        mm=$((30 + s / 60)); ss=$(printf '%02d' $((s % 60))); cs=$(printf '%02d' $(( (s - 3) % 60 )))
+        cm=$((30 + (s - 3) / 60))
+        fps=29.6; p50=33.3; p95=35; spk=0
+        if [ "$mode" = "sessionlow" ] && [ "$s" -gt 60 ]; then fps=24; p50=41; p95=60; spk=3; fi
+        if [ "$s" -eq 35 ] || [ "$s" -gt 60 ]; then
+          echo "10-20 04:$cm:$cs.500  4242  4260 I Unity   : [ArDamage] swing=$s outcome=Hit hp=100/120"
+          [ "$mode" != "sessionnocombo" ] && echo "10-20 04:$cm:$cs.600  4242  4260 I Unity   : [Combo] step=$(( (s / 5) % 3 + 1 )) weapon=1H hit=yes swing=$s"
+        fi
+        echo "10-20 04:$mm:$ss.000  4242  4260 I Unity   : [MetinARPerf] v=1 scene=ArEncounterPrototype windowS=5 frames=148 fpsAvg=$fps frameAvgMs=33.8 frameP50Ms=$p50 frameP95Ms=$p95 frameMaxMs=45 frameSpikes=$spk mainAvgMs=20 mainP95Ms=30 mainMaxMs=40 mainSpikes=0 totalUsedMB=420 gcReservedMB=40 systemUsedMB=600"
+      done
+      [ "$last" -eq 150 ] && echo "10-20 04:32:30.500  4242  4260 I Unity   : [ArDamage] defeated pajak exp=+40 talary=+12"
+      exit 0;;
+    esac
     [ "$mode" = "logcatempty" ] && exit 0
     if [ "$mode" = "logcaterr" ]; then
       echo "10-20 04:30:18.123  4242  4242 I Unity   : [MetinARPerf] v=1 event=start mainThreadRecorder=1 device=FakePhone"
@@ -58,6 +87,12 @@ case "$1" in
     cmd="$*"
     case "$cmd" in
       "getprop ro.product.model") echo "FakePhone";;
+      "getprop ro.product.manufacturer") echo "FakeVendor";;
+      "dumpsys gfxinfo $pkg framestats") echo "Total frames rendered: 120"; echo "Janky frames: 6 (5.00%)"; echo "50th percentile: 33ms"; echo "90th percentile: 34ms"; echo "95th percentile: 36ms"; echo "99th percentile: 50ms"
+        echo "---PROFILEDATA---"; echo "Flags,IntendedVsync,Vsync,OldestInputEvent,NewestInputEvent,HandleInputStart,AnimationStart,PerformTraversalsStart,DrawStart,SyncQueued,SyncStart,IssueDrawCommandsStart,SwapBuffers,FrameCompleted,"
+        for i in 0 1 2 3; do v=$((1000000000 + i*33333333)); echo "0,$v,$v,0,0,0,0,0,0,0,0,0,0,$((v + 30000000 + i*1000000)),"; done; echo "1,5,5,0,0,0,0,0,0,0,0,0,0,999999999,"; echo "---PROFILEDATA---";;
+      "dumpsys gfxinfo $pkg reset") ;;
+      screenrecord*) sleep 1;;
       "getprop ro.build.version.release") echo "12";;
       "getprop ro.build.version.sdk") echo "31";;
       "getprop ro.product.cpu.abi") echo "arm64-v8a";;
@@ -70,7 +105,9 @@ case "$1" in
       "pidof $pkg") echo "4242";;
       "dumpsys activity activities") if [ -f "$state" ]; then echo "  topResumedActivity=ActivityRecord{1 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity}"; else echo "  topResumedActivity=ActivityRecord{1 u0 $pkg/com.unity3d.player.UnityPlayerGameActivity t5}"; fi;;
       "dumpsys package $pkg") printf '    runtime permissions:\n      android.permission.ACCESS_FINE_LOCATION: granted=true, flags=[ USER_SET ]\n      android.permission.CAMERA: granted=false, flags=[ USER_SET ]\n';;
-      "dumpsys meminfo $pkg") echo "               TOTAL PSS:   312345            TOTAL RSS:   400000";;
+      "dumpsys meminfo $pkg")
+        case "$mode" in session*) mc=$(( $(cat "${state}.mem" 2>/dev/null || echo 0) + 1 )); echo "$mc" > "${state}.mem"; echo "               TOTAL PSS:   $((400000 + mc * 1024))            TOTAL RSS:   500000";;
+          *) echo "               TOTAL PSS:   312345            TOTAL RSS:   400000";; esac;;
       "dumpsys gfxinfo $pkg") echo "Total frames rendered: 0"; echo "Janky frames: 0 (0.00%)";;
       "dumpsys SurfaceFlinger --list") echo "SurfaceView[$pkg/com.unity3d.player.UnityPlayerGameActivity]#0"; echo "SurfaceView[$pkg/com.unity3d.player.UnityPlayerGameActivity](BLAST)#1";;
       dumpsys\ SurfaceFlinger\ --latency*) echo "16666666"; for i in $(seq 0 60); do t=$((1000000000 + i*16666666)); echo "$t	$t	$t"; done;;

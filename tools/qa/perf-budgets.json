@@ -80,5 +80,27 @@
     "warnBatteryTempC": 40,
     "failBatteryTempC": 45
   },
-  "schemaNotes": "latencyMetrics[]: {metric, maxAvgMs, maxP95Ms, required(default true)}; legacy latencyMetric/maxLatencyAvgMs/maxLatencyP95Ms still accepted; anyScene=true evaluates the budget over samples from every scene"
+  "productTargets": {
+    "ArCombatA31": {
+      "label": "PRODUCT TARGET (owner spec section 15: stable 30 FPS on the A31 in typical combat) - PROPOSAL from #90, thresholds wait for the lead's approval; the scenes{} entries stay the prototype regression gate",
+      "description": "Combat windows only: [MetinARPerf] windows of sceneNames after warmupSeconds that contain a combat log line and (requireCombo) a [Combo] step= line. Evaluated by Test-MetinARCombatFps from Invoke-MetinARDeviceSession.ps1; measured on the device only, never from simulation",
+      "sceneNames": [
+        "ArEncounterPrototype",
+        "ArCombat"
+      ],
+      "requireCombo": true,
+      "warmupSeconds": 60,
+      "minWindows": 3,
+      "minFpsMedian": 29.0,
+      "minFpsP5": 27.0,
+      "maxFrameP50MedianMs": 34.5,
+      "maxFrameP95Ms": 40,
+      "maxFrameSpikesPerWindow": 2,
+      "maxMainP95Ms": 40,
+      "maxPssGrowthPercent": 10,
+      "maxStartThermalStatus": 1,
+      "maxStartBatteryTempC": 35
+    }
+  },
+  "schemaNotes": "latencyMetrics[]: {metric, maxAvgMs, maxP95Ms, required(default true)}; legacy latencyMetric/maxLatencyAvgMs/maxLatencyP95Ms still accepted; anyScene=true evaluates the budget over samples from every scene; productTargets{} are product targets (not prototype gates) read only by Invoke-MetinARDeviceSession.ps1"
 }

@@ -1,0 +1,171 @@
+<#
+.SYNOPSIS
+  Tests for the #90 (METINAR-045) device session evidence collector: tools/qa/Invoke-MetinARDeviceSession.ps1 and its
+  helpers in MetinARQa.psm1. Dependency-free like Invoke-QaToolTests.ps1 (no Pester: Windows PowerShell 5.1 ships
+  Pester 3.4). Part 1 (pure helpers) runs on Windows PowerShell 5.1 and pwsh 7. Part 2 runs the collector against
+  tests/fake-adb.sh (Linux/macOS, CI) - a SIMULATION, never physical-device evidence. Exit 0 = all passed.
+#>
+$ErrorActionPreference = 'Continue'
+Import-Module (Join-Path $PSScriptRoot '..\MetinARQa.psm1') -Force -DisableNameChecking
+[System.Threading.Thread]::CurrentThread.CurrentCulture = [System.Globalization.CultureInfo]::InvariantCulture
+$script:passed = 0; $script:failed = 0
+function Assert([string]$name, [bool]$cond, [string]$info = '') {
+    if ($cond) { $script:passed++; Write-Host "PASS $name" -ForegroundColor Green }
+    else { $script:failed++; Write-Host "FAIL $name $info" -ForegroundColor Red }
+}
+$budgets = Get-Content -Raw (Join-Path $PSScriptRoot '..\perf-budgets.json') | ConvertFrom-Json
+$target = $budgets.productTargets.ArCombatA31
+
+# --- Part 1: pure helpers -------------------------------------------------------------------------------------------
+Assert 'budgets.productTarget-present' ($null -ne $target -and $target.requireCombo -eq $true -and [double]$target.minFpsMedian -gt [double]$budgets.scenes.ArEncounterPrototype.minFpsAvg)
+Assert 'budgets.scenes-unchanged' ($budgets.scenes.ArEncounterPrototype.minFpsAvg -eq 24 -and $budgets.scenes.ArEncounterPrototype.maxFrameP95Ms -eq 55)
+
+$steps = (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot '..\etap1-steps.json') | ConvertFrom-Json).steps
+Assert 'steps.22' (@($steps).Count -eq 22 -and (@($steps | ForEach-Object { $_.id }) -join ',') -eq ((1..22) -join ','))
+Assert 'steps.fields' (@($steps | Where-Object { -not $_.step -or -not $_.criterion -or -not $_.evidence -or -not $_.fixOwner }).Count -eq 0)
+Assert 'steps.patterns-compile' (@($steps | Where-Object { $_.logPattern } | Where-Object { try { [void][regex]::new($_.logPattern); $false } catch { $true } }).Count -eq 0)
+
+Assert 'logtime.parse' ((Get-MetinARLogcatTime '10-20 04:30:18.123  4242  4242 I Unity   : x') -eq '10-20 04:30:18.123')
+Assert 'logtime.none' ($null -eq (Get-MetinARLogcatTime '--------- beginning of main'))
+Assert 'logtime.seconds' (((ConvertTo-MetinARLogcatSeconds '10-20 04:31:00.500') - (ConvertTo-MetinARLogcatSeconds '10-20 04:30:59.000')) -eq 1.5)
+
+$c = New-MetinARLogcatCollector
+$a1 = Add-MetinARLogcatChunk -Collector $c -Lines @('--------- beginning of main', '10-20 04:30:00.000  1  1 I A: one', '10-20 04:30:01.000  1  1 I A: two', '  continuation of two', '10-20 04:30:01.000  1  1 I A: two-b')
+$a2 = Add-MetinARLogcatChunk -Collector $c -Lines @('10-20 04:30:00.000  1  1 I A: one', '10-20 04:30:01.000  1  1 I A: two', '  continuation of two', '10-20 04:30:01.000  1  1 I A: two-b', '10-20 04:30:01.000  1  1 I A: two-c', '10-20 04:30:02.000  1  1 I A: three')
+Assert 'merge.first' ($a1 -eq 4) "added=$a1"
+Assert 'merge.dedupe' ($a2 -eq 2 -and $c.Lines.Count -eq 6 -and $c.Gaps.Count -eq 0) "added=$a2 total=$($c.Lines.Count)"
+$a3 = Add-MetinARLogcatChunk -Collector $c -Lines @('10-20 04:30:09.000  1  1 I A: after rollover')
+Assert 'merge.gap-recorded' ($a3 -eq 1 -and $c.Gaps.Count -eq 1 -and $c.Gaps[0] -match 'rolled over')
+
+$gfxLines = @('Total frames rendered: 120', 'Janky frames: 6 (5.00%)', '50th percentile: 33ms', '90th percentile: 34ms', '95th percentile: 36ms', '99th percentile: 50ms', '---PROFILEDATA---',
+    'Flags,IntendedVsync,Vsync,OldestInputEvent,NewestInputEvent,HandleInputStart,AnimationStart,PerformTraversalsStart,DrawStart,SyncQueued,SyncStart,IssueDrawCommandsStart,SwapBuffers,FrameCompleted,',
+    '0,1000000000,1000000000,0,0,0,0,0,0,0,0,0,0,1030000000,', '0,1033333333,1033333333,0,0,0,0,0,0,0,0,0,0,1073333333,', '1,5,5,0,0,0,0,0,0,0,0,0,0,999999999,', '---PROFILEDATA---')
+$g = ConvertFrom-MetinARGfxInfo -Lines $gfxLines
+Assert 'gfx.summary' ($g.TotalFrames -eq 120 -and $g.JankyPercent -eq 5 -and $g.P50Ms -eq 33 -and $g.P95Ms -eq 36 -and $g.P99Ms -eq 50)
+Assert 'gfx.profiledata' ($g.ProfileFrames -eq 2 -and $g.ProfileP50Ms -eq 30 -and $g.ProfileP95Ms -eq 40) "frames=$($g.ProfileFrames) p50=$($g.ProfileP50Ms) p95=$($g.ProfileP95Ms)"
+$g0 = ConvertFrom-MetinARGfxInfo -Lines @('Total frames rendered: 0', 'Janky frames: 0 (0.00%)')
+Assert 'gfx.empty-unity-surface' ($g0.TotalFrames -eq 0 -and $g0.ProfileFrames -eq 0 -and $null -eq $g0.P50Ms)
+
+Assert 'pct.nearest-rank' ((Get-MetinARPercentile -Values @(10, 20, 30, 40, 50, 60, 70, 80, 90, 100) -Percent 5) -eq 10 -and (Get-MetinARPercentile -Values @(1, 2, 3, 4) -Percent 50) -eq 2)
+Assert 'pct.empty' ($null -eq (Get-MetinARPercentile -Values @() -Percent 50))
+
+Assert 'commit.from-name' ((Get-MetinARApkCommitFromName 'C:\b\MetinAR-v0c2-ee48cb9-dev.apk') -eq 'ee48cb9' -and $null -eq (Get-MetinARApkCommitFromName 'x/MetinAR-ar-encounter-qa.apk'))
+$h = Get-MetinARSerialHash 'FAKESERIAL123'
+Assert 'serial.hash' ($h -match '^[0-9a-f]{12}$' -and $h -ne 'FAKESERIAL123' -and $h -eq (Get-MetinARSerialHash 'FAKESERIAL123'))
+
+# synthetic combat timeline: 30 windows of 5 s from 04:30:00; combat (+combo) lines in every window after 04:31:00
+function New-Timeline([double]$fps = 29.6, [double]$p95 = 35, [switch]$NoCombo, [switch]$NoCombat) {
+    $l = New-Object System.Collections.Generic.List[string]
+    for ($s = 5; $s -le 150; $s += 5) {
+        $t = ([datetime]'2000-10-20 04:30:00').AddSeconds($s)
+        if (-not $NoCombat -and $s -gt 60) {
+            $l.Add(('{0:MM-dd HH:mm:ss}.500  4242  4260 I Unity   : [ArDamage] swing={1} outcome=Hit' -f $t.AddSeconds(-3), $s))
+            if (-not $NoCombo) { $l.Add(('{0:MM-dd HH:mm:ss}.600  4242  4260 I Unity   : [Combo] step=1 weapon=1H hit=yes swing={1}' -f $t.AddSeconds(-3), $s)) }
+        }
+        $f = if ($s -gt 60) { $fps } else { 29.6 }; $q = if ($s -gt 60) { $p95 } else { 35 }
+        $l.Add(('{0:MM-dd HH:mm:ss}.000  4242  4260 I Unity   : [MetinARPerf] v=1 scene=ArEncounterPrototype windowS=5 frames=148 fpsAvg={1} frameP50Ms=33.3 frameP95Ms={2} frameSpikes=0 mainP95Ms=30 totalUsedMB=420' -f $t, $f, $q))
+    }
+    return , $l.ToArray()
+}
+$tl = New-Timeline
+$ts = Get-MetinARTimedPerfSamples -Lines $tl
+Assert 'timed.samples' ($ts.Count -eq 30 -and $ts[0].ts -eq '10-20 04:30:05.000' -and ($ts[1].t - $ts[0].t) -eq 5)
+$r = Test-MetinARCombatFps -Lines $tl -Target $target
+Assert 'combat.pass' ($r.Measured -eq 'PASS' -and $r.Windows -eq 18 -and $r.FpsMedian -eq 29.6 -and $r.FpsP5 -eq 29.6) "m=$($r.Measured) w=$($r.Windows) $($r.Reason)"
+$rl = Test-MetinARCombatFps -Lines (New-Timeline -fps 24 -p95 60) -Target $target
+Assert 'combat.low-fails' ($rl.Measured -eq 'FAIL' -and @($rl.Checks | Where-Object { $_.Status -eq 'FAIL' }).Count -ge 2)
+$rn = Test-MetinARCombatFps -Lines (New-Timeline -NoCombo) -Target $target
+Assert 'combat.no-combo-no-data' ($rn.Measured -eq 'NO DATA' -and $rn.Windows -eq 0 -and $rn.Reason -match '#82')
+$rc = Test-MetinARCombatFps -Lines (New-Timeline -NoCombat) -Target $target
+Assert 'combat.no-combat-no-data' ($rc.Measured -eq 'NO DATA' -and $rc.Reason -match 'combat|combo')
+$rw = Test-MetinARCombatFps -Lines $tl -Target $target -WarmupSeconds 140
+Assert 'combat.warmup-excludes' ($rw.Windows -eq 2 -and $rw.Measured -eq 'FAIL') "w=$($rw.Windows) m=$($rw.Measured)"
+$tl2 = @($tl | Where-Object { $_ -notmatch '04:30:(0[5-9]|[1-5]\d)\.000.*MetinARPerf' })
+$rs = Test-MetinARCombatFps -Lines @($tl | ForEach-Object { $_ -replace 'scene=ArEncounterPrototype', 'scene=WorldMapPrototype' }) -Target $target
+Assert 'combat.other-scene-no-data' ($rs.Measured -eq 'NO DATA' -and $rs.SceneWindows -eq 0)
+Assert 'combat.subset-still-measured' ((Test-MetinARCombatFps -Lines $tl2 -Target $target).Windows -ge 1)
+
+$m1 = Test-MetinARPssTrend -SamplesMB @(400, 404, 406) -MaxPssMB 850
+$m2 = Test-MetinARPssTrend -SamplesMB @(400, 430, 460) -MaxPssMB 850
+$m3 = Test-MetinARPssTrend -SamplesMB @(400, 900) -MaxPssMB 850
+$m4 = Test-MetinARPssTrend -SamplesMB @(400) -MaxPssMB 850
+Assert 'pss.stable-pass' ($m1.Measured -eq 'PASS' -and $m1.GrowthPercent -eq 1.5)
+Assert 'pss.growth-fail' ($m2.Measured -eq 'FAIL' -and $m2.Reason -match 'growth')
+Assert 'pss.peak-fail' ($m3.Measured -eq 'FAIL' -and $m3.Reason -match 'peak')
+Assert 'pss.too-few-no-data' ($m4.Measured -eq 'NO DATA')
+
+$ev = Get-MetinARStepLogEvidence -Steps @($steps) -Lines $tl
+Assert 'steps.hints' ($ev.Count -eq 22 -and ($ev | Where-Object { $_.id -eq 11 }).logLines -eq 18 -and $null -eq ($ev | Where-Object { $_.id -eq 2 }).logLines -and ($ev | Where-Object { $_.id -eq 14 }).logLines -eq 0)
+
+# --- Part 2: collector against fake adb (Linux/macOS only) -----------------------------------------------------------
+$isWin = ($PSVersionTable.PSEdition -ne 'Core') -or $IsWindows
+if ($isWin) {
+    Write-Host 'SKIP collector simulation (needs bash for tests/fake-adb.sh; runs in CI on ubuntu)'
+} else {
+    $collector = Join-Path $PSScriptRoot '..\Invoke-MetinARDeviceSession.ps1'
+    $fake = Join-Path $PSScriptRoot 'fake-adb.sh'
+    function RunSession([string]$mode, [int]$expected, [scriptblock]$check, [string[]]$extra = @('-SkipInstall'), [string]$label = $mode) {
+        $root = Join-Path ([IO.Path]::GetTempPath()) ('metinar-session-' + $label + '-' + [guid]::NewGuid().ToString('N').Substring(0, 6))
+        New-Item -ItemType Directory -Force $root | Out-Null
+        $env:FAKE_ADB_MODE = $mode; $env:FAKE_ADB_STATE = Join-Path $root 'state'; $env:FAKE_ADB_PACKAGE = 'com.metinar.game.qa'; $env:FAKE_ADB_LOST_AFTER = '3'
+        & pwsh -NoProfile -File $collector -AdbPath $fake -SessionId "SIM-$label" -OutputRoot $root -DurationSeconds 0 -SampleIntervalSeconds 1 -LaunchWaitSeconds 0 -AdbReconnectSeconds 3 -WarmupSeconds 60 @extra *> (Join-Path $root 'console.txt')
+        $code = $LASTEXITCODE
+        $dir = Join-Path $root "SIM-$label"
+        $ok = $false
+        try { $ok = ($code -eq $expected) -and [bool](& $check $dir) } catch { Write-Host "check threw: $_" }
+        Assert ("session-sim.{0} exit={1} (expected {2})" -f $label, $code, $expected) $ok $dir
+        if (-not $ok) { Get-Content (Join-Path $root 'console.txt') | Write-Host }
+        return $dir
+    }
+    function J([string]$d, [string]$f) { return (Get-Content -Raw -Encoding UTF8 (Join-Path $d $f) | ConvertFrom-Json) }
+    function AllText([string]$d) { return ((Get-ChildItem -Recurse -File $d | ForEach-Object { Get-Content -Raw $_.FullName }) -join "`n") }
+    function ItemOf($s, [string]$n) { return ($s.items | Where-Object { $_.name -eq $n } | Select-Object -First 1) }
+
+    RunSession 'nodevice' 2 { param($d) $s = J $d 'session-summary.json'; $s.verdict -eq 'UNVERIFIED' -and $s.measuredOverall -eq 'NO DATA' -and (Test-Path (Join-Path $d 'session-manifest.json')) } | Out-Null
+    RunSession 'session' 0 {
+        param($d)
+        $m = J $d 'session-manifest.json'; $s = J $d 'session-summary.json'; $all = AllText $d
+        $fps = ItemOf $s 'CombatFps30'
+        $okManifest = ($m.sessionId -eq 'SIM-session') -and ($m.device.model -eq 'FakePhone') -and ($m.device.manufacturer -eq 'FakeVendor') -and ($m.device.android -eq '12') -and
+            ($m.device.serialSha256 -match '^[0-9a-f]{12}$') -and ((Get-Content -Raw (Join-Path $d 'session-manifest.json')) -match '"started":\s*"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}[+-]\d\d:\d\d"') -and ($m.host.os -notmatch '<') -and ($m.qaTool.gitHead -match '^[0-9a-f]{40}$') -and
+            ($m.adb.checks -ge 4) -and ($m.adb.killServer -eq 'never') -and (@($m.files | Where-Object { $_.path -eq 'logcat-filtered.txt' -and $_.sha256 -match '^[0-9a-f]{64}$' }).Count -eq 1)
+        $okSummary = ($s.verdict -eq 'UNVERIFIED') -and ($s.measuredOverall -ne 'FAIL') -and (@($s.items | Where-Object { $_.verdict -ne 'UNVERIFIED' -or $_.reviewRequired -ne $true }).Count -eq 0) -and
+            ($fps.measured -eq 'PASS') -and ($fps.data.Windows -eq 18) -and (@($s.steps22).Count -eq 22) -and (@($s.steps22 | Where-Object { $_.verdict -ne 'UNVERIFIED' }).Count -eq 0) -and
+            ((ItemOf $s 'Crash').measured -eq 'PASS') -and ((ItemOf $s 'ColdLaunch').detail -match 'TotalTime=2345')
+        $filtered = Get-Content -Raw (Join-Path $d 'logcat-filtered.txt')
+        $okLog = ([regex]::Matches($filtered, 'scene=ArEncounterPrototype').Count -eq 30) -and ($filtered -match '\[Combo\] step=') -and (Test-Path (Join-Path $d 'logcat-full-redacted.txt')) -and (@(Get-Content (Join-Path $d 'samples.jsonl')).Count -eq 1)
+        $okPrivacy = ($all -notmatch 'FAKESERIAL123') -and ($all -notmatch '52\.2297') -and ($all -notmatch '21\.0117')
+        if (-not ($okManifest -and $okSummary -and $okLog -and $okPrivacy)) { Write-Host "manifest=$okManifest summary=$okSummary log=$okLog privacy=$okPrivacy fps=$($fps.measured)/$($fps.detail)" }
+        $okManifest -and $okSummary -and $okLog -and $okPrivacy
+    } | Out-Null
+    RunSession 'sessionlow' 1 { param($d) $s = J $d 'session-summary.json'; ((ItemOf $s 'CombatFps30').measured -eq 'FAIL') -and $s.verdict -eq 'UNVERIFIED' -and $s.measuredOverall -eq 'FAIL' } | Out-Null
+    RunSession 'sessionnocombo' 0 { param($d) $s = J $d 'session-summary.json'; $f = ItemOf $s 'CombatFps30'; ($f.measured -eq 'NO DATA') -and ($f.detail -match '#82') -and $s.measuredOverall -eq 'NO DATA' } | Out-Null
+    RunSession 'adblost' 3 { param($d) $m = J $d 'session-manifest.json'; $s = J $d 'session-summary.json'; ($m.adb.lost -match "before 'Sample 1'") -and $s.verdict -eq 'UNVERIFIED' -and $s.measuredOverall -eq 'FAIL' -and ((AllText $d) -notmatch 'FAKESERIAL123') } | Out-Null
+    RunSession 'session' 0 { param($d) $m = J $d 'session-manifest.json'; $v = @($m.videos); ($v.Count -eq 1) -and $v[0].pulled -and ($v[0].sha256 -match '^[0-9a-f]{64}$') -and (Test-Path (Join-Path $d 'video/metinar-SIM-video-01.mp4')) -and ((AllText $d) -match 'deletes nothing') } @('-SkipInstall', '-ScreenRecordSegments', '1', '-ScreenRecordSeconds', '5') 'video' | Out-Null
+
+    # an existing non-empty session folder is never overwritten
+    $root = Join-Path ([IO.Path]::GetTempPath()) ('metinar-session-exists-' + [guid]::NewGuid().ToString('N').Substring(0, 6))
+    New-Item -ItemType Directory -Force (Join-Path $root 'SIM-exists') | Out-Null
+    Set-Content -Path (Join-Path $root 'SIM-exists/keep.txt') -Value 'keep'
+    $env:FAKE_ADB_MODE = 'session'; $env:FAKE_ADB_STATE = Join-Path $root 'state'
+    & pwsh -NoProfile -File $collector -AdbPath $fake -SessionId 'SIM-exists' -OutputRoot $root -DurationSeconds 0 -SkipInstall *> (Join-Path $root 'console.txt')
+    Assert 'session-sim.existing-folder-refused' ($LASTEXITCODE -eq 5 -and @(Get-ChildItem (Join-Path $root 'SIM-exists')).Count -eq 1)
+
+    # install path with the same guards as the smoke harness (synthetic APK named like a build: commit from the name)
+    Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+    $apkDir = Join-Path ([IO.Path]::GetTempPath()) ('metinar-session-apk-' + [guid]::NewGuid().ToString('N').Substring(0, 6))
+    New-Item -ItemType Directory -Force $apkDir | Out-Null
+    $apk = Join-Path $apkDir 'MetinAR-v0c9-abc1234-dev.apk'
+    $fs = [IO.File]::Open($apk, [IO.FileMode]::Create)
+    $za = New-Object System.IO.Compression.ZipArchive($fs, [System.IO.Compression.ZipArchiveMode]::Create)
+    $files = [ordered]@{ 'assets/bin/Data/globalgamemanagers' = 'x'; 'assets/bin/Data/data.unity3d' = 'x'; 'lib/arm64-v8a/libil2cpp.so' = 'x'; 'lib/arm64-v8a/libUnityARCore.so' = 'x'
+        'assets/bin/Data/UnitySubsystems/UnityARCore/UnitySubsystemsManifest.json' = '{}'; 'assets/bin/Data/RuntimeInitializeOnLoads.json' = (Get-Content -Raw (Join-Path $PSScriptRoot 'fixtures/runtime-init-synthetic-arcore-ok.json')) }
+    foreach ($n in $files.Keys) { $e = $za.CreateEntry($n); $w = New-Object IO.StreamWriter($e.Open()); $w.Write([string]$files[$n]); $w.Dispose() }
+    $za.Dispose(); $fs.Dispose()
+    $sha = (Get-FileHash -Algorithm SHA256 $apk).Hash.ToLowerInvariant()
+    RunSession 'session' 0 { param($d) $m = J $d 'session-manifest.json'; ($m.apk.sha256 -eq $sha) -and ($m.apk.name -eq 'MetinAR-v0c9-abc1234-dev.apk') -and ($m.gameCommit.sha -eq 'abc1234') -and ($m.gameCommit.source -eq 'APK file name') -and ($m.install.status -eq 'OK') } @('-ApkPath', $apk) 'install' | Out-Null
+}
+
+Write-Host ''
+Write-Host "Device session tests: $script:passed passed, $script:failed failed"
+if ($script:failed -gt 0) { exit 1 } else { exit 0 }
