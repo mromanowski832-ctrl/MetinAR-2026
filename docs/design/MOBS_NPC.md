@@ -66,8 +66,8 @@ Spawn → Approach → Engage ⇄ (Telegraph → Attack → Recover) → Death
 
 - `Spawn`: pojawienie się 2,5 m od kamery na wykrytym podłożu (zgodnie z METINAR-006).
 - `Approach`: podejście na dystans walki 1,2 m (zasięg ostrza FPP ~0,94 m + margines).
-- Bezpieczeństwo AR ([D3](DECISIONS_2026-10-23.md), #97): w widoku kamery podchodzi wyłącznie potwór albo jest
-  stawiany ponownie bliżej. Gracz nigdy nie musi iść ani się cofać.
+- Bezpieczeństwo AR ([D3](DECISIONS_2026-10-23.md), #97): w widoku kamery podchodzi wyłącznie potwór, płynnie i animowanie,
+  bez teleportu. Gracz nigdy nie musi iść ani się cofać. Liczby: [AR_NO_WALK_ANALYSIS_2026-10-23.md](AR_NO_WALK_ANALYSIS_2026-10-23.md).
 - `Telegraph`: wyraźna zapowiedź ataku 0,6–0,9 s (animacja + dźwięk), okno na BLOK/UNIK/Ripostę.
 - `Attack`: obrażenia w jednej klatce zdarzenia animacji, jeśli gracz nie zablokował/uniknął.
 - `Recover`: 0,5–0,8 s **okno odsłonięcia** (bonus dla Ciosu w Splot itp.).
