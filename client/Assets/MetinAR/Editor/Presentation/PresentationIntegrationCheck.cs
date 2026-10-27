@@ -41,10 +41,21 @@ namespace MetinAR.Editor.Presentation
                 Check(catalog.Find("starter_buckler")?.ModelPrefab == catalog.StarterBuckler, "buckler model reference");
                 Check(catalog.FppArms != null && catalog.WanderingMerchant != null && catalog.StarterBuckler != null,
                     "all three visual prefab references resolve");
-                Check(GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(catalog.FppArms) == 0, "FPP root has no missing scripts");
+                foreach (GameObject prefab in new[] { catalog.FppArms, catalog.WanderingMerchant, catalog.StarterBuckler,
+                             catalog.Find("starter_sword").ModelPrefab })
+                    foreach (Transform child in prefab.GetComponentsInChildren<Transform>(true))
+                        Check(GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(child.gameObject) == 0,
+                            prefab.name + "/" + child.name + " has no missing scripts");
                 Check(catalog.WanderingMerchant.GetComponentInChildren<LODGroup>(true) != null, "merchant LODGroup");
                 Check(catalog.WanderingMerchant.GetComponentInChildren<Animator>(true) != null, "merchant Animator");
                 Check(catalog.WanderingMerchant.GetComponentInChildren<SkinnedMeshRenderer>(true) != null, "merchant skinned mesh");
+                var merchantController = catalog.WanderingMerchant.GetComponentInChildren<Animator>(true).runtimeAnimatorController
+                    as UnityEditor.Animations.AnimatorController;
+                Check(merchantController != null, "merchant controller resolves");
+                foreach (string state in new[] { "Idle", "Talk" })
+                    Check(merchantController.layers.Any(layer => layer.stateMachine.states.Any(child =>
+                        child.state.name == state && child.state.motion is AnimationClip clip && clip.length > 0f)),
+                        "merchant has a nonempty " + state + " clip");
                 CheckRig(catalog);
                 CheckMenu(catalog);
                 success = true;
@@ -91,6 +102,8 @@ namespace MetinAR.Editor.Presentation
                 // A translated/rotated camera must not change the camera-local hit/visual contract.
                 probe.transform.SetPositionAndRotation(new Vector3(3f, 1.6f, -4f), Quaternion.Euler(12f, 85f, -7f));
                 CheckSamples(presenter, FppCombatAction.Attack, FppCombatTimeline.AttackSeconds);
+                CheckSamples(presenter, FppCombatAction.Aura, FppCombatTimeline.AuraCastSeconds);
+                CheckSamples(presenter, FppCombatAction.Idle, 2f);
             }
             finally { UnityEngine.Object.DestroyImmediate(probe); }
         }
@@ -130,6 +143,13 @@ namespace MetinAR.Editor.Presentation
                 Check(root.GetComponentsInChildren<Slider>(true).Length == 1, "settings contains one volume slider");
                 frontend.ShowItems();
                 Check(frontend.IsOpen && frontend.CurrentPage == "items", "item catalog opens");
+                ScrollRect scroll = root.GetComponentInChildren<ScrollRect>(true);
+                Check(scroll != null && scroll.viewport != null && scroll.content != null, "catalog scroll is connected");
+                Image surface = scroll.viewport.GetComponent<Image>();
+                Check(surface != null && surface.raycastTarget, "catalog text/spacing can receive scroll gestures");
+                scroll.velocity = new Vector2(0f, 1000f);
+                frontend.ShowSettings();
+                Check(scroll.velocity == Vector2.zero, "page navigation stops catalog inertia");
                 frontend.CloseMenu();
                 Check(!frontend.IsOpen, "menu closes");
             }

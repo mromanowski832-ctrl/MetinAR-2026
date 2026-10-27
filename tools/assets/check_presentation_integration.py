@@ -17,6 +17,36 @@ ROOT = Path(__file__).resolve().parents[2]
 ART = ROOT / "client/Assets/MetinAR"
 
 
+def validate_prefab_dependencies(roots, guids, require):
+    """Walk production prefab/controller dependencies. Imported FBX subasset IDs still need Unity.
+
+    Material references are resolved, but package-owned shader GUIDs are outside this catalog's scope.
+    """
+    pending, visited = list(roots), set()
+    builtin_guids = {"0000000000000000e000000000000000", "0000000000000000f000000000000000"}
+    while pending:
+        path = pending.pop()
+        if path in visited:
+            continue
+        visited.add(path)
+        text = path.read_text()
+        for file_id, guid in re.findall(r"\{fileID: (-?\d+), guid: ([a-f0-9]{32}), type: \d+\}", text):
+            if guid in builtin_guids:
+                continue
+            target = guids.get(guid)
+            require(target is not None and target.is_file(), f"unresolved dependency in {path}: {guid}")
+            if target.suffix in (".prefab", ".controller", ".mat", ".asset"):
+                # Unity's virtual main Prefab ID is not a YAML object declaration.
+                virtual_prefab = target.suffix == ".prefab" and file_id == "100100000"
+                declared = re.search(r"^--- !u!\d+ &" + re.escape(file_id) + r"(?: stripped)?$",
+                                     target.read_text(), re.M)
+                require(virtual_prefab or declared is not None,
+                        f"unresolved fileID {file_id} in {path} -> {target}")
+            if target.suffix in (".prefab", ".controller"):
+                pending.append(target)
+    return visited
+
+
 def validate(metadata_only=False):
     checks = 0
 
@@ -62,9 +92,11 @@ def validate(metadata_only=False):
                 "wrong GameObject fileID: " + field)
         return path
 
-    prefab_reference(catalog, "_fppArms")
-    prefab_reference(catalog, "_wanderingMerchant")
+    arms = prefab_reference(catalog, "_fppArms")
+    merchant = prefab_reference(catalog, "_wanderingMerchant")
     buckler = prefab_reference(catalog, "_starterBuckler")
+    if not metadata_only:
+        validate_prefab_dependencies((arms, merchant, buckler), guids, require)
     ids = set()
     entries = re.findall(r"^  - _definitionId: ([a-z0-9_]+)\n(.*?)(?=^  - _definitionId:|\Z)", catalog, re.M | re.S)
     require(len(entries) == 21, "catalog must have 21 items")

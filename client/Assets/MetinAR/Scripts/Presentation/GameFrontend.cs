@@ -22,6 +22,7 @@ namespace MetinAR.Presentation
         private GameArtCatalog _catalog;
         private GameObject _canvasRoot;
         private RectTransform _body;
+        private ScrollRect _scroll;
         private TextMeshProUGUI _heading;
         private TextMeshProUGUI _volumeLabel;
         private Image _emblem;
@@ -142,6 +143,10 @@ namespace MetinAR.Presentation
             scrollRoot.offsetMax = new Vector2(0f, -152f);
             var viewport = GameMenuUi.Rect("Viewport", scrollRoot);
             GameMenuUi.Stretch(viewport);
+            // Text and spacing must receive drags through this viewport, not the sibling modal background.
+            Image scrollSurface = viewport.gameObject.AddComponent<Image>();
+            scrollSurface.color = Color.clear;
+            scrollSurface.raycastTarget = true;
             viewport.gameObject.AddComponent<RectMask2D>();
             _body = GameMenuUi.Vertical(viewport, "Content", 18f);
             _body.anchorMin = new Vector2(0f, 1f);
@@ -150,12 +155,12 @@ namespace MetinAR.Presentation
             _body.offsetMin = Vector2.zero;
             _body.offsetMax = Vector2.zero;
             _body.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            var scroll = scrollRoot.gameObject.AddComponent<ScrollRect>();
-            scroll.viewport = viewport;
-            scroll.content = _body;
-            scroll.horizontal = false;
-            scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 36f;
+            _scroll = scrollRoot.gameObject.AddComponent<ScrollRect>();
+            _scroll.viewport = viewport;
+            _scroll.content = _body;
+            _scroll.horizontal = false;
+            _scroll.movementType = ScrollRect.MovementType.Clamped;
+            _scroll.scrollSensitivity = 36f;
             _back = GameMenuUi.Button(window, "Wróć", Back);
             var backRect = (RectTransform)_back.transform;
             backRect.anchorMin = Vector2.zero;
@@ -191,6 +196,7 @@ namespace MetinAR.Presentation
                 if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
             }
             _canvasRoot.SetActive(true);
+            _scroll.StopMovement();
             _page = page;
             _heading.text = heading;
             _emblem = null;
@@ -304,9 +310,9 @@ namespace MetinAR.Presentation
             GameMenuUi.Button(_body, "Wróć do katalogu", ShowItems);
         }
 
-        public void ShowMerchant(NpcModelPresenter speaker)
+        public bool ShowMerchant(NpcModelPresenter speaker)
         {
-            if (!_enteredWorld || speaker == null || IsOpen) return;
+            if (!_enteredWorld || speaker == null || IsOpen) return false;
             _speaker = speaker;
             Open("merchant", "WĘDROWNY HANDLARZ");
             GameMenuUi.Paragraph(_body, "Dobrze cię widzieć, wędrowcze.", 38f, 110f, GameMenuUi.Gold);
@@ -314,6 +320,7 @@ namespace MetinAR.Presentation
             GameMenuUi.Button(_body, "Obejrzyj przedmioty", ShowItems);
             GameMenuUi.Paragraph(_body, "Kupno i sprzedaż nie są jeszcze dostępne.", 26f, 96f, GameMenuUi.Muted);
             GameMenuUi.Button(_body, "Zakończ rozmowę", CloseMenu);
+            return true;
         }
 
         private void ShowCredits()

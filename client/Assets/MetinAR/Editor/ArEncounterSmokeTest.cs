@@ -6,6 +6,7 @@ using System.Text;
 using MetinAR.ArEncounter;
 using MetinAR.Gameplay.Combat;
 using MetinAR.Progression;
+using MetinAR.Presentation;
 using MetinAR.Location;
 using MetinAR.UI;
 using MetinAR.WorldMap;
@@ -216,6 +217,7 @@ namespace MetinAR.Editor
                 yield return Frames(5);
                 var tests = new (string, Func<IEnumerator>)[]
                 {
+                    ("T00_EnterThroughStartupMenu", T00_EnterThroughStartupMenu),
                     ("T01_WorldMapHasLauncherAndBuildScenes", T01_WorldMapHasLauncherAndBuildScenes),
                     ("T02_NoMissingScriptsInScenesAndPrefabs", T02_NoMissingScriptsInScenesAndPrefabs),
                     ("T03_EnterArButtonHandsOffRequestAndOpensArScene", T03_EnterArButtonHandsOffRequestAndOpensArScene),
@@ -342,6 +344,23 @@ namespace MetinAR.Editor
             }
 
             // ---------------------------------------------------------------- tests
+
+            private IEnumerator T00_EnterThroughStartupMenu()
+            {
+                GameFrontend frontend = FindAnyObjectByType<GameFrontend>();
+                Check(frontend != null && frontend.IsOpen && frontend.CurrentPage == "home", "startup menu missing");
+                if (frontend == null) yield break;
+                Button start = null;
+                foreach (Button button in frontend.GetComponentsInChildren<Button>(true))
+                {
+                    var label = button.GetComponentInChildren<TMPro.TMP_Text>(true);
+                    if (label != null && label.text == "Rozpocznij przygodę") { start = button; break; }
+                }
+                Check(start != null && start.IsInteractable(), "real startup action missing/blocked");
+                start?.onClick.Invoke();
+                yield return Frames(2);
+                Check(!frontend.IsOpen, "startup action did not enter world");
+            }
 
             private IEnumerator T01_WorldMapHasLauncherAndBuildScenes()
             {
@@ -700,6 +719,9 @@ namespace MetinAR.Editor
                     Check(combat.Ready && combat.View != null && combat.View.gameObject.activeInHierarchy, "FPP view not ready");
                     if (combat.View == null) yield break;
                     Check(combat.View.RightGrip != null && combat.View.LeftHand != null, "virtual hands missing");
+                    FppModelPresenter production = combat.View.GetComponent<FppModelPresenter>();
+                    Check(production != null && production.IsProductionVisible,
+                        "production FPP rig is missing/rejected; procedural fallback is not visual acceptance");
                     // #31 A31 retest framing: scaled sword, rest pose lower-right, spider visual scale, nameplate clamp.
                     Check(combat.View.Sword != null && Mathf.Abs(combat.View.Sword.localScale.x - FppHandsView.SwordScale) < 1e-4f,
                         "sword model not scaled to " + FppHandsView.SwordScale);
@@ -886,6 +908,8 @@ namespace MetinAR.Editor
                 Check(FindAnyObjectByType<ArEncounterSceneController>() == null && MobCount() == 0, "AR objects left after exit");
                 Check(!ArEncounterHandoff.HasPending, "handoff pending after exit");
                 Check(FindAnyObjectByType<FppHandsView>() == null, "FPP view leaked after scene exit");
+                GameFrontend frontend = FindAnyObjectByType<GameFrontend>();
+                Check(frontend != null && !frontend.IsOpen, "return from AR reopened/blocked the world with the startup menu");
                 PrototypeWorldPlacement placement = FindAnyObjectByType<PrototypeWorldPlacement>();
                 yield return WaitUntil(() => placement != null && placement.IsInitialized, 10f);
                 Check(placement != null && placement.IsInitialized, "world map did not re-initialize");
@@ -1091,6 +1115,8 @@ namespace MetinAR.Editor
                 }
 
                 Check(_exceptions.Count == 0, "exceptions: " + string.Join(" | ", _exceptions));
+                Check(!_errors.Exists(message => message.StartsWith("[MetinAR Art]", StringComparison.Ordinal)),
+                    "production art reported an integration error");
                 Debug.Log("[ArSmoke] logged errors (" + _errors.Count + "): " + string.Join(" | ", _errors));
                 yield break;
             }
