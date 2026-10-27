@@ -45,8 +45,8 @@ namespace MetinAR.Presentation
         public void OnPointerClick(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left || Model == null || _frontend == null) return;
-            Play("Talk");
-            _frontend.ShowMerchant(this);
+            // A rejected (e.g. queued behind another modal) click must not leave the NPC talking forever.
+            if (_frontend.ShowMerchant(this)) Play("Talk");
         }
 
         public void EndConversation() => Play("Idle");

@@ -156,6 +156,7 @@ namespace MetinAR.Editor
                     E_EnterArButtonEmitsEncounterRequest(),
                     F_AggroTriggersOnceInsideRange(),
                     G_HudButtonsOpenAndClosePanels(),
+                    P_MenuDragAndMerchantConversation(),
                     M_AppPauseSuspendsAndResumeRestoresWithoutOriginReset(),
                     N_ManualStopIsNotRestartedByResume(),
                     O_DisabledServiceIsNotRestartedByResume(),
@@ -175,6 +176,7 @@ namespace MetinAR.Editor
                     "E_EnterArButtonEmitsEncounterRequest",
                     "F_AggroTriggersOnceInsideRange",
                     "G_HudButtonsOpenAndClosePanels",
+                    "P_MenuDragAndMerchantConversation",
                     "M_AppPauseSuspendsAndResumeRestoresWithoutOriginReset",
                     "N_ManualStopIsNotRestartedByResume",
                     "O_DisabledServiceIsNotRestartedByResume",
@@ -750,6 +752,76 @@ namespace MetinAR.Editor
                     yield return Frames(2);
                     Check(!frontend.IsOpen && _mob.enabled && _movement.enabled, "closing menu did not restore map");
                 }
+            }
+
+            private IEnumerator P_MenuDragAndMerchantConversation()
+            {
+                GameFrontend frontend = FindFirstObjectByType<GameFrontend>();
+                PrototypeNpc npc = FindFirstObjectByType<PrototypeNpc>();
+                NpcModelPresenter presenter = npc != null ? npc.GetComponent<NpcModelPresenter>() : null;
+                Animator animator = presenter != null && presenter.Model != null
+                    ? presenter.Model.GetComponentInChildren<Animator>() : null;
+                Check(frontend != null && presenter != null && animator != null, "menu/merchant Animator missing");
+                if (frontend == null || presenter == null || animator == null) yield break;
+
+                var click = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left };
+                try
+                {
+                    // A queued world click behind a modal must not start an unowned Talk state.
+                    frontend.ShowSettings();
+                    ExecuteEvents.Execute(npc.gameObject, click, ExecuteEvents.pointerClickHandler);
+                    yield return new WaitForSecondsRealtime(0.5f);
+                    Check(frontend.CurrentPage == "settings" && animator.GetCurrentAnimatorStateInfo(0).IsName("Base Layer.Idle"),
+                        "rejected merchant conversation changed page or left NPC talking");
+                    frontend.CloseMenu();
+
+                    Collider body = presenter.Model.GetComponentInChildren<Collider>();
+                    Check(body != null && body.enabled, "production merchant click collider missing/disabled");
+                    if (body != null)
+                        Check(ExecuteEvents.ExecuteHierarchy(body.gameObject, click, ExecuteEvents.pointerClickHandler) == npc.gameObject,
+                            "click on production collider did not reach the NPC handler");
+                    yield return new WaitForSecondsRealtime(0.5f);
+                    Check(frontend.IsOpen && frontend.CurrentPage == "merchant", "merchant click did not open conversation");
+                    Check(animator.GetCurrentAnimatorStateInfo(0).IsName("Base Layer.Talk"), "accepted conversation did not play Talk");
+                    frontend.ShowItems();
+                    yield return new WaitForSecondsRealtime(0.5f);
+                    Check(animator.GetCurrentAnimatorStateInfo(0).IsName("Base Layer.Idle"), "leaving conversation did not restore Idle");
+
+                    Canvas.ForceUpdateCanvases();
+                    ScrollRect scroll = frontend.GetComponentInChildren<ScrollRect>();
+                    Check(scroll != null && scroll.content.childCount > 0, "catalog scroll/content missing");
+                    if (scroll == null || scroll.content.childCount == 0) yield break;
+                    var header = (RectTransform)scroll.content.GetChild(0);
+                    Vector2 point = RectTransformUtility.WorldToScreenPoint(null, header.TransformPoint(header.rect.center));
+                    var drag = new PointerEventData(EventSystem.current)
+                    {
+                        button = PointerEventData.InputButton.Left, position = point, pressPosition = point
+                    };
+                    var hits = new List<RaycastResult>();
+                    EventSystem.current.RaycastAll(drag, hits);
+                    GameObject dragTarget = hits.Count > 0 ? ExecuteEvents.GetEventHandler<IDragHandler>(hits[0].gameObject) : null;
+                    Check(dragTarget == scroll.gameObject, "drag on catalog text hits modal background instead of ScrollRect");
+                    if (dragTarget != null)
+                    {
+                        drag.pointerPressRaycast = hits[0];
+                        ExecuteEvents.Execute(dragTarget, drag, ExecuteEvents.initializePotentialDrag);
+                        ExecuteEvents.Execute(dragTarget, drag, ExecuteEvents.beginDragHandler);
+                        float before = scroll.content.anchoredPosition.y;
+                        drag.position += new Vector2(0f, 160f);
+                        ExecuteEvents.Execute(dragTarget, drag, ExecuteEvents.dragHandler);
+                        ExecuteEvents.Execute(dragTarget, drag, ExecuteEvents.endDragHandler);
+                        Check(scroll.content.anchoredPosition.y > before + 1f, "catalog did not move when dragged from text");
+                    }
+
+                    scroll.velocity = new Vector2(0f, 1000f);
+                    frontend.ShowSettings();
+                    Check(scroll.velocity == Vector2.zero && scroll.content.anchoredPosition == Vector2.zero,
+                        "page navigation retained catalog scroll velocity/position");
+                    Check(!_mob.enabled && !_movement.enabled, "page navigation resumed the map behind the modal");
+                }
+                finally { frontend.CloseMenu(); }
+                yield return Frames(2);
+                Check(_mob.enabled && _movement.enabled, "menu/merchant flow did not restore map behaviours");
             }
 
             private void WriteResultsAndExit()

@@ -24,6 +24,9 @@ jobs:
       - name: Validate integrated art references and pinned source bytes
         run: python3 tools/assets/check_presentation_integration.py
 
+      - name: Test detection of broken production prefab dependencies
+        run: python3 tools/assets/test_presentation_dependencies.py
+
       - name: Test asset pipeline rules (METINAR-009)
         run: dotnet test tests/AssetPipeline.Tests/AssetPipeline.Tests.csproj --configuration Release --logger "console;verbosity=normal"
 

@@ -2,6 +2,9 @@
 
 Refs #86, #34, #38, #59. To jest **gałąź integracyjna do review**, nie ukończenie tych zadań ani gotowa gra.
 
+Przegląd kodu, poprawki przewijania/rozmowy NPC i dokładna kolejność ponownego odbioru:
+[`METINAR-041-PR115-REVIEW.md`](METINAR-041-PR115-REVIEW.md). Wyniki Unity/APK/A31 pozostają UNVERIFIED.
+
 ## Problem i rezultat w kodzie
 
 Na `main` modele i ikony z osobnych PR-ów nie są dostępne w jednym drzewie projektu, a `FppHandsView`
