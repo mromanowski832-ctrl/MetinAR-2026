@@ -54,6 +54,9 @@ jobs:
       - name: Device harness simulation (fake adb, not device evidence)
         shell: pwsh
         run: ./tools/qa/tests/Invoke-DeviceSmokeSimulation.ps1
+      - name: A31 session collector tests (fake adb, not device evidence)
+        shell: pwsh
+        run: ./tools/qa/tests/Invoke-DeviceSessionTests.ps1
 
   repo-checks:
     name: repo hygiene + docs links
