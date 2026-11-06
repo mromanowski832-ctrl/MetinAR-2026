@@ -6,12 +6,14 @@ Właściciel: QA (#26). Zadanie: #90 (METINAR-045). Wykonawca przebiegu: MetinAR
 - Główna specyfikacja (PR #96, `2bb0a72e`): [§18 pętla 22 kroków](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L727-L756), [§15 30 FPS](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L642-L656), [§20 DoD](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/2bb0a72eae0ab9cdb440b022d52927d30f358d1e/docs/design/OWNER_SPEC_2026-10-23.md#L849-L859).
 - Luki i kolejność: [SPEC_GAP §3 (PR #84)](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/docs/owner-spec-2026-10-23/docs/audit/SPEC_GAP_2026-10-23.md).
 - Zasady sesji urządzenia: [DEVICE-ACCEPTANCE-LOOP-V0.md §1](DEVICE-ACCEPTANCE-LOOP-V0.md). Arkusz sesji v0: [A31-SESSION-PROTOCOL-V0.md (PR #79)](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/docs/qa-a31-session-protocol-v0/docs/qa/A31-SESSION-PROTOCOL-V0.md).
-- Narzędzia (PR #100, stack na #75):
+- Narzędzia (PR #100, baza main):
   - [`tools/qa/Invoke-MetinARDeviceSession.ps1`](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/chore/090-a31-session-evidence/tools/qa/Invoke-MetinARDeviceSession.ps1) (kolektor dowodów),
   - [`tools/qa/etap1-steps.json`](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/chore/090-a31-session-evidence/tools/qa/etap1-steps.json) (te same 22 kroki w formie maszynowej),
   - [`tools/qa/perf-budgets.json`](https://github.com/mromanowski832-ctrl/MetinAR-2026/blob/chore/090-a31-session-evidence/tools/qa/perf-budgets.json) (`productTargets.ArCombatA31`).
 
 > **Decyzje leada 2026-10-23 04:28 (#90) są wprowadzone** (rozdział 9): progi ArCombatA31 zatwierdzone, scena z konfiguracji, format `[Combo] step=N`, `serialSha256`, harness `Assert`, nagrania na telefonie z listą do ręcznego usunięcia, zasada T09 i prób fizycznych. Dodany obowiązkowy krok A97 z #97 (walka bez chodzenia).
+>
+> **Poprawki z review leada 2026-10-23 04:52 (#102, #100):** krok 5 tylko w trybie mapy (kamera wyłączona), krok 8 i miejsce pomiaru zgodne z #97 (podejście i zatrzymanie potwora w ≈ 1,32 m), mediana `frameP50Ms` ≤ 33,9 ms, czyszczenie bufora logcat opcjonalne (`-ClearLogcat`), A97 podpowiadany automatycznie przez kolektor z `etap1-steps.json` (#90).
 >
 > **Status dokumentu:** projekt do przeglądu. Ten dokument nie zawiera jeszcze żadnego wyniku z telefonu. **Wszystkie kroki: UNVERIFIED.**
 > Specyfikacja: „Nie deklarować 30 FPS na A31 na podstawie testów jednostkowych lub symulacji” (§15). Zielone CI nie jest dowodem działania na telefonie (§16 p. 8).
@@ -68,10 +70,10 @@ Ta sama lista jest w `tools/qa/etap1-steps.json`, a kolektor kopiuje ją do `ses
 | 2 | Wczytuję postać Wojownika | po starcie wczytana zapisana postać Wojownika (klasa, poziom), bez tworzenia nowej przy każdym starcie | VID + LOG zapisu/wczytania | brak (do zdefiniowania w #71) | #71 | #71 save/load |
 | 3 | Widzę mapę GPS | mapa rzeczywistej okolicy z pozycją gracza z GPS (nie mapa prototypowa) | VID + IMG (współrzędne zamaskowane) | `[MetinARPerf] … scene=WorldMapPrototype` | #87, PR #28 | #87 mapa/GPS |
 | 4 | Otrzymuję informację o pobliskim potworze | potwór na mapie, panel z nazwą, poziomem i odległością, komunikat zbliżenia | VID + IMG | brak | #87 | #87 mapa/GPS |
-| 5 | Podchodzę do niego | odległość w panelu maleje przy chodzeniu (prawdziwy GPS, nie symulacja) | VID (spacer) + IMG odległości przed i po | brak | #87 | #87 mapa/GPS |
+| 5 | Podchodzę do niego | odległość w panelu maleje przy chodzeniu (prawdziwy GPS, nie symulacja); kamera wyłączona / tylko tryb mapy | VID (spacer) + IMG odległości przed i po | brak | #87 | #87 mapa/GPS |
 | 6 | Wybieram rozpoczęcie walki | przycisk „Wejdź do AR” w zasięgu startuje spotkanie | LOG + VID | `[WorldMapPrototype] AR ENCOUNTER REQUESTED` | – | #87 / #31 |
 | 7 | Włącza się kamera AR | obraz z kamery, stan Starting → Scanning, uprawnienie kamery obsłużone | LOG + VID | `[ArEncounter] state … -> Scanning` | – | #31 AR |
-| 8 | Pająk stoi stabilnie na rzeczywistym podłożu | jeden pająk na podłodze w 1,5–3 m; S3-A1…A6 z PR #79 PASS (dryf ≤ 0,10 m, powrót ≤ 0,20 m) | LOG `[ArAnchor]` + VID + OWN | `[ArEncounter] spawned` / `[ArAnchor]` | PR #80 | #31 AR (PR #80) |
+| 8 | Pająk stoi stabilnie na rzeczywistym podłożu | jeden pająk na podłodze, postawiony w 1,10–3,0 m; gdy jest poza zasięgiem ostrza, sam podchodzi i zatrzymuje się w d_stop ≈ 1,32 m (± 0,05 m), nigdy bliżej niż d_min 1,10 m – gracz nie podchodzi (#97); S3-A1…A6 z PR #79 PASS (dryf ≤ 0,10 m, powrót ≤ 0,20 m) | LOG `[ArAnchor]` + VID (z boku albo z miarką: odległość zatrzymania) + OWN; build dev z #97 / PR #104: `[ArReach] swing pitch=… dist=N.NN m` | `[ArEncounter] spawned` / `[ArAnchor]` | PR #80, #97 | #31 AR (PR #80) |
 | 9 | Widzę animowane dłonie i miecz | dłonie i miecz FPP widoczne i animowane (idle i atak), bez dziur i migotania | VID + OWN | brak | PR #36, #91 | #91 dłonie |
 | 10 | Wykonuję trzyciosowe combo | 3 kolejne ATAK dają cios 1, 2 i 3 (finisher) | LOG + VID | dokładnie `[Combo] step=N` (N = 1, 2, 3; decyzja 3) | **#82** | #82 combo |
 | 11 | Przeciwnik traci HP | każdy trafiony cios to jedna linia `[ArDamage] swing=`, HP maleje, etykieta trafienia | LOG + VID | `[ArDamage] swing=` | PR #80 | #31 walka (PR #80) |
@@ -89,7 +91,7 @@ Ta sama lista jest w `tools/qa/etap1-steps.json`, a kolektor kopiuje ją do `ses
 
 ### 3.1 Krok obowiązkowy A97: walka bez chodzenia (#97)
 
-Osobny, **obowiązkowy** krok odbioru ETAPU I (decyzja leada 04:28). Nie zastępuje kroków 8, 10 i 11, tylko je łączy w jeden scenariusz bez ruchu gracza. Nie jest częścią 22 kroków w `tools/qa/etap1-steps.json`, więc kolektor go nie podpowiada; wynik wpisuje się ręcznie w karcie (rozdział 4).
+Osobny, **obowiązkowy** krok odbioru ETAPU I (decyzja leada 04:28). Nie zastępuje kroków 8, 10 i 11, tylko je łączy w jeden scenariusz bez ruchu gracza. Jest w `tools/qa/etap1-steps.json` jako krok `A97` (`mandatory: true`, poza 22 krokami §18) i kolektor uzupełnia go automatycznie: wskazówka z logu w tabeli kroków, pole `stepA97` i werdykt `stageClosure` w podsumowaniu sesji (#90, PR #100). Wynik PASS/FAIL nadal zatwierdza człowiek po obejrzeniu nagrania (UNVERIFIED do przeglądu), a karta (rozdział 4) przepisuje go z podsumowania.
 
 Kryterium akceptacji z #97 (cytat dosłowny):
 
@@ -167,7 +169,7 @@ Cel z §15: **„Stabilne 30 FPS na A31 podczas typowej walki”**, a do tego br
 - Build **development lub QA** z sondą `[MetinARPerf]`. Sonda działa tylko z `DEVELOPMENT_BUILD` na Androidzie (`MetinARPerfProbe.cs`), więc na buildzie release pomiar daje NO DATA. Okno sondy ma 5 s (`MetinARPerfProbe.WindowSeconds`).
 - W buildzie jest combo (#82) z logiem dokładnie `[Combo] step=N` i walka z PR #80 (`[ArDamage] swing=`).
 - **Zimny start:** telefon przez 10 min bez gry i bez ładowania, `thermal status ≤ 1`, bateria ≤ 35 °C, poziom ≥ 50%. Jasność stała (np. 50%, bez auto), tryb oszczędzania energii wyłączony, inne aplikacje zamknięte. Wartości zapisuje pierwsza próbka kolektora. Gorący start daje ostrzeżenie (WARN) w pozycji Thermal i przebieg trzeba powtórzyć.
-- Miejsce: dobrze oświetlona podłoga z teksturą, pająk w 1,5–3 m (jak S3-A1).
+- Miejsce: dobrze oświetlona podłoga z teksturą, pająk postawiony w 1,10–3,0 m; w walce podchodzi i zatrzymuje się w ≈ 1,32 m (#97, krok 8). Gracz stoi w miejscu.
 
 ### 6.2 Przebieg
 1. Slot #33 ACQUIRED. `adb devices` pokazuje dokładnie A31 jako `device`.
@@ -175,6 +177,8 @@ Cel z §15: **„Stabilne 30 FPS na A31 podczas typowej walki”**, a do tego br
    ```
    powershell -ExecutionPolicy Bypass -File tools\qa\Invoke-MetinARDeviceSession.ps1 -ApkPath <apk> -SessionId A31-RRRRMMDD-NN -GameCommit <40-hex> -DurationSeconds 600 -ScreenRecordSegments 4
    ```
+   **Bufor logcat:** domyślnie kolektor **nie** czyści bufora logów telefonu. Przed startem czyta zegar telefonu i odrzuca na komputerze starsze linie (`session-manifest.json` → `logcat.sinceDeviceTime`, `droppedOlderLines`). `-ClearLogcat` wykonuje `adb logcat -c` przed startem. **Ryzyko:** to czyści cały bufor logów urządzenia (wszystkie aplikacje, także nieskopiowane crashe z wcześniejszych uruchomień), więc używać tylko wtedy, gdy nic wcześniejszego z telefonu nie jest już potrzebne.
+
    Scena walki pochodzi z `perf-budgets.json` → `productTargets.ArCombatA31.sceneNames` (domyślnie `ArEncounterPrototype`). Po zmianie nazwy przy integracji: zmienić tam albo dodać `-CombatScene <nazwa>`.
 3. **Rozgrzewka 60 s** (`warmupSeconds`): mapa → wejście do AR → umieszczenie pająka. Okna z tego czasu nie są liczone.
 4. **Walka typowa, co najmniej 8 min:** seria combo 3 ciosów co około 5 s z krótkimi przerwami. Co 1–2 min Aura. Pająk ma się odradzać albo trzeba wchodzić w kolejne spotkania. Kamera porusza się naturalnie (kroki 8 i 11). Bez minimalizacji w czasie pomiaru.
@@ -209,7 +213,7 @@ Okno bez dowodu walki w logu nie jest liczone.
 | liczba okien walki z combo | ≥ 3 (#90); zalecane ≥ 18 (90 s) | kryterium #90 |
 | mediana `fpsAvg` | ≥ 29,5 | „stabilne 30” (decyzja 1) |
 | p5 `fpsAvg` (najgorsze 5% okien) | ≥ 27,0 | „stabilne”: bez długich spadków |
-| mediana `frameP50Ms` | ≤ 34,5 ms | typowa klatka ≈ 33,3 ms |
+| mediana `frameP50Ms` | ≤ 33,9 ms | 1000 / 29,5 ≈ 33,9 ms, spójne z medianą fps ≥ 29,5 (review leada 04:52; poprzednie 34,5 ms ≈ 29,0 FPS było z nią sprzeczne) |
 | `frameP95Ms` w każdym oknie | ≤ 40 ms | bez częstych klatek > 1,2 × budżetu |
 | `frameSpikes` (> 50 ms) w każdym oknie | ≤ 2 | bez szarpnięć przy ciosie |
 | `mainP95Ms` w każdym oknie | ≤ 40 ms | §15 „brak blokowania głównego wątku” |
@@ -251,7 +255,7 @@ Kolejność: najpierw tanie bramki, potem urządzenie. Kandydat bez zielonych br
 
 | # | Decyzja | Gdzie w protokole i narzędziach |
 |---|---|---|
-| D1 | Progi `ArCombatA31` zatwierdzone: mediana fps ≥ 29,5, p5 ≥ 27, frame p50 ≤ 34,5 ms, p95 ≤ 40 ms, spikes ≤ 2, main p95 ≤ 40 ms, rozgrzewka 60 s | 6.4; `perf-budgets.json` (PR #100) |
+| D1 | Progi `ArCombatA31` zatwierdzone: mediana fps ≥ 29,5, p5 ≥ 27, frame p50 ≤ 33,9 ms (korekta z review 04:52), p95 ≤ 40 ms, spikes ≤ 2, main p95 ≤ 40 ms, rozgrzewka 60 s | 6.4; `perf-budgets.json` (PR #100) |
 | D2 | Scena: na razie `ArEncounterPrototype`; kolektor bierze scenę z konfiguracji (`sceneNames` albo `-CombatScene`), nazwa zmieni się przy integracji | 5, 6.2; PR #100 |
 | D3 | Akceptowany jest dokładnie format `[Combo] step=N` (lead przypisuje go Developerowi w #82) | 3 (krok 10), 6.4; PR #100 |
 | D4 | Tylko `serialSha256` (12 hex), nigdy surowy serial | 1, 8; PR #100 |
