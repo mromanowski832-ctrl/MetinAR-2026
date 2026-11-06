@@ -969,4 +969,335 @@ function Resolve-MetinARPermissionAllowList {
     return @($Allowed | ForEach-Object { if ($Package) { "$_".Replace('{package}', $Package) } else { "$_" } })
 }
 
+# ---------------------------------------------------------------------------------------------
+# #90 (METINAR-045) device session evidence: pure helpers for Invoke-MetinARDeviceSession.ps1
+# ---------------------------------------------------------------------------------------------
+
+function Get-MetinARLogcatTime {
+    <# Returns the 'MM-dd HH:mm:ss.fff' prefix of a `logcat -v threadtime` line, or $null. #>
+    param([AllowNull()][AllowEmptyString()][string]$Line)
+    if ($Line -and $Line -match '^(\d\d-\d\d \d\d:\d\d:\d\d\.\d{3})\s') { return $Matches[1] }
+    return $null
+}
+
+function ConvertTo-MetinARLogcatSeconds {
+    <# Seconds since the start of a leap reference year for a logcat 'MM-dd HH:mm:ss.fff' stamp (differences only). #>
+    param([Parameter(Mandatory = $true)][string]$Stamp)
+    $d = [datetime]::ParseExact('2000-' + $Stamp, 'yyyy-MM-dd HH:mm:ss.fff', [System.Globalization.CultureInfo]::InvariantCulture)
+    return ($d - [datetime]'2000-01-01').TotalSeconds
+}
+
+function New-MetinARLogcatCollector {
+    <# Accumulates repeated `adb logcat -d` dumps without duplicates (the in-memory text is redacted by the caller). #>
+    [pscustomobject]@{ Lines = (New-Object System.Collections.Generic.List[string]); LastStamp = $null; LastStampLines = (New-Object 'System.Collections.Generic.HashSet[string]'); Dumps = 0; Gaps = (New-Object System.Collections.Generic.List[string]) }
+}
+
+function Add-MetinARLogcatChunk {
+    <#
+      Merges one `adb logcat -d -v threadtime` dump into the collector. Lines at or before the last stamp already seen
+      are skipped (lines with exactly that stamp are compared as text). When the oldest stamp in the dump is newer than
+      the last stamp seen, the ring buffer rolled over between two dumps: a possible gap is recorded (never hidden).
+      Returns the number of new lines.
+    #>
+    param([Parameter(Mandatory = $true)]$Collector, [AllowEmptyCollection()][AllowNull()][string[]]$Lines = @())
+    $Collector.Dumps++
+    $first = $null
+    foreach ($l in @($Lines)) { $t = Get-MetinARLogcatTime $l; if ($t) { $first = $t; break } }
+    if ($Collector.LastStamp -and $first -and [string]::CompareOrdinal($first, $Collector.LastStamp) -gt 0) {
+        $Collector.Gaps.Add(("possible logcat gap: dump {0} starts at {1}, previous dump ended at {2} (ring buffer rolled over)" -f $Collector.Dumps, $first, $Collector.LastStamp))
+    }
+    $added = 0
+    $newStamp = $Collector.LastStamp
+    $newSet = New-Object 'System.Collections.Generic.HashSet[string]'
+    foreach ($s in $Collector.LastStampLines) { [void]$newSet.Add($s) }
+    $take = $false
+    foreach ($l in @($Lines)) {
+        if ($null -eq $l) { continue }
+        $t = Get-MetinARLogcatTime $l
+        if (-not $t) {
+            # continuation / '--------- beginning of' lines follow the decision of the last stamped line
+            if ($take -and -not $l.StartsWith('--------- ')) { $Collector.Lines.Add($l); $added++ }
+            continue
+        }
+        $cmp = if ($Collector.LastStamp) { [string]::CompareOrdinal($t, $Collector.LastStamp) } else { 1 }
+        if ($cmp -lt 0) { $take = $false; continue }
+        if ($cmp -eq 0 -and $Collector.LastStampLines.Contains($l)) { $take = $false; continue }
+        $take = $true
+        $Collector.Lines.Add($l); $added++
+        if (-not $newStamp -or [string]::CompareOrdinal($t, $newStamp) -gt 0) { $newStamp = $t; $newSet.Clear() }
+        if ($t -eq $newStamp) { [void]$newSet.Add($l) }
+    }
+    $Collector.LastStamp = $newStamp
+    $Collector.LastStampLines = $newSet
+    return $added
+}
+
+function ConvertFrom-MetinARGfxInfo {
+    <#
+      Parses `dumpsys gfxinfo <pkg> [framestats]`: the HWUI summary (frames, janky, percentiles) and, when present,
+      the ---PROFILEDATA--- rows (frame time = FrameCompleted - IntendedVsync, rows with Flags=0 only).
+      Unity renders to its own surface, so HWUI data is often empty for the game; that is reported, not hidden.
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines)
+    $r = [ordered]@{ TotalFrames = $null; JankyFrames = $null; JankyPercent = $null; P50Ms = $null; P90Ms = $null; P95Ms = $null; P99Ms = $null; ProfileFrames = 0; ProfileP50Ms = $null; ProfileP95Ms = $null }
+    $hdr = $null; $durations = New-Object System.Collections.Generic.List[double]; $inProfile = $false
+    foreach ($l in @($Lines)) {
+        if ($null -eq $l) { continue }
+        $t = $l.Trim()
+        if ($null -eq $r.TotalFrames -and $t -match '^Total frames rendered:\s*(\d+)') { $r.TotalFrames = [long]$Matches[1] }
+        elseif ($null -eq $r.JankyFrames -and $t -match '^Janky frames:\s*(\d+)\s*\(([\d.]+)%\)') { $r.JankyFrames = [long]$Matches[1]; $r.JankyPercent = [double]::Parse($Matches[2], [System.Globalization.CultureInfo]::InvariantCulture) }
+        elseif ($null -eq $r.P50Ms -and $t -match '^50th percentile:\s*(\d+)ms') { $r.P50Ms = [double]$Matches[1] }
+        elseif ($null -eq $r.P90Ms -and $t -match '^90th percentile:\s*(\d+)ms') { $r.P90Ms = [double]$Matches[1] }
+        elseif ($null -eq $r.P95Ms -and $t -match '^95th percentile:\s*(\d+)ms') { $r.P95Ms = [double]$Matches[1] }
+        elseif ($null -eq $r.P99Ms -and $t -match '^99th percentile:\s*(\d+)ms') { $r.P99Ms = [double]$Matches[1] }
+        elseif ($t -eq '---PROFILEDATA---') { $inProfile = -not $inProfile; $hdr = $null }
+        elseif ($inProfile) {
+            $cols = $t.TrimEnd(',') -split ','
+            if ($cols[0] -eq 'Flags') { $hdr = @{}; for ($i = 0; $i -lt $cols.Count; $i++) { $hdr[$cols[$i]] = $i }; continue }
+            if ($null -eq $hdr -or -not $hdr.ContainsKey('IntendedVsync') -or -not $hdr.ContainsKey('FrameCompleted')) { continue }
+            if ($cols.Count -le [math]::Max($hdr['IntendedVsync'], $hdr['FrameCompleted']) -or $cols[0] -ne '0') { continue }
+            [double]$a = 0; [double]$b = 0
+            if ([double]::TryParse($cols[$hdr['IntendedVsync']], [ref]$a) -and [double]::TryParse($cols[$hdr['FrameCompleted']], [ref]$b) -and $b -gt $a -and $a -gt 0) { $durations.Add(($b - $a) / 1e6) }
+        }
+    }
+    if ($durations.Count) {
+        $r.ProfileFrames = $durations.Count
+        $r.ProfileP50Ms = [math]::Round((Get-MetinARPercentile -Values $durations.ToArray() -Percent 50), 2)
+        $r.ProfileP95Ms = [math]::Round((Get-MetinARPercentile -Values $durations.ToArray() -Percent 95), 2)
+    }
+    return [pscustomobject]$r
+}
+
+function Get-MetinARPercentile {
+    <# Nearest-rank percentile (no interpolation), $null for no values. #>
+    param([AllowEmptyCollection()][double[]]$Values = @(), [Parameter(Mandatory = $true)][double]$Percent)
+    $v = @($Values | Sort-Object)
+    if ($v.Count -eq 0) { return $null }
+    $rank = [math]::Ceiling(($Percent / 100.0) * $v.Count)
+    if ($rank -lt 1) { $rank = 1 }
+    return [double]$v[[int]$rank - 1]
+}
+
+function Get-MetinARTimedPerfSamples {
+    <# Like Get-MetinARPerfSamples, plus 'ts' (logcat stamp) and 't' (seconds, for differences) on every window. #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines)
+    $out = New-Object System.Collections.Generic.List[object]
+    foreach ($l in @($Lines)) {
+        $ts = Get-MetinARLogcatTime $l
+        if (-not $ts) { continue }
+        $s = Get-MetinARPerfSamples -Lines @($l)
+        if ($s.Count -eq 0) { continue }
+        $s[0] | Add-Member -NotePropertyName ts -NotePropertyValue $ts -Force
+        $s[0] | Add-Member -NotePropertyName t -NotePropertyValue (ConvertTo-MetinARLogcatSeconds $ts) -Force
+        $out.Add($s[0])
+    }
+    return , $out.ToArray()
+}
+
+function Test-MetinARCombatFps {
+    <#
+      #90 / spec section 15: "stable 30 FPS on the A31 in typical combat". Selects the [MetinARPerf] windows of the target scene(s)
+      that end after the warm-up (counted from the start of the first window of that scene) and that contain a combat
+      log line (-CombatPattern) - and, with requireCombo, a combo line (-ComboPattern) - inside the window
+      (end - windowS, end]. Checks median and p5 of fpsAvg, the median of frameP50Ms, the worst frameP95Ms, spikes and
+      main-thread p95 against the target. A window is never counted as combat without a log line that proves it.
+      Measured: PASS / FAIL / NO DATA. This is an automatic measurement; the session verdict stays UNVERIFIED until a
+      human has reviewed the video of the same time range.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines,
+        [Parameter(Mandatory = $true)]$Target,
+        [string]$CombatPattern = '\[ArDamage\] swing=|\[Combo\] step=[1-9][0-9]*(?=\s|$)',
+        [string]$ComboPattern = '\[Combo\] step=[1-9][0-9]*(?=\s|$)',
+        [AllowNull()][object]$WarmupSeconds = $null
+    )
+    $scenes = @(Get-MetinARProp $Target 'sceneNames')
+    $requireCombo = (Get-MetinARProp $Target 'requireCombo') -ne $false
+    $warm = if ($null -ne $WarmupSeconds) { [double]$WarmupSeconds } elseif ($null -ne (Get-MetinARProp $Target 'warmupSeconds')) { [double](Get-MetinARProp $Target 'warmupSeconds') } else { 60.0 }
+    $all = Get-MetinARTimedPerfSamples -Lines $Lines
+    $sceneSamples = @($all | Where-Object { $scenes -contains [string]$_.scene })
+    $combatT = New-Object System.Collections.Generic.List[double]; $comboT = New-Object System.Collections.Generic.List[double]
+    foreach ($l in @($Lines)) {
+        $ts = Get-MetinARLogcatTime $l
+        if (-not $ts) { continue }
+        if ($l -cmatch $CombatPattern) { $combatT.Add((ConvertTo-MetinARLogcatSeconds $ts)) }
+        if ($ComboPattern -and $l -cmatch $ComboPattern) { $comboT.Add((ConvertTo-MetinARLogcatSeconds $ts)) }
+    }
+    $result = [ordered]@{ Name = 'CombatFps'; Measured = 'NO DATA'; Scenes = ($scenes -join ','); SceneWindows = $sceneSamples.Count; WarmupSeconds = $warm
+        CombatLines = $combatT.Count; ComboLines = $comboT.Count; Windows = 0; FpsMedian = $null; FpsP5 = $null; FrameP50MedianMs = $null; FrameP95WorstMs = $null
+        SpikesWorst = $null; MainP95WorstMs = $null; Checks = @(); Reason = ''; WindowStamps = @() }
+    if ($sceneSamples.Count -eq 0) { $result.Reason = "no [MetinARPerf] windows for scene(s) $($result.Scenes) (release build, probe missing or AR not entered)"; return [pscustomobject]$result }
+    $first = $sceneSamples[0]
+    $firstLen = if ($null -ne (Get-MetinARProp $first 'windowS')) { [double]$first.windowS } else { 5.0 }
+    $warmEnd = ($first.t - $firstLen) + $warm
+    $picked = New-Object System.Collections.Generic.List[object]
+    foreach ($s in $sceneSamples) {
+        $len = if ($null -ne (Get-MetinARProp $s 'windowS')) { [double]$s.windowS } else { 5.0 }
+        $start = $s.t - $len
+        if ($start -lt $warmEnd) { continue }
+        $inCombat = @($combatT | Where-Object { $_ -gt $start -and $_ -le $s.t }).Count -gt 0
+        $inCombo = @($comboT | Where-Object { $_ -gt $start -and $_ -le $s.t }).Count -gt 0
+        if ($inCombat -and (-not $requireCombo -or $inCombo)) { $picked.Add($s) }
+    }
+    $result.Windows = $picked.Count
+    $result.WindowStamps = @($picked | ForEach-Object { $_.ts })
+    if ($picked.Count -eq 0) {
+        $why = if ($requireCombo -and $comboT.Count -eq 0) { 'no combo log line (' + $ComboPattern + ') in the log: combo is not in this build (#82) or was not used' }
+               elseif ($combatT.Count -eq 0) { 'no combat log line (' + $CombatPattern + ') in the log: no hits recorded' }
+               else { 'no combat window after the warm-up' }
+        $result.Reason = $why
+        return [pscustomobject]$result
+    }
+    function Vals([string]$k) { return [double[]]@($picked | ForEach-Object { Get-MetinARProp $_ $k } | Where-Object { $null -ne $_ -and $_ -isnot [string] }) }
+    $fps = Vals 'fpsAvg'; $p50 = Vals 'frameP50Ms'; $p95 = Vals 'frameP95Ms'; $sp = Vals 'frameSpikes'; $mp = Vals 'mainP95Ms'
+    $result.FpsMedian = Get-MetinARPercentile -Values $fps -Percent 50
+    $result.FpsP5 = Get-MetinARPercentile -Values $fps -Percent 5
+    $result.FrameP50MedianMs = Get-MetinARPercentile -Values $p50 -Percent 50
+    if ($p95.Count) { $result.FrameP95WorstMs = ($p95 | Measure-Object -Maximum).Maximum }
+    if ($sp.Count) { $result.SpikesWorst = ($sp | Measure-Object -Maximum).Maximum }
+    if ($mp.Count) { $result.MainP95WorstMs = ($mp | Measure-Object -Maximum).Maximum }
+    $checks = New-Object System.Collections.Generic.List[object]
+    function Chk([string]$metric, [string]$op, $limit, $observed) {
+        if ($null -eq $limit) { return }
+        if ($null -eq $observed) { $checks.Add([pscustomobject]@{ Metric = $metric; Limit = "$op $limit"; Observed = 'n/a'; Status = 'NO DATA' }); return }
+        $ok = if ($op -eq '>=') { [double]$observed -ge [double]$limit } else { [double]$observed -le [double]$limit }
+        $checks.Add([pscustomobject]@{ Metric = $metric; Limit = "$op $limit"; Observed = [math]::Round([double]$observed, 2); Status = $(if ($ok) { 'PASS' } else { 'FAIL' }) })
+    }
+    Chk 'combat windows' '>=' (Get-MetinARProp $Target 'minWindows') $picked.Count
+    Chk 'fpsAvg median' '>=' (Get-MetinARProp $Target 'minFpsMedian') $result.FpsMedian
+    Chk 'fpsAvg p5' '>=' (Get-MetinARProp $Target 'minFpsP5') $result.FpsP5
+    Chk 'frameP50Ms median' '<=' (Get-MetinARProp $Target 'maxFrameP50MedianMs') $result.FrameP50MedianMs
+    Chk 'frameP95Ms worst window' '<=' (Get-MetinARProp $Target 'maxFrameP95Ms') $result.FrameP95WorstMs
+    Chk 'frameSpikes>50ms worst window' '<=' (Get-MetinARProp $Target 'maxFrameSpikesPerWindow') $result.SpikesWorst
+    Chk 'mainP95Ms worst window' '<=' (Get-MetinARProp $Target 'maxMainP95Ms') $result.MainP95WorstMs
+    $st = @($checks | ForEach-Object { $_.Status })
+    $result.Checks = $checks.ToArray()
+    $result.Measured = if ($st -contains 'FAIL') { 'FAIL' } elseif ($st -contains 'NO DATA' -or $st.Count -eq 0) { 'NO DATA' } else { 'PASS' }
+    return [pscustomobject]$result
+}
+
+function Test-MetinARPssTrend {
+    <# PSS samples (MB, in time order): peak vs budget and growth first -> last (leak indicator). Needs >= MinSamples. #>
+    param([AllowEmptyCollection()][double[]]$SamplesMB = @(), [AllowNull()][object]$MaxPssMB = $null, [double]$MaxGrowthPercent = 10, [int]$MinSamples = 3)
+    $v = @($SamplesMB | Where-Object { $null -ne $_ -and $_ -gt 0 })
+    $r = [ordered]@{ Name = 'Memory'; Measured = 'NO DATA'; Samples = $v.Count; FirstMB = $null; LastMB = $null; PeakMB = $null; GrowthPercent = $null; MaxPssMB = $MaxPssMB; MaxGrowthPercent = $MaxGrowthPercent; Reason = '' }
+    if ($v.Count -eq 0) { $r.Reason = 'no dumpsys meminfo TOTAL PSS sample'; return [pscustomobject]$r }
+    $r.FirstMB = $v[0]; $r.LastMB = $v[$v.Count - 1]; $r.PeakMB = ($v | Measure-Object -Maximum).Maximum
+    $r.GrowthPercent = [math]::Round((($r.LastMB - $r.FirstMB) / $r.FirstMB) * 100, 1)
+    $fail = @()
+    if ($null -ne $MaxPssMB -and $r.PeakMB -gt [double]$MaxPssMB) { $fail += ("peak {0} MB > {1} MB" -f $r.PeakMB, $MaxPssMB) }
+    if ($v.Count -ge $MinSamples -and $r.GrowthPercent -ge $MaxGrowthPercent) { $fail += ("growth {0}% >= {1}%" -f $r.GrowthPercent, $MaxGrowthPercent) }
+    if ($fail.Count) { $r.Measured = 'FAIL'; $r.Reason = ($fail -join '; ') }
+    elseif ($v.Count -lt $MinSamples) { $r.Measured = 'NO DATA'; $r.Reason = ("{0} sample(s), need >= {1} for the growth check" -f $v.Count, $MinSamples) }
+    else { $r.Measured = 'PASS' }
+    return [pscustomobject]$r
+}
+
+function Get-MetinARApkCommitFromName {
+    <# Game commit from an APK file name such as MetinAR-v0c2-ee48cb9-dev.apk (7-40 hex between '-' and '-'/'.apk'). #>
+    param([string]$Name)
+    if ($Name -and ([IO.Path]::GetFileName($Name)) -match '-([0-9a-f]{7,40})(?=-|\.apk$)') { return $Matches[1] }
+    return $null
+}
+
+function Get-MetinARSerialHash {
+    <#
+      Short SHA-256 of a device serial: identifies the same phone across sessions without writing the serial.
+      #90 decision 4: only this value (first 12 lowercase hex characters of SHA-256 over the UTF-8 serial) is ever
+      written; the raw serial never reaches a file.
+    #>
+    param([string]$Serial)
+    if (-not $Serial) { return $null }
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { $h = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Serial)) } finally { $sha.Dispose() }
+    return ((($h | ForEach-Object { $_.ToString('x2') }) -join '').Substring(0, 12))
+}
+
+function Get-MetinARStepLogEvidence {
+    <#
+      For each step of tools/qa/etap1-steps.json with a logPattern: number of matching log lines and the first stamp.
+      This is a hint for the reviewer, never a PASS: every step stays UNVERIFIED until a human checks the video.
+    #>
+    param([Parameter(Mandatory = $true)][object[]]$Steps, [AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines = @())
+    $out = New-Object System.Collections.Generic.List[object]
+    foreach ($s in $Steps) {
+        $pat = [string](Get-MetinARProp $s 'logPattern')
+        $count = $null; $firstTs = $null
+        if ($pat) {
+            $hits = @($Lines | Where-Object { $_ -cmatch $pat })
+            $count = $hits.Count
+            if ($hits.Count) { $firstTs = Get-MetinARLogcatTime $hits[0] }
+        }
+        $out.Add([pscustomobject]@{ id = $s.id; logPattern = $(if ($pat) { $pat } else { $null }); logLines = $count; firstStamp = $firstTs })
+    }
+    return , $out.ToArray()
+}
+
+function Select-MetinARLogcatSince {
+    <#
+      Keeps logcat lines stamped at or after -Since ('MM-dd HH:mm:ss.fff', device clock); lines without a threadtime
+      stamp ('--------- beginning of main') are kept. Used by Invoke-MetinARDeviceSession.ps1 when the device log buffer
+      is NOT cleared (default since review #100): lines of earlier runs are dropped on the host instead of wiping the
+      device buffer with `adb logcat -c`. Empty -Since returns the lines unchanged.
+    #>
+    param([AllowEmptyCollection()][string[]]$Lines = @(), [string]$Since)
+    if (-not $Since) { return , @($Lines) }
+    $out = New-Object System.Collections.Generic.List[string]
+    foreach ($l in @($Lines)) {
+        $t = Get-MetinARLogcatTime $l
+        if ($null -eq $t -or [string]::CompareOrdinal([string]$t, $Since) -ge 0) { $out.Add($l) }
+    }
+    return , $out.ToArray()
+}
+
+function ConvertFrom-MetinARDeviceDate {
+    # `adb shell date +%m-%d_%H:%M:%S` -> 'MM-dd HH:mm:ss.000' (null when the output is not in that format)
+    param([AllowEmptyCollection()][string[]]$Lines = @())
+    foreach ($l in @($Lines)) { if ("$l".Trim() -cmatch '^(\d\d-\d\d)_(\d\d:\d\d:\d\d)$') { return ('{0} {1}.000' -f $Matches[1], $Matches[2]) } }
+    return $null
+}
+
+function Get-MetinARStageClosure {
+    <#
+      Closing verdict of ETAP I (#90, lead decision 2026-10-23 04:43): CLOSED only when every required step has
+      verdict PASS with a reviewer and a videoRef (recording of the successful attempt). The 22 steps of spec
+      section 18 and the mandatory step A97 (#97, combat without walking) are a hard minimum: a step definition
+      file cannot drop them (extra requiredStepIds are added on top). A97 is never a manual side entry.
+      Results come from session-summary.json -> steps after human review; at collection time all are UNVERIFIED.
+    #>
+    param([AllowEmptyCollection()][object[]]$StepResults = @(), [Parameter(Mandatory = $true)][object]$Definition)
+    $required = New-Object System.Collections.Generic.List[string]
+    foreach ($i in 1..22) { $required.Add([string]$i) }
+    $required.Add('A97')
+    foreach ($c in @(Get-MetinARProp $Definition 'requiredStepIds')) { if ($null -ne $c -and -not $required.Contains([string]$c)) { $required.Add([string]$c) } }
+    $defIds = @(@(Get-MetinARProp $Definition 'steps') | ForEach-Object { [string]$_.id })
+    $missingDef = @($required | Where-Object { $defIds -notcontains $_ })
+    $byId = @{}
+    foreach ($r in @($StepResults)) { if ($null -ne $r) { $byId[[string]$r.id] = $r } }
+    $passed = New-Object System.Collections.Generic.List[string]
+    $failed = New-Object System.Collections.Generic.List[string]
+    $open = New-Object System.Collections.Generic.List[string]
+    $reasons = New-Object System.Collections.Generic.List[string]
+    foreach ($id in $required) {
+        $r = $byId[$id]
+        if ($null -eq $r) { $open.Add($id); $reasons.Add("${id}: no result"); continue }
+        $v = [string](Get-MetinARProp $r 'verdict')
+        if ($v -ceq 'PASS') {
+            if (-not [string](Get-MetinARProp $r 'videoRef')) { $open.Add($id); $reasons.Add("${id}: PASS without videoRef (recording of the successful attempt)") }
+            elseif (-not [string](Get-MetinARProp $r 'reviewer')) { $open.Add($id); $reasons.Add("${id}: PASS without reviewer") }
+            else { $passed.Add($id) }
+        } elseif ($v -ceq 'FAIL') { $failed.Add($id); $reasons.Add("${id}: FAIL") }
+        else { $open.Add($id); $reasons.Add(("{0}: {1}" -f $id, $(if ($v) { $v } else { 'no verdict' }))) }
+    }
+    $closed = ($missingDef.Count -eq 0) -and ($passed.Count -eq $required.Count)
+    $a97 = if ($passed.Contains('A97')) { 'PASS' } elseif ($failed.Contains('A97')) { 'FAIL' } else { 'UNVERIFIED' }
+    return [pscustomobject][ordered]@{
+        verdict = $(if ($missingDef.Count) { 'INVALID DEFINITION' } elseif ($closed) { 'CLOSED' } else { 'NOT CLOSED' })
+        closed = $closed; required = $required.ToArray(); requiredCount = $required.Count
+        passed = $passed.Count; failed = $failed.ToArray(); open = $open.ToArray(); missingDefinition = $missingDef
+        a97 = $a97; reasons = $reasons.ToArray()
+        rule = 'ETAP I closes only with PASS (reviewer + videoRef) of all 22 steps of spec section 18 AND the mandatory step A97 (#97) on one APK'
+    }
+}
+
 Export-ModuleMember -Function *-MetinAR*

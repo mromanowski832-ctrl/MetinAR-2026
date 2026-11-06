@@ -80,5 +80,28 @@
     "warnBatteryTempC": 40,
     "failBatteryTempC": 45
   },
-  "schemaNotes": "latencyMetrics[]: {metric, maxAvgMs, maxP95Ms, required(default true)}; legacy latencyMetric/maxLatencyAvgMs/maxLatencyP95Ms still accepted; anyScene=true evaluates the budget over samples from every scene"
+  "productTargets": {
+    "ArCombatA31": {
+      "label": "PRODUCT TARGET (owner spec section 15: stable 30 FPS on the A31 in typical combat) - thresholds APPROVED by the production lead 2026-10-23 04:28 (#90, decision 1); the scenes{} entries stay the prototype regression gate",
+      "description": "Combat windows only: [MetinARPerf] windows of sceneNames after warmupSeconds that contain a combat log line and (requireCombo) a [Combo] step= line. Evaluated by Test-MetinARCombatFps from Invoke-MetinARDeviceSession.ps1; measured on the device only, never from simulation",
+      "sceneNames": [
+        "ArEncounterPrototype"
+      ],
+      "sceneNamesNote": "#90 decision 2: ArEncounterPrototype until integration renames the combat scene; change it here or pass -CombatScene to Invoke-MetinARDeviceSession.ps1 (never hardcoded in the collector)",
+      "requireCombo": true,
+      "warmupSeconds": 60,
+      "minWindows": 3,
+      "minFpsMedian": 29.5,
+      "minFpsP5": 27.0,
+      "maxFrameP50MedianMs": 33.9,
+      "maxFrameP50MedianMsNote": "lead review #100 2026-10-23 04:52: 34.5 ms is about 29.0 FPS and contradicted minFpsMedian 29.5; 33.9 ms (1000/29.5) keeps the frame-time median consistent with the FPS median",
+      "maxFrameP95Ms": 40,
+      "maxFrameSpikesPerWindow": 2,
+      "maxMainP95Ms": 40,
+      "maxPssGrowthPercent": 10,
+      "maxStartThermalStatus": 1,
+      "maxStartBatteryTempC": 35
+    }
+  },
+  "schemaNotes": "latencyMetrics[]: {metric, maxAvgMs, maxP95Ms, required(default true)}; legacy latencyMetric/maxLatencyAvgMs/maxLatencyP95Ms still accepted; anyScene=true evaluates the budget over samples from every scene; productTargets{} are product targets (not prototype gates) read only by Invoke-MetinARDeviceSession.ps1"
 }

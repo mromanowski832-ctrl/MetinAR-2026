@@ -1,0 +1,292 @@
+{
+  "schema": 1,
+  "source": "docs/design/OWNER_SPEC_2026-10-23.md §18 @ 2bb0a72e (PR #96); protocol docs/qa/ETAP-I-A31-ACCEPTANCE.md (#90); A97 from #97 (lead decision 2026-10-23 04:43)",
+  "rule": "Every step is UNVERIFIED until a human has reviewed the video/evidence. logPattern is a hint for the reviewer, never a PASS.",
+  "closingRule": "ETAP I jest zamknięty tylko przy PASS wszystkich kroków z requiredStepIds (22 kroki §18 + obowiązkowy A97 z #97) na jednym APK; każdy PASS wymaga przeglądu nagrania (videoRef) i recenzenta. Decyzja leada 2026-10-23 04:43 (#90): A97 nie jest wpisem ręcznym, tylko krokiem wymaganym przez kolektor.",
+  "requiredStepIds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    "A97"
+  ],
+  "steps": [
+    {
+      "id": 1,
+      "step": "Uruchamiam grę",
+      "criterion": "zimny start z launchera; mapa < 15 s (perf-budgets device.maxColdLaunchMs); brak FATAL/ANR",
+      "evidence": "LOG + VID + MEAS TotalTime",
+      "logPattern": "\\[MetinARPerf\\] v=1 event=start",
+      "dependsOn": [],
+      "fixOwner": "#31 (start)"
+    },
+    {
+      "id": 2,
+      "step": "Wczytuję postać Wojownika",
+      "criterion": "po starcie wczytana zapisana postać Wojownika (klasa, poziom); bez nowej postaci przy każdym starcie",
+      "evidence": "VID + LOG zapisu/wczytania",
+      "logPattern": null,
+      "dependsOn": [
+        "#71"
+      ],
+      "fixOwner": "#71 save/load"
+    },
+    {
+      "id": 3,
+      "step": "Widzę mapę GPS",
+      "criterion": "mapa rzeczywistej okolicy z pozycją gracza z GPS (nie mapa prototypowa)",
+      "evidence": "VID + IMG (współrzędne zamaskowane)",
+      "logPattern": "\\[MetinARPerf\\] .*scene=WorldMapPrototype",
+      "dependsOn": [
+        "#87",
+        "PR #28"
+      ],
+      "fixOwner": "#87 mapa/GPS"
+    },
+    {
+      "id": 4,
+      "step": "Otrzymuję informację o pobliskim potworze",
+      "criterion": "na mapie widać potwora i panel z nazwą, poziomem i odległością; komunikat zbliżenia",
+      "evidence": "VID + IMG",
+      "logPattern": null,
+      "dependsOn": [
+        "#87"
+      ],
+      "fixOwner": "#87 mapa/GPS"
+    },
+    {
+      "id": 5,
+      "step": "Podchodzę do niego",
+      "criterion": "odległość w panelu maleje przy chodzeniu (rzeczywisty GPS, nie symulacja)",
+      "evidence": "VID (spacer) + IMG odległości przed/po",
+      "logPattern": null,
+      "dependsOn": [
+        "#87"
+      ],
+      "fixOwner": "#87 mapa/GPS"
+    },
+    {
+      "id": 6,
+      "step": "Wybieram rozpoczęcie walki",
+      "criterion": "przycisk „Wejdź do AR” w zasięgu startuje spotkanie",
+      "evidence": "LOG + VID",
+      "logPattern": "\\[WorldMapPrototype\\] AR ENCOUNTER REQUESTED",
+      "dependsOn": [],
+      "fixOwner": "#87 / #31"
+    },
+    {
+      "id": 7,
+      "step": "Włącza się kamera AR",
+      "criterion": "obraz z kamery, stan Starting -> Scanning, uprawnienie kamery obsłużone",
+      "evidence": "LOG + VID",
+      "logPattern": "\\[ArEncounter\\] state .*-> (Starting|Scanning)",
+      "dependsOn": [],
+      "fixOwner": "#31 AR"
+    },
+    {
+      "id": 8,
+      "step": "Pająk stoi stabilnie na rzeczywistym podłożu",
+      "criterion": "jeden pająk na podłodze, postawiony w 1,10–3,0 m; gdy jest poza zasięgiem ostrza, sam podchodzi i zatrzymuje się w d_stop ≈ 1,32 m (± 0,05 m), nigdy bliżej niż d_min 1,10 m – gracz nie podchodzi (#97); S3-A1…A6 PASS (dryf ≤ 0,10 m, powrót ≤ 0,20 m)",
+      "evidence": "LOG [ArAnchor] + VID (z boku albo z miarką: odległość zatrzymania); build dev z #97/PR #104: [ArReach] swing pitch=… dist=N.NN m",
+      "logPattern": "\\[ArEncounter\\] spawned|\\[ArAnchor\\]",
+      "dependsOn": [
+        "PR #80",
+        "#97"
+      ],
+      "fixOwner": "#31 AR (PR #80)"
+    },
+    {
+      "id": 9,
+      "step": "Widzę animowane dłonie i miecz",
+      "criterion": "dłonie i miecz FPP widoczne i animowane (idle/atak), bez dziur i migotania",
+      "evidence": "VID",
+      "logPattern": null,
+      "dependsOn": [
+        "PR #36",
+        "#91"
+      ],
+      "fixOwner": "#91 dłonie"
+    },
+    {
+      "id": 10,
+      "step": "Wykonuję trzyciosowe combo",
+      "criterion": "3 kolejne tapnięcia ATAK = cios 1, 2, 3 (finisher); log [Combo] step=1/2/3",
+      "evidence": "LOG [Combo] + VID",
+      "logPattern": "\\[Combo\\] step=3(?=\\s|$)",
+      "dependsOn": [
+        "#82"
+      ],
+      "fixOwner": "#82 combo"
+    },
+    {
+      "id": 11,
+      "step": "Przeciwnik traci HP",
+      "criterion": "każdy trafiony cios: jedna linia [ArDamage] swing=, HP maleje, etykieta „Trafienie −N HP” / „Krytyk!”",
+      "evidence": "LOG + VID",
+      "logPattern": "\\[ArDamage\\] swing=",
+      "dependsOn": [
+        "PR #80"
+      ],
+      "fixOwner": "#31 walka (PR #80)"
+    },
+    {
+      "id": 12,
+      "step": "Aktywuję Aurę",
+      "criterion": "przycisk AURA uruchamia Aurę (AU1–AU3: bez obrażeń od samej Aury)",
+      "evidence": "VID",
+      "logPattern": null,
+      "dependsOn": [
+        "#93"
+      ],
+      "fixOwner": "#93 Aura"
+    },
+    {
+      "id": 13,
+      "step": "Widzę animację dwóch rąk i energii",
+      "criterion": "gest obu dłoni + efekt energii na ostrzu (AU1, AU2)",
+      "evidence": "VID",
+      "logPattern": null,
+      "dependsOn": [
+        "#93",
+        "#91"
+      ],
+      "fixOwner": "#93 / #91"
+    },
+    {
+      "id": 14,
+      "step": "Zabijam przeciwnika",
+      "criterion": "HP 0, „Pokonany”, dokładnie jedna linia defeated, dalsze ATAK bez obrażeń",
+      "evidence": "LOG + VID",
+      "logPattern": "\\[ArDamage\\] defeated",
+      "dependsOn": [],
+      "fixOwner": "#31 walka"
+    },
+    {
+      "id": 15,
+      "step": "Otrzymuję EXP, talary i przedmiot",
+      "criterion": "nagroda raz: EXP i talary w logu i UI („Pokonano! +X EXP, +Y talarów”) oraz przedmiot",
+      "evidence": "LOG + VID + OWN",
+      "logPattern": "\\[ArDamage\\] defeated .*exp=\\+\\d+ talary=\\+\\d+",
+      "dependsOn": [
+        "#49"
+      ],
+      "fixOwner": "#49 łup"
+    },
+    {
+      "id": 16,
+      "step": "Przedmiot pojawia się w ekwipunku",
+      "criterion": "zdobyty przedmiot widoczny w ekwipunku",
+      "evidence": "VID + IMG",
+      "logPattern": null,
+      "dependsOn": [
+        "#49"
+      ],
+      "fixOwner": "#49 ekwipunek"
+    },
+    {
+      "id": 17,
+      "step": "Mogę założyć zdobyty przedmiot",
+      "criterion": "założenie przedmiotu zmienia ekwipunek/statystyki (i model, jeśli dotyczy)",
+      "evidence": "VID + IMG",
+      "logPattern": null,
+      "dependsOn": [
+        "#49",
+        "#86"
+      ],
+      "fixOwner": "#49 / #86"
+    },
+    {
+      "id": 18,
+      "step": "Mogę skorzystać ze sklepu NPC",
+      "criterion": "otwarcie sklepu NPC, zakup lub sprzedaż zmienia talary i ekwipunek",
+      "evidence": "VID + IMG talarów przed/po",
+      "logPattern": null,
+      "dependsOn": [
+        "#50",
+        "PR #45"
+      ],
+      "fixOwner": "#50 sklep"
+    },
+    {
+      "id": 19,
+      "step": "Wracam na mapę",
+      "criterion": "„Wróć do mapy” / „Wyjdź z AR” wraca na mapę; HUD pokazuje nowy EXP i talary",
+      "evidence": "VID + IMG HUD + LOG",
+      "logPattern": null,
+      "dependsOn": [
+        "#89",
+        "#88"
+      ],
+      "fixOwner": "#89 / #88"
+    },
+    {
+      "id": 20,
+      "step": "Zamykam aplikację",
+      "criterion": "zamknięcie z przełącznika aplikacji (swipe); stan zapisany przed zamknięciem",
+      "evidence": "VID",
+      "logPattern": null,
+      "dependsOn": [
+        "#71"
+      ],
+      "fixOwner": "#71 save/load"
+    },
+    {
+      "id": 21,
+      "step": "Uruchamiam ją ponownie",
+      "criterion": "zimny start bez awarii (jak krok 1)",
+      "evidence": "VID + LOG + MEAS TotalTime",
+      "logPattern": null,
+      "dependsOn": [],
+      "fixOwner": "#31 (start)"
+    },
+    {
+      "id": 22,
+      "step": "Mój poziom, przedmioty i talary nadal istnieją",
+      "criterion": "po restarcie ten sam poziom, EXP, talary i przedmioty co przed zamknięciem",
+      "evidence": "VID + IMG przed/po",
+      "logPattern": null,
+      "dependsOn": [
+        "#71"
+      ],
+      "fixOwner": "#71 save/load"
+    },
+    {
+      "id": "A97",
+      "mandatory": true,
+      "source": "#97 (METINAR-051), odbiór końcowy, cytat dosłowny",
+      "step": "Walka bez chodzenia",
+      "criterion": "„stoję nieruchomo w bezpiecznym miejscu, rozpoczynam walkę AR, potwór podchodzi w zasięg, wykonuję combo, zadaję obrażenia i mogę zakończyć walkę bez fizycznego chodzenia”",
+      "evidence": "VID: fizyczny test na Samsung A31, wideo pokazujące stopy lub podłogę albo drugie nagranie z boku + LOG walki ([ArDamage] swing=, [Combo] step=N) + OWN; testy jednostkowe, edytor i CI nie wystarczają; bez wideo UNVERIFIED; raport w #31/#90 z commitem i SHA-256 APK",
+      "logPattern": "\\[ArDamage\\] swing=|\\[Combo\\] step=[1-9][0-9]*(?=\\s|$)",
+      "dependsOn": [
+        "#97",
+        "PR #80",
+        "#82"
+      ],
+      "relatedSteps": [
+        8,
+        10,
+        11
+      ],
+      "fixOwner": "#97 MetinAR Developer"
+    }
+  ]
+}

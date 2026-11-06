@@ -26,9 +26,11 @@ Assert 'badging.permissions' (@($b.Permissions).Count -eq 5)
 $cfg = Get-Content -Raw (Join-Path $PSScriptRoot '..\qa-config.json') | ConvertFrom-Json
 $p = Test-MetinARPermissionPolicy -Permissions $b.Permissions -Forbidden @($cfg.permissions.forbidden) -Allowed (Resolve-MetinARPermissionAllowList -Allowed @($cfg.permissions.allowed) -Package $b.Package)
 Assert 'perm.current-build-pass' ($p.Status -eq 'PASS' -and $p.BackgroundLocationAbsent) "status=$($p.Status) unexpected=$($p.Unexpected -join ',')"
-$p2 = Test-MetinARPermissionPolicy -Permissions (@($b.Permissions) + 'android.permission.ACCESS_BACKGROUND_LOCATION') -Forbidden @($cfg.permissions.forbidden) -Allowed @($cfg.permissions.allowed)
+$p2 = Test-MetinARPermissionPolicy -Permissions (@($b.Permissions) + 'android.permission.ACCESS_BACKGROUND_LOCATION') -Forbidden @($cfg.permissions.forbidden) -Allowed (Resolve-MetinARPermissionAllowList -Allowed @($cfg.permissions.allowed) -Package $b.Package)
 Assert 'perm.background-location-fails' ($p2.Status -eq 'FAIL' -and -not $p2.BackgroundLocationAbsent)
-$p3 = Test-MetinARPermissionPolicy -Permissions (@($b.Permissions) + 'android.permission.BLUETOOTH_CONNECT') -Forbidden @($cfg.permissions.forbidden) -Allowed @($cfg.permissions.allowed)
+$p3 = Test-MetinARPermissionPolicy -Permissions (@($b.Permissions) + 'android.permission.BLUETOOTH_CONNECT') -Forbidden @($cfg.permissions.forbidden) -Allowed (Resolve-MetinARPermissionAllowList -Allowed @($cfg.permissions.allowed) -Package $b.Package)
+# p3 must warn about exactly the one added permission: the resolved {package} allow-list entry is not 'unexpected'
+Assert 'perm.unexpected-only-added' ((@($p3.Unexpected) -join ',') -eq 'android.permission.BLUETOOTH_CONNECT') "unexpected=$(@($p3.Unexpected) -join ',')"
 Assert 'perm.unexpected-warns' ($p3.Status -eq 'WARN' -and @($p3.Unexpected) -contains 'android.permission.BLUETOOTH_CONNECT')
 
 # --- Unity log summary
