@@ -1,6 +1,8 @@
 # MetinAR — GPS + augmented-reality RPG (prototype)
 
-**Status:** private, actively developed prototype — **not a released Android/iOS game**.
+**Status:** public source review snapshot of an actively developed prototype — **not a released Android/iOS game**.
+
+This snapshot is based on development commit `e59930d3dd9453cd34c64ae849536e44a400b808`. Agent operating instructions and GitHub workflow definitions are excluded from this branch. Gameplay code, tests, Unity assets, metadata, packages and project settings are unchanged from that commit. No repository-wide source-code licence has been selected; existing per-asset licence and provenance records remain applicable.
 
 MetinAR explores a location-based RPG in which GPS coordinates drive world navigation and an AR scene can present encounters in the camera view. The repository contains real Unity/C# and .NET components, but **having code and passing headless tests does not establish that the complete mobile gameplay loop works on a physical device**.
 
@@ -9,10 +11,10 @@ MetinAR explores a location-based RPG in which GPS coordinates drive world navig
 | Area | Implementation in repository | Evidence and limits |
 | --- | --- | --- |
 | Unity client | Unity Editor `6000.6.4f1`; C# modules under `client/Assets/MetinAR/Scripts/` | [Pinned editor version](client/ProjectSettings/ProjectVersion.txt); requires Unity runtime/device checks |
-| GPS and geometry | Pure-C# coordinate and distance logic | [GeoCore test project](tests/GeoCore.Tests/) and [CI workflow](.github/workflows/geo-core-tests.yml) |
+| GPS and geometry | Pure-C# coordinate and distance logic | [GeoCore test project](tests/GeoCore.Tests/) |
 | Gameplay rules | C# damage, progression and combat-state logic | [Gameplay sources](client/Assets/MetinAR/Scripts/Gameplay/) and [test project](tests/MetinAR.Gameplay.Tests/) |
 | Development API | ASP.NET Core / .NET 8, SQLite persistence, HTTP endpoints | [Backend README](server/README.md), [server tests](server/tests/MetinAR.Server.Tests/) |
-| Repository QA | GitHub Actions, PowerShell checks and .NET tests | [QA gates](docs/METINAR-011-QA-GATES.md), [static CI](.github/workflows/qa-static.yml) |
+| Repository QA | PowerShell checks and .NET tests | [QA gates](docs/METINAR-011-QA-GATES.md) |
 | Android validation | QA APK / ADB inspection tooling is implemented | [Device QA procedure](docs/METINAR-037-QA-APK-ADB.md); a simulated harness is **not** a physical-device PASS |
 
 ### Architecture at a glance
@@ -37,7 +39,7 @@ This diagram describes repository components and intended integration boundaries
 - Unity project structure, scenes, assets and C# client modules.
 - Geospatial computations, gameplay calculations and automated unit tests.
 - Prototype server, API contracts, SQLite migrations and tests.
-- Local QA scripts plus GitHub Actions for checks that do not require Unity.
+- Local QA scripts and automated tests that do not require Unity.
 
 **Not yet asserted as verified**
 - A fully reliable GPS → map → encounter → AR fight → rewards journey on a physical phone.

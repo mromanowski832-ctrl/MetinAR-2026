@@ -8,16 +8,18 @@ Use GitHub's private vulnerability reporting feature if it is enabled for this r
 
 ## Source confidentiality
 
-- Do not change the repository visibility to Public for a portfolio or a demonstration.
-- Do not grant access to the full MetinAR source or assets for a recruiting review. Use the separate private reviewer repository with independently authored examples.
+- This branch is a public source review snapshot. Existing asset licence and provenance records apply independently.
+- Review shared source and assets for credentials, personal records and distribution restrictions before publishing another snapshot.
 - Audit collaborator access, deploy keys, GitHub Apps, OAuth apps and personal access tokens regularly.
 - Do not commit local environment files, signing credentials, game-service tokens or production configurations.
 - Keep copyrighted or unlicensed third-party assets out of this repository.
 
 ## Automated safeguards
 
-- The existing QA Static workflow checks tracked credential-file names and several high-confidence token patterns.
-- The Secret Scan workflow adds Gitleaks pattern checks on pushes, pull requests and manual dispatch. The action is pinned to a commit and granted **read-only** repository permissions.
+GitHub workflow definitions are intentionally excluded from this source snapshot.
+
+- The development repository's QA Static workflow checks tracked credential-file names and several high-confidence token patterns.
+- The development repository's Secret Scan workflow adds Gitleaks pattern checks on pushes, pull requests and manual dispatch. The action is pinned to a commit and granted **read-only** repository permissions.
 - The scan is a safety gate, **not a guarantee** that there are no secrets in blobs, older history, CI artifacts, external services or collaborators' copies.
 - When investigating potential leaked data, never paste the matched secret itself into PR comments or issue logs.
 
