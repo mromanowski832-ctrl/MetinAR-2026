@@ -130,7 +130,7 @@ public static partial class Endpoints
         {
             return ApiErrors.Result(http, StatusCodes.Status422UnprocessableEntity, ErrorCodes.SaveGameLocalModeNotSyncable,
                 "Local saves cannot be synced.",
-                "A local-mode save is unverified. Importing local progress is an open owner decision (#39); start from GET.");
+                "A local-mode save is unverified: brak importu w v1 (§11.1); ewentualny import później = #39. Start from GET.");
         }
 
         if (!string.Equals(incoming.PlayerId, playerId, StringComparison.Ordinal))
