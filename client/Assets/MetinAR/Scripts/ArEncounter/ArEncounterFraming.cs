@@ -2,6 +2,15 @@ using System;
 
 namespace MetinAR.ArEncounter
 {
+    /// <summary>Spawn distance verdict of a placement target (#31 decision 18:58).</summary>
+    public enum ArSpawnDistance
+    {
+        InRange,
+        TooClose,
+        TooFar,
+        Invalid,
+    }
+
     /// <summary>
     /// Engine-free placement and nameplate framing rules of the AR encounter (#31 owner retest on A31, 2026-10-21):
     /// the spider was placed too close and filled the screen, and its world-space nameplate was huge up close.
@@ -11,6 +20,9 @@ namespace MetinAR.ArEncounter
     {
         /// <summary>Minimum horizontal (ground) distance from the AR camera to the placement target.</summary>
         public const double MinPlacementDistanceMeters = 1.5;
+
+        /// <summary>v0 maximum horizontal spawn distance (#31 decision 18:58, PROTOTYPE 3.0 m).</summary>
+        public const double MaxPlacementDistanceMeters = 3.0;
 
         /// <summary>Tolerance so a target exactly at the minimum is not rejected by float noise.</summary>
         public const double PlacementDistanceTolerance = 0.01;
@@ -47,6 +59,33 @@ namespace MetinAR.ArEncounter
         {
             double d = HorizontalDistance(cameraX, cameraZ, targetX, targetZ);
             return !double.IsNaN(d) && !double.IsInfinity(d) && d >= MinPlacementDistanceMeters - PlacementDistanceTolerance;
+        }
+
+        /// <summary>
+        /// v0 spawn range check (#31 decision 18:58): horizontal camera-target distance within [min, max] metres, with
+        /// <see cref="PlacementDistanceTolerance"/> on both ends. Non-finite input → <see cref="ArSpawnDistance.Invalid"/>.
+        /// </summary>
+        public static ArSpawnDistance ClassifySpawnDistance(double cameraX, double cameraZ, double targetX, double targetZ, double minMeters, double maxMeters)
+        {
+            double d = HorizontalDistance(cameraX, cameraZ, targetX, targetZ);
+            if (double.IsNaN(d) || double.IsInfinity(d) || double.IsNaN(minMeters) || double.IsNaN(maxMeters)) return ArSpawnDistance.Invalid;
+            if (d < minMeters - PlacementDistanceTolerance) return ArSpawnDistance.TooClose;
+            if (d > maxMeters + PlacementDistanceTolerance) return ArSpawnDistance.TooFar;
+            return ArSpawnDistance.InRange;
+        }
+
+        /// <summary>Height of the camera above a placement surface (metres, positive = surface below the camera).</summary>
+        public static double PlaneDropBelowCamera(double cameraY, double planeY) => cameraY - planeY;
+
+        /// <summary>
+        /// False when the surface is more than <paramref name="maxDropMeters"/> below the camera (#31 P1, prototype 2.5 m)
+        /// or any value is not finite. Surfaces above the camera are left to the existing plane rules.
+        /// </summary>
+        public static bool IsPlaneHeightAcceptable(double cameraY, double planeY, double maxDropMeters)
+        {
+            double drop = PlaneDropBelowCamera(cameraY, planeY);
+            return !double.IsNaN(drop) && !double.IsInfinity(drop) && !double.IsNaN(maxDropMeters)
+                   && drop <= maxDropMeters + PlacementDistanceTolerance;
         }
 
         /// <summary>

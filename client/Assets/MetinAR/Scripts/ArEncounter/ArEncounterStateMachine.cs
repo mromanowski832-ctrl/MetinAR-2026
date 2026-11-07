@@ -19,6 +19,28 @@ namespace MetinAR.ArEncounter
         /// </summary>
         public float startTimeoutSeconds = 20f;
 
+        /// <summary>
+        /// Seconds a placed encounter may stay without session tracking before the ARSession is reset
+        /// (#31 MANAGER DECISION 18:50). PROTOTYPE: 15 s.
+        /// </summary>
+        public float trackingLostResetSeconds = 15f;
+
+        /// <summary>
+        /// A placement surface more than this far below the AR camera is rejected (#31 P1: A31 picked a plane 2.91 m below
+        /// a handheld phone). PROTOTYPE: 2.5 m.
+        /// </summary>
+        public float maxPlaneDropBelowCameraMeters = 2.5f;
+
+        /// <summary>
+        /// v0 spawn range, horizontal camera-to-target distance (#31 decision 18:58). PROTOTYPE: 1.5–3.0 m. Targets outside it
+        /// are rejected (not clamped) for the reticle, the plane-centre fallback and post-reset relocation. The 2.5 m spawn
+        /// distance in docs/design/MOBS_NPC.md §4.2 stays open until S3.
+        /// </summary>
+        public float minSpawnDistanceMeters = (float)ArEncounterFraming.MinPlacementDistanceMeters;
+
+        /// <summary>See <see cref="minSpawnDistanceMeters"/>. PROTOTYPE: 3.0 m.</summary>
+        public float maxSpawnDistanceMeters = (float)ArEncounterFraming.MaxPlacementDistanceMeters;
+
         public static ArPlacementSettings CreatePrototypeDefaults()
         {
             return new ArPlacementSettings();
@@ -49,6 +71,12 @@ namespace MetinAR.ArEncounter
             if (!(_settings.startTimeoutSeconds > 0f))
             {
                 throw new ArgumentOutOfRangeException(nameof(settings), "startTimeoutSeconds must be > 0.");
+            }
+
+            if (!(_settings.minSpawnDistanceMeters >= 0f) || !(_settings.maxSpawnDistanceMeters > _settings.minSpawnDistanceMeters)
+                || float.IsInfinity(_settings.maxSpawnDistanceMeters))
+            {
+                throw new ArgumentOutOfRangeException(nameof(settings), "spawn range must be finite with 0 <= min < max.");
             }
 
             State = ArEncounterState.Starting;

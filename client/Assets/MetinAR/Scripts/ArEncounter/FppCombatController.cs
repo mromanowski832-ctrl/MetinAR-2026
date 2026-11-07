@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace MetinAR.ArEncounter
@@ -18,7 +19,7 @@ namespace MetinAR.ArEncounter
         public event Action<ArEncounterMob, int> HitDetected;
         public bool Ready => isActiveAndEnabled && !_paused && !_unfocused && _encounter != null
             && !_encounter.IsExiting && _encounter.State == ArEncounterState.Placed
-            && _encounter.LastSessionStatus == ArSessionStatus.SessionTracking
+            && _encounter.LastSessionStatus == ArSessionStatus.SessionTracking && _encounter.MobUsable
             && _encounter.SpawnedMob != null && _encounter.ArCamera != null && _view != null;
 
         public void Initialize(ArEncounterSceneController encounter)
@@ -114,8 +115,70 @@ namespace MetinAR.ArEncounter
             Transform camera = _encounter.ArCamera.transform;
             Vector3 a = mob.transform.InverseTransformPoint(camera.TransformPoint(pose.position + pose.rotation * FppHandsView.BladeBase));
             Vector3 b = mob.transform.InverseTransformPoint(camera.TransformPoint(pose.position + pose.rotation * FppHandsView.BladeTip));
-            // Covers the existing abdomen/cephalothorax plus a 2.5 cm prototype tolerance. Legs/label are excluded.
-            return FppHitGeometry.IntersectsBox(Point(a), Point(b), new FppPoint(-0.285, 0.125, -0.605), new FppPoint(0.285, 0.595, 0.345));
+            // Body footprint (abdomen/cephalothorax + 2.5 cm) extruded vertically: the floor spider is reachable from a
+            // handheld phone height (#31 v0 A31 P0-1). Legs/label are excluded; horizontal reach is unchanged.
+            return FppHitGeometry.IntersectsReachColumn(Point(a), Point(b));
+        }
+
+        private static float _bladeReach = -1f;
+
+        /// <summary>
+        /// #31 decision 18:58 correction: the blade's horizontal reach from the camera, independent of aim — derived from the
+        /// SAME animated sword pose and blade segment as the hit sweep (<see cref="FppHandsView.SwordPose"/>,
+        /// <see cref="FppHandsView.BladeBase"/>/<see cref="FppHandsView.BladeTip"/>, ATAK hit window), via
+        /// <see cref="ArApproachPrompt.BladeReach"/>. No new constant. Used for the „Podejdź” prompt only.
+        /// </summary>
+        public static float BladeReachMeters
+        {
+            get
+            {
+                if (_bladeReach >= 0f) return _bladeReach;
+                const int samples = 48;
+                var points = new List<FppPoint>(2 * (samples + 1));
+                for (int i = 0; i <= samples; i++)
+                {
+                    float t = Mathf.Lerp(FppCombatTimeline.HitStartSeconds, FppCombatTimeline.HitEndSeconds, i / (float)samples);
+                    Pose pose = FppHandsView.SwordPose(FppCombatAction.Attack, t);
+                    points.Add(Point(pose.position + pose.rotation * FppHandsView.BladeBase));
+                    points.Add(Point(pose.position + pose.rotation * FppHandsView.BladeTip));
+                }
+
+                _bladeReach = (float)ArApproachPrompt.BladeReach(points);
+                return _bladeReach;
+            }
+        }
+
+        /// <summary>
+        /// Horizontal world distance from the AR camera to the mob's hit footprint (<see cref="FppHitGeometry.BodyMin"/> ..
+        /// <see cref="FppHitGeometry.ReachColumnMax"/> in x/z, mob scale applied). Aim-independent. NaN without camera/mob.
+        /// </summary>
+        public float HorizontalDistanceToHitFootprint(ArEncounterMob mob)
+        {
+            if (mob == null || _encounter == null || _encounter.ArCamera == null) return float.NaN;
+            Vector3 cam = _encounter.ArCamera.transform.position;
+            Vector3 local = mob.transform.InverseTransformPoint(cam);
+            FppPoint max = FppHitGeometry.ReachColumnMax;
+            float x = Mathf.Clamp(local.x, (float)FppHitGeometry.BodyMin.X, (float)max.X);
+            float z = Mathf.Clamp(local.z, (float)FppHitGeometry.BodyMin.Z, (float)max.Z);
+            Vector3 nearest = mob.transform.TransformPoint(new Vector3(x, local.y, z));
+            Vector2 d = new Vector2(nearest.x - cam.x, nearest.z - cam.z);
+            return d.magnitude;
+        }
+
+        /// <summary>
+        /// Hit test only (not the prompt): true when an ATAK swung from the current camera pose — including where it aims —
+        /// would hit the mob, using the same blade sweep over the hit window as <see cref="CheckBladeSweep"/>.
+        /// </summary>
+        public bool SwingWouldHit(ArEncounterMob mob)
+        {
+            const int samples = 48;
+            for (int i = 0; i <= samples; i++)
+            {
+                float t = Mathf.Lerp(FppCombatTimeline.HitStartSeconds, FppCombatTimeline.HitEndSeconds, i / (float)samples);
+                if (BladeIntersects(mob, t)) return true;
+            }
+
+            return false;
         }
 
         private static FppPoint Point(Vector3 p) => new FppPoint(p.x, p.y, p.z);

@@ -52,6 +52,9 @@ namespace MetinAR.ArEncounter
         /// <summary>True once the body renderers were hidden after death (label stays).</summary>
         public bool IsBodyHidden { get; private set; }
 
+        /// <summary>False while AR tracking is lost: the mob is not drawn with a stale camera pose (#31 v0 A31 P0-2).</summary>
+        public bool IsTrackingVisible { get; private set; } = true;
+
         public ArEncounterRequest Request { get; private set; }
 
         public string NameLabel => _nameText != null ? _nameText.text : null;
@@ -160,6 +163,26 @@ namespace MetinAR.ArEncounter
         {
             yield return new WaitForSeconds(_bodyHideDelaySeconds);
             HideBody();
+        }
+
+        /// <summary>
+        /// Hides (false) or restores (true) every renderer of the mob, nameplate included, without touching its pose or anchor.
+        /// While ARCore is not tracking the camera pose freezes; content drawn then sticks to the screen and "moves with the
+        /// phone". A body hidden after death stays hidden.
+        /// </summary>
+        public void SetTrackingVisible(bool visible)
+        {
+            if (IsTrackingVisible == visible)
+            {
+                return;
+            }
+
+            IsTrackingVisible = visible;
+            foreach (Renderer r in GetComponentsInChildren<Renderer>(true))
+            {
+                bool isLabel = _labelRoot != null && r.transform.IsChildOf(_labelRoot);
+                r.enabled = visible && (isLabel || !IsBodyHidden);
+            }
         }
 
         private void HideBody()

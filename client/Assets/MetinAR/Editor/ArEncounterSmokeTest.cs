@@ -136,7 +136,14 @@ namespace MetinAR.Editor
 
             private void Check(bool condition, string message)
             {
-                if (!condition && _currentFailure == null)
+                if (condition)
+                {
+                    return;
+                }
+
+                // Every failed check is logged (the report keeps the first), so one early failure cannot hide later ones.
+                Debug.Log("[ArSmoke] CHECK FAIL " + message);
+                if (_currentFailure == null)
                 {
                     _currentFailure = message;
                 }
@@ -227,9 +234,12 @@ namespace MetinAR.Editor
                     ("T09_RepeatedPlaceNeverDuplicatesAndStaysStable", T09_RepeatedPlaceNeverDuplicatesAndStaysStable),
                     ("T10_FppActionsAndRemainingPlaceholders", T10_FppActionsAndRemainingPlaceholders),
                     ("T10b_FppAttackAuraAndHitGeometry", T10b_FppAttackAuraAndHitGeometry),
+                    ("T10d_DeviceGeometry_CameraWalkAndHandheldHit", T10d_DeviceGeometry_CameraWalkAndHandheldHit),
+                    ("T10e_ApproachPrompt_OnlyOutOfReach", T10e_ApproachPrompt_OnlyOutOfReach),
                     ("T10c_RealSwingsKillSpider_RewardOnce", T10c_RealSwingsKillSpider_RewardOnce),
                     ("T11_ExitButtonReturnsToWorldMap", T11_ExitButtonReturnsToWorldMap),
                     ("T12_SyntheticFrames_ScanReadyPlacedSingleSpawn", T12_SyntheticFrames_ScanReadyPlacedSingleSpawn),
+                    ("T12b_TrackingLostOver15s_ResetKeepsHpAndRewardOnce", T12b_TrackingLostOver15s_ResetKeepsHpAndRewardOnce),
                     ("T13_UnsupportedStateIsClearAndNonCrashing", T13_UnsupportedStateIsClearAndNonCrashing),
                     ("T14_SessionStartTimeoutFailsThenRecovers", T14_SessionStartTimeoutFailsThenRecovers),
                     ("T15_NoExceptionsLogged", T15_NoExceptionsLogged),
@@ -473,6 +483,31 @@ namespace MetinAR.Editor
             /// XR Simulation only scans the environment while this camera moves, like a real phone.
             /// Found by type name to avoid a compile-time dependency on the simulation assembly.
             /// </summary>
+            /// <summary>
+            /// XR Simulation clamps its camera to the environment's camera movement bounds on every input update
+            /// (CameraFPSModeHandler.useMovementBounds); the #31 device-geometry walk (up to 4.82 m from the spider) leaves
+            /// them, so the test camera was silently clamped (first LuzMen run 21.10 18:28). Test-only: switch the clamp
+            /// off for the walk and restore it afterwards. Returns the previous value, or null if the field is not found.
+            /// </summary>
+            private static bool? SetSimulationCameraBounds(Transform simCam, bool use)
+            {
+                if (simCam == null) return null;
+                const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance
+                    | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+                foreach (MonoBehaviour b in simCam.GetComponents<MonoBehaviour>())
+                {
+                    if (b == null || b.GetType().Name != "SimulationCameraPoseProvider") continue;
+                    object handler = b.GetType().GetField("m_FPSModeHandler", flags)?.GetValue(b);
+                    System.Reflection.PropertyInfo prop = handler?.GetType().GetProperty("useMovementBounds", flags);
+                    if (prop == null || prop.PropertyType != typeof(bool)) return null;
+                    bool previous = (bool)prop.GetValue(handler);
+                    prop.SetValue(handler, use);
+                    return previous;
+                }
+
+                return null;
+            }
+
             private static Transform FindSimulationCamera()
             {
                 foreach (MonoBehaviour b in FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include))
@@ -775,6 +810,244 @@ namespace MetinAR.Editor
                 }
             }
 
+            /// <summary>Phone height above the spider's floor and natural pitch on the A31 (#31 v0 session: camPitch 25–45).</summary>
+            private const float DeviceCameraHeight = 1.25f, DeviceCameraPitch = 30f, DevicePlacementDistance = 3.82f;
+
+            /// <summary>
+            /// #31 v0 A31 regression (P0-1, P0-2). Unlike T10b/T10c the spider is NOT moved into the blade: it stays on its
+            /// floor anchor and the AR camera moves like the phone did on the device (1.25 m above the floor, 30° pitch,
+            /// placed 3.82 m away). (a) Walking forward/back changes the camera-mob distance and never the mob's world pose.
+            /// (b) From 3.82 m the blade cannot reach. (c) After approaching to 1.0 m a real ATAK hits and HP drops.
+            /// (d) With tracking lost (frozen camera pose) the mob is not drawn, and it is drawn again when tracking returns.
+            /// On 9368783 (b)/(a) pass, (c) fails (the blade passes above a floor spider) and (d) fails (mob drawn glued to the screen).
+            /// </summary>
+            private IEnumerator T10d_DeviceGeometry_CameraWalkAndHandheldHit()
+            {
+                FppCombatController fpp = _ar != null ? _ar.FppCombat : null;
+                ArEncounterCombat combat = _ar != null ? _ar.Combat : null;
+                ArEncounterMob mob = _ar != null ? _ar.SpawnedMob : null;
+                Transform simCam = FindSimulationCamera();
+                Check(fpp != null && combat != null && mob != null && simCam != null, "FPP, combat, spider or XR Simulation camera missing");
+                if (fpp == null || combat == null || mob == null || simCam == null) yield break;
+                var savedFrameSource = _ar.FrameSourceOverride;
+                Vector3 savedSimPos = simCam.position;
+                Quaternion savedSimRot = simCam.rotation;
+                bool? savedBounds = SetSimulationCameraBounds(simCam, false);
+                Check(savedBounds.HasValue, "cannot lift the XR Simulation camera movement bounds (package internals changed)");
+                _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionTracking;
+                try
+                {
+                    LocalPlayerSession.Reset();
+                    combat.SeedOverride = 20261021UL;
+                    combat.Bind(mob);
+                    yield return Frames(3);
+                    Vector3 mobPos = mob.transform.position;
+                    Vector3 dir = Vector3.ProjectOnPlane(_ar.ArCamera.transform.position - mobPos, Vector3.up);
+                    dir = dir.sqrMagnitude < 1e-4f ? Vector3.back : dir.normalized;
+                    Quaternion look = Quaternion.LookRotation(-dir, Vector3.up) * Quaternion.Euler(DeviceCameraPitch, 0f, 0f);
+
+                    // (a) forward/back along the camera axis, as the owner walked on the A31.
+                    float[] walk = { DevicePlacementDistance, 2.82f, 1.82f, DevicePlacementDistance, 4.82f, DevicePlacementDistance };
+                    float maxDrift = 0f;
+                    foreach (float d in walk)
+                    {
+                        yield return PlaceArCamera(simCam, mobPos + dir * d + Vector3.up * DeviceCameraHeight, look);
+                        Vector3 cam = _ar.ArCamera.transform.position;
+                        float horizontal = Vector3.ProjectOnPlane(cam - mob.transform.position, Vector3.up).magnitude;
+                        float drift = Vector3.Distance(mob.transform.position, mobPos);
+                        maxDrift = Mathf.Max(maxDrift, drift);
+                        Check(drift < 0.01f, "mob world position moved with the camera at d=" + d + ": drift " + drift);
+                        Check(Mathf.Abs(horizontal - d) < 0.05f, "camera-mob distance " + horizontal + " m, expected " + d + " m (mob follows camera?)");
+                        Check(!mob.transform.IsChildOf(_ar.ArCamera.transform), "mob is parented to the AR camera");
+                    }
+
+                    // (b) device placement distance: out of reach.
+                    yield return PlaceArCamera(simCam, mobPos + dir * DevicePlacementDistance + Vector3.up * DeviceCameraHeight, look);
+                    Check(!SweepHits(fpp, mob), "blade reaches the spider from " + DevicePlacementDistance + " m");
+
+                    // (c) approach to 1.0 m, real ATAK through the HUD.
+                    yield return PlaceArCamera(simCam, mobPos + dir * 1.0f + Vector3.up * DeviceCameraHeight, look);
+                    Check(SweepHits(fpp, mob), "handheld swing from 1.0 m (camera 1.25 m above floor, pitch 30°) misses the floor spider");
+                    int hpBefore = combat.Session != null ? combat.Session.MobHp : -1;
+                    int hitsBefore = fpp.HitCount, swings = 0;
+                    while (swings < 3 && combat.Session != null && combat.Session.MobHp >= hpBefore)
+                    {
+                        yield return WaitUntil(() => fpp.Ready && fpp.Timeline.Action == FppCombatAction.Idle, 3f);
+                        _ar.Hud.ActionButtons[0].onClick.Invoke();
+                        swings++;
+                        yield return WaitUntil(() => fpp.Timeline.Action == FppCombatAction.Idle, 3f);
+                    }
+
+                    int hpAfter = combat.Session != null ? combat.Session.MobHp : -1;
+                    Check(fpp.HitCount - hitsBefore == swings, "handheld swings registered " + (fpp.HitCount - hitsBefore) + " hits / " + swings + " swings");
+                    Check(hpBefore == 120 && hpAfter < hpBefore, "HP did not drop after handheld ATAK from 1.0 m: " + hpBefore + "->" + hpAfter);
+                    Check(Vector3.Distance(mob.transform.position, mobPos) < 0.01f, "mob moved during the approach/attack");
+
+                    // (d) tracking lost: frozen camera pose, the mob must not be drawn; drawn again on tracking.
+                    _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionInitializing;
+                    yield return Frames(3);
+                    int drawnLost = DrawnRenderers(mob);
+                    Check(drawnLost == 0, "mob still drawn with tracking lost (stale camera pose glues it to the screen): " + drawnLost + " renderers");
+                    Check(Vector3.Distance(mob.transform.position, mobPos) < 0.01f, "mob moved while tracking was lost");
+                    _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionTracking;
+                    yield return Frames(3);
+                    int drawnBack = DrawnRenderers(mob);
+                    Check(drawnBack > 0, "mob not drawn again after tracking returned");
+                    Debug.Log("[ArSmoke] T10d walk maxDrift=" + maxDrift + " hp " + hpBefore + "->" + hpAfter + " swings=" + swings
+                              + " drawnLost=" + drawnLost + " drawnBack=" + drawnBack);
+                }
+                finally
+                {
+                    fpp.CancelActions();
+                    simCam.SetPositionAndRotation(savedSimPos, savedSimRot);
+                    if (savedBounds.HasValue) SetSimulationCameraBounds(simCam, savedBounds.Value);
+                    _ar.FrameSourceOverride = savedFrameSource;
+                }
+
+                yield return Frames(3);
+            }
+
+            /// <summary>
+            /// #31 decision 18:58 + correction: v0 mob stands still, the player walks up. „Podejdź – x,x m” (horizontal
+            /// camera-mob distance) is shown only while the camera is farther from the hit footprint than the blade's horizontal
+            /// reach — DISTANCE ONLY, independent of aim. Up close but aiming away: no prompt (even though a swing cannot hit);
+            /// far away aiming away: prompt. Hidden while tracking is lost („Szukam otoczenia…” has priority). Mob never moves.
+            /// </summary>
+            private IEnumerator T10e_ApproachPrompt_OnlyOutOfReach()
+            {
+                FppCombatController fpp = _ar != null ? _ar.FppCombat : null;
+                ArEncounterCombat combat = _ar != null ? _ar.Combat : null;
+                ArEncounterMob mob = _ar != null ? _ar.SpawnedMob : null;
+                Transform simCam = FindSimulationCamera();
+                Check(fpp != null && combat != null && mob != null && simCam != null, "FPP, combat, spider or XR Simulation camera missing");
+                if (fpp == null || combat == null || mob == null || simCam == null) yield break;
+                var savedFrameSource = _ar.FrameSourceOverride;
+                Vector3 savedSimPos = simCam.position;
+                Quaternion savedSimRot = simCam.rotation;
+                bool? savedBounds = SetSimulationCameraBounds(simCam, false);
+                Check(savedBounds.HasValue, "cannot lift the XR Simulation camera movement bounds (package internals changed)");
+                var promptLogs = new List<string>();
+                Application.LogCallback onLog = (message, stack, type) =>
+                {
+                    if (message.StartsWith("[ArEncounter] approach prompt", StringComparison.Ordinal)) promptLogs.Add(message);
+                };
+                Application.logMessageReceived += onLog;
+                _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionTracking;
+                try
+                {
+                    LocalPlayerSession.Reset();
+                    combat.SeedOverride = 20261021UL;
+                    combat.Bind(mob);
+                    yield return Frames(3);
+                    Vector3 mobPos = mob.transform.position;
+                    Vector3 dir = Vector3.ProjectOnPlane(_ar.ArCamera.transform.position - mobPos, Vector3.up);
+                    dir = dir.sqrMagnitude < 1e-4f ? Vector3.back : dir.normalized;
+                    Quaternion look = Quaternion.LookRotation(-dir, Vector3.up) * Quaternion.Euler(DeviceCameraPitch, 0f, 0f);
+
+                    foreach (float d in new[] { 2.4f, DevicePlacementDistance })
+                    {
+                        yield return PlaceArCamera(simCam, mobPos + dir * d + Vector3.up * DeviceCameraHeight, look);
+                        yield return Frames(2);
+                        string expected = ArApproachPrompt.Format(_ar.ApproachDistance);
+                        Check(Mathf.Abs(_ar.ApproachDistance - d) < 0.05f, "approach distance " + _ar.ApproachDistance + " m, expected " + d);
+                        Check(!_ar.InAttackReach && _ar.ApproachPromptVisible, "prompt hidden out of reach at " + d + " m (inReach " + _ar.InAttackReach + ")");
+                        Check(_ar.Hud.StatusLabel == expected && expected.StartsWith(ArApproachPrompt.Prefix, StringComparison.Ordinal),
+                            "status at " + d + " m: '" + _ar.Hud.StatusLabel + "' expected '" + expected + "'");
+                        if (Mathf.Approximately(d, 2.4f)) Check(expected == "Podejdź – 2,4 m", "format " + expected);
+                    }
+
+                    float bladeReach = FppCombatController.BladeReachMeters;
+                    Check(bladeReach > 0.3f && bladeReach < 2f, "blade reach derived from the sword geometry: " + bladeReach);
+
+                    // In reach (same device pose as T10d (c)): prompt hidden.
+                    yield return PlaceArCamera(simCam, mobPos + dir * 1.0f + Vector3.up * DeviceCameraHeight, look);
+                    yield return Frames(2);
+                    Check(_ar.InAttackReach && !_ar.ApproachPromptVisible, "prompt in reach at 1.0 m (inReach " + _ar.InAttackReach + ")");
+                    Check(_ar.Hud.StatusLabel != null && !_ar.Hud.StatusLabel.StartsWith(ArApproachPrompt.Prefix, StringComparison.Ordinal)
+                          && _ar.Hud.StatusLabel != ArEncounterHud.SearchingSurroundingsNotice, "status in reach '" + _ar.Hud.StatusLabel + "'");
+
+                    // Up close but aiming AWAY from the mob: a swing cannot hit, yet no „Podejdź” (distance only).
+                    Quaternion lookAway = Quaternion.LookRotation(dir, Vector3.up) * Quaternion.Euler(DeviceCameraPitch, 0f, 0f);
+                    yield return PlaceArCamera(simCam, mobPos + dir * 1.0f + Vector3.up * DeviceCameraHeight, lookAway);
+                    yield return Frames(2);
+                    Check(!fpp.SwingWouldHit(mob), "aiming away at 1.0 m still hits (hit test must use the aim)");
+                    Check(_ar.InAttackReach && !_ar.ApproachPromptVisible, "prompt shown up close while aiming away (inReach " + _ar.InAttackReach
+                          + " toFootprint " + _ar.FootprintDistance + " bladeReach " + bladeReach + ")");
+                    Check(_ar.Hud.StatusLabel != null && !_ar.Hud.StatusLabel.StartsWith(ArApproachPrompt.Prefix, StringComparison.Ordinal),
+                        "status up close aiming away '" + _ar.Hud.StatusLabel + "'");
+
+                    // Far away and aiming away: prompt shown.
+                    yield return PlaceArCamera(simCam, mobPos + dir * DevicePlacementDistance + Vector3.up * DeviceCameraHeight, lookAway);
+                    yield return Frames(2);
+                    Check(!_ar.InAttackReach && _ar.ApproachPromptVisible && _ar.Hud.StatusLabel == ArApproachPrompt.Format(_ar.ApproachDistance),
+                        "no prompt far away aiming away: '" + _ar.Hud.StatusLabel + "'");
+
+                    // Out of reach but tracking lost: „Szukam otoczenia…” wins, no prompt; back with tracking.
+                    yield return PlaceArCamera(simCam, mobPos + dir * 2.4f + Vector3.up * DeviceCameraHeight, look);
+                    _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionInitializing;
+                    yield return Frames(3);
+                    Check(!_ar.ApproachPromptVisible && _ar.Hud.StatusLabel == ArEncounterHud.SearchingSurroundingsNotice,
+                        "tracking lost: prompt " + _ar.ApproachPromptVisible + " status '" + _ar.Hud.StatusLabel + "'");
+                    _ar.FrameSourceOverride = frame => frame.SessionStatus = ArSessionStatus.SessionTracking;
+                    yield return Frames(3);
+                    Check(_ar.ApproachPromptVisible && _ar.Hud.StatusLabel == ArApproachPrompt.Format(_ar.ApproachDistance),
+                        "prompt not back after tracking: '" + _ar.Hud.StatusLabel + "'");
+                    Check(Vector3.Distance(mob.transform.position, mobPos) < 0.01f, "v0 mob moved");
+                    Check(promptLogs.Count >= 4, "approach prompt logs " + promptLogs.Count);
+                    Debug.Log("[ArSmoke] T10e bladeReach=" + bladeReach.ToString("F2") + " prompt logs=" + promptLogs.Count + " | " + string.Join(" | ", promptLogs));
+                }
+                finally
+                {
+                    Application.logMessageReceived -= onLog;
+                    fpp.CancelActions();
+                    simCam.SetPositionAndRotation(savedSimPos, savedSimRot);
+                    if (savedBounds.HasValue) SetSimulationCameraBounds(simCam, savedBounds.Value);
+                    _ar.FrameSourceOverride = savedFrameSource;
+                }
+
+                yield return Frames(3);
+            }
+
+            /// <summary>Moves the XR Simulation pose provider so the AR camera lands on a world pose (camera = T * sim).</summary>
+            private IEnumerator PlaceArCamera(Transform simCam, Vector3 position, Quaternion rotation)
+            {
+                Transform cam = _ar.ArCamera.transform;
+                for (int pass = 0; pass < 4; pass++)
+                {
+                    Quaternion tRot = cam.rotation * Quaternion.Inverse(simCam.rotation);
+                    Vector3 tPos = cam.position - tRot * simCam.position;
+                    Quaternion inv = Quaternion.Inverse(tRot);
+                    simCam.SetPositionAndRotation(inv * (position - tPos), inv * rotation);
+                    yield return Frames(3);
+                    if (Vector3.Distance(cam.position, position) < 0.005f && Quaternion.Angle(cam.rotation, rotation) < 0.5f) break;
+                }
+
+                Check(Vector3.Distance(cam.position, position) < 0.02f && Quaternion.Angle(cam.rotation, rotation) < 1f,
+                    "AR camera did not reach " + position.ToString("F2") + " (at " + cam.position.ToString("F2") + ")");
+            }
+
+            private static bool SweepHits(FppCombatController fpp, ArEncounterMob mob)
+            {
+                for (int i = 0; i <= 48; i++)
+                {
+                    float t = Mathf.Lerp(FppCombatTimeline.HitStartSeconds, FppCombatTimeline.HitEndSeconds, i / 48f);
+                    if (fpp.BladeIntersects(mob, t)) return true;
+                }
+
+                return false;
+            }
+
+            private static int DrawnRenderers(ArEncounterMob mob)
+            {
+                int n = 0;
+                foreach (Renderer r in mob.GetComponentsInChildren<Renderer>(true))
+                {
+                    if (r.enabled && r.gameObject.activeInHierarchy) n++;
+                }
+
+                return n;
+            }
+
             /// <summary>
             /// v0 / T07 acceptance (METINAR-020 x #31): REAL sword swings through the HUD ATAK button and the FPP blade
             /// geometry — FppCombatController.HitDetected → ArEncounterCombat.HandleHitDetected → DamageResolver — take the
@@ -971,6 +1244,30 @@ namespace MetinAR.Editor
                 yield return Frames(1);
                 Check(MobCount() == 0, "spawned on a too-close target");
 
+                // #31 P1: the A31 picked a plane 2.91 m below the phone. More than 2.5 m below the camera is no spawn surface.
+                _syntheticTarget = cam.position + fwd * 1.8f + Vector3.down * 2.91f;
+                yield return Frames(3);
+                Check(_ar.State == ArEncounterState.ReadyToPlace && !_ar.HasPlacementTarget && _ar.PlacementTargetTooLow,
+                    "plane 2.91 m below the camera accepted: target " + _ar.HasPlacementTarget + " tooLow " + _ar.PlacementTargetTooLow);
+                Check(!_ar.Hud.IsPlaceButtonInteractable, "place button enabled for a plane 2.91 m below the camera");
+                _ar.Hud.PlaceButton.onClick.Invoke();
+                yield return Frames(1);
+                Check(MobCount() == 0, "spawned on a plane 2.91 m below the camera");
+
+                // #31 decision 18:58: v0 spawn range 1.5–3.0 m (prototype); beyond it the target is rejected, not clamped.
+                _syntheticTarget = cam.position + fwd * 3.5f + Vector3.down * 1.2f;
+                yield return Frames(3);
+                Check(_ar.State == ArEncounterState.ReadyToPlace && !_ar.HasPlacementTarget && _ar.PlacementTargetTooFar,
+                    "target 3.5 m away accepted: target " + _ar.HasPlacementTarget + " tooFar " + _ar.PlacementTargetTooFar);
+                Check(!_ar.Hud.IsPlaceButtonInteractable && _ar.Hud.StatusLabel == ArEncounterHud.PlacementTooFarNotice,
+                    "too-far hint missing: " + _ar.Hud.StatusLabel);
+                _ar.Hud.PlaceButton.onClick.Invoke();
+                yield return Frames(1);
+                Check(MobCount() == 0, "spawned 3.5 m away");
+                _syntheticTarget = cam.position + fwd * 2.95f + Vector3.down * 1.2f;
+                yield return Frames(3);
+                Check(_ar.HasPlacementTarget && !_ar.PlacementTargetTooFar, "target 2.95 m (inside 1.5–3.0 m) rejected");
+
                 _syntheticTarget = cam.position + fwd * 1.8f + Vector3.down * 1.2f; // far enough
                 yield return Frames(3);
                 Check(_ar.State == ArEncounterState.ReadyToPlace && _ar.HasPlacementTarget && !_ar.PlacementTargetTooClose, "phase2 state " + _ar.State);
@@ -996,7 +1293,8 @@ namespace MetinAR.Editor
                 _syntheticStatus = ArSessionStatus.SessionInitializing;
                 yield return Frames(5);
                 Check(_ar.State == ArEncounterState.Placed && _ar.Machine.IsTrackingLimited, "tracking-limited not reported");
-                Check(_ar.Hud.StatusLabel != null && _ar.Hud.StatusLabel.StartsWith("Śledzenie ograniczone"), "status " + _ar.Hud.StatusLabel);
+                Check(_ar.Hud.StatusLabel != null && _ar.Hud.StatusLabel == ArEncounterHud.SearchingSurroundingsNotice, "status " + _ar.Hud.StatusLabel);
+                Check(!_ar.ApproachPromptVisible, "approach prompt shown with tracking lost");
                 Check(Vector3.Distance(_ar.SpawnedMob.transform.position, placedAt) < 0.001f && MobCount() == 1, "mob moved/duplicated during tracking loss");
                 _syntheticStatus = ArSessionStatus.SessionTracking;
                 yield return Frames(3);
@@ -1006,6 +1304,109 @@ namespace MetinAR.Editor
                 int iPlaced = IndexOf(ArEncounterState.Placed);
                 Check(iScan >= 0 && iReady > iScan && iPlaced > iReady, "state order " + string.Join(",", _ar.StateHistory));
                 Debug.Log("[ArSmoke] T12 states " + string.Join(",", _ar.StateHistory));
+                // T12b continues in this synthetic encounter and exits to the world map.
+            }
+
+            /// <summary>
+            /// #31 MANAGER DECISION 18:50: without tracking the mob is hidden and combat paused at once ("Szukam otoczenia…");
+            /// after more than 15 s (prototype setting) the ARSession is reset ([ArSession] reset …). The same mob object keeps its
+            /// HP, is anchored again on new ground when tracking returns, and the kill reward is granted only once across resets.
+            /// </summary>
+            private IEnumerator T12b_TrackingLostOver15s_ResetKeepsHpAndRewardOnce()
+            {
+                ArEncounterCombat combat = _ar != null ? _ar.Combat : null;
+                ArEncounterMob mob = _ar != null ? _ar.SpawnedMob : null;
+                Check(combat != null && mob != null && _ar.State == ArEncounterState.Placed && _ar.TrackingRecovery != null,
+                    "no placed synthetic encounter (T12)");
+                if (combat == null || mob == null || _ar.TrackingRecovery == null) yield break;
+                int defeatedEvents = 0;
+                Action<ArEncounterMob, MobKillReward> onDefeated = (m, r) => defeatedEvents++;
+                var resetLogs = new List<string>();
+                var relocateLogs = new List<string>();
+                Application.LogCallback onLog = (message, stack, type) =>
+                {
+                    if (message.StartsWith("[ArSession] reset")) resetLogs.Add(message);
+                    if (message.StartsWith("[ArSession] relocated")) relocateLogs.Add(message);
+                };
+                combat.MobDefeated += onDefeated;
+                Application.logMessageReceived += onLog;
+                try
+                {
+                    LocalPlayerSession.Reset();
+                    combat.SeedOverride = 20261021UL;
+                    combat.Bind(mob);
+                    int swing = 700000;
+                    while (combat.Session != null && combat.Session.MobHp == combat.Session.MobMaxHp && swing < 700010)
+                        combat.HandleHitDetected(mob, swing++);
+                    int hp = combat.Session != null ? combat.Session.MobHp : -1;
+                    Check(hp > 0 && hp < 120, "precondition: partial damage, hp " + hp);
+                    float limit = _ar.Machine.Settings.trackingLostResetSeconds;
+                    Check(Mathf.Approximately(limit, 15f), "prototype reset limit " + limit + " s, expected 15 s");
+
+                    // (1) tracking lost: hidden + paused at once.
+                    float lostAt = Time.realtimeSinceStartup;
+                    _syntheticStatus = ArSessionStatus.SessionInitializing;
+                    yield return Frames(2);
+                    Check(!_ar.MobUsable && DrawnRenderers(mob) == 0, "mob not hidden at once on tracking loss");
+                    Check(_ar.FppCombat == null || (!_ar.FppCombat.Ready && !_ar.FppCombat.RequestAttack()), "combat not paused on tracking loss");
+                    Check(_ar.Hud.StatusLabel == ArEncounterHud.SearchingSurroundingsNotice, "status " + _ar.Hud.StatusLabel);
+                    Check(_ar.TrackingRecovery.ResetCount == 0, "reset before the limit");
+
+                    // (2) more than 15 s: exactly one reset, same mob object, same HP.
+                    yield return WaitUntil(() => _ar.TrackingRecovery.ResetCount >= 1, limit + 5f);
+                    float resetAfter = Time.realtimeSinceStartup - lostAt;
+                    Check(_ar.TrackingRecovery.ResetCount == 1 && resetLogs.Count == 1, "resets " + _ar.TrackingRecovery.ResetCount + " logs " + resetLogs.Count);
+                    Check(resetAfter >= limit - 0.1f, "reset too early: " + resetAfter + " s");
+                    Check(_ar.SpawnedMob == mob && mob != null && MobCount() == 1 && _ar.SpawnCount == 1, "mob destroyed or duplicated by the reset");
+                    Check(combat.Session != null && combat.Session.MobHp == hp, "HP changed by the reset: " + hp + " -> " + (combat.Session != null ? combat.Session.MobHp : -1));
+                    Check(_ar.IsRelocatingMob && _ar.MobAnchorKind == "relocating" && DrawnRenderers(mob) == 0, "not waiting for new ground: kind " + _ar.MobAnchorKind);
+                    yield return Frames(10);
+                    Check(_ar.TrackingRecovery.ResetCount == 1, "reset repeated right away");
+
+                    // (3) tracking back on new ground: anchored again there, shown, HP unchanged.
+                    Transform cam = _ar.ArCamera.transform;
+                    Vector3 fwd = Vector3.ProjectOnPlane(cam.forward, Vector3.up).normalized;
+                    // Relocation obeys the same v0 spawn range: new ground 3.5 m away is not used.
+                    _syntheticTarget = cam.position + fwd * 3.5f + Vector3.down * 1.2f;
+                    _syntheticStatus = ArSessionStatus.SessionTracking;
+                    yield return Frames(10);
+                    Check(_ar.IsRelocatingMob && relocateLogs.Count == 0, "mob relocated 3.5 m away (outside 1.5–3.0 m)");
+                    _syntheticTarget = cam.position + fwd * 2.0f + Vector3.down * 1.2f;
+                    _syntheticStatus = ArSessionStatus.SessionTracking;
+                    yield return WaitUntil(() => !_ar.IsRelocatingMob, 5f);
+                    Check(!_ar.IsRelocatingMob && relocateLogs.Count == 1, "mob not relocated after tracking returned (logs " + relocateLogs.Count + ")");
+                    Check(Vector3.Distance(mob.transform.position, _syntheticTarget) < 0.01f, "mob not on the new ground: " + mob.transform.position + " vs " + _syntheticTarget);
+                    yield return WaitUntil(() => _ar.MobAnchorKind != "pending", 5f);
+                    Check(_ar.MobAnchorKind == "world" || _ar.MobAnchorKind == "plane" || _ar.MobAnchorKind == "session", "anchor after relocation " + _ar.MobAnchorKind);
+                    Check(_ar.MobUsable && DrawnRenderers(mob) > 0, "mob not shown after relocation");
+                    Check(combat.Session.MobHp == hp, "HP changed after relocation");
+
+                    // (4) kill, lose tracking > 15 s again, relocate: still one reward.
+                    while (!combat.Session.MobDefeated && swing < 700200) combat.HandleHitDetected(mob, swing++);
+                    Check(combat.Session.MobDefeated && defeatedEvents == 1, "kill: defeated " + combat.Session.MobDefeated + " events " + defeatedEvents);
+                    PlayerProgress p0 = LocalPlayerSession.Progress;
+                    long exp = p0.TotalExp, talary = p0.Talary;
+                    _syntheticStatus = ArSessionStatus.SessionInitializing;
+                    yield return WaitUntil(() => _ar.TrackingRecovery.ResetCount >= 2, limit + 5f);
+                    Check(_ar.TrackingRecovery.ResetCount == 2 && resetLogs.Count == 2, "second reset missing: " + _ar.TrackingRecovery.ResetCount);
+                    _syntheticTarget = cam.position + fwd * 1.8f + Vector3.down * 1.2f;
+                    _syntheticStatus = ArSessionStatus.SessionTracking;
+                    yield return WaitUntil(() => !_ar.IsRelocatingMob, 5f);
+                    combat.HandleHitDetected(mob, swing++);
+                    Check(combat.LastReport != null && combat.LastReport.Status == CombatHitStatus.MobAlreadyDefeated,
+                        "hit after reset+relocation on a dead mob " + (combat.LastReport != null ? combat.LastReport.Status.ToString() : "-"));
+                    PlayerProgress p1 = LocalPlayerSession.Progress;
+                    Check(defeatedEvents == 1 && p1.TotalExp == exp && p1.Talary == talary, "double reward across reset: events " + defeatedEvents + " exp " + p1.TotalExp + " talary " + p1.Talary);
+                    Check(mob.IsBodyHidden && mob.HpLabel == ArEncounterMob.DefeatedLabel, "dead mob revived by relocation");
+                    Debug.Log("[ArSmoke] T12b reset after " + resetAfter.ToString("F1") + " s, hp kept " + hp + ", resets=" + _ar.TrackingRecovery.ResetCount
+                              + ", reward events=" + defeatedEvents + " | " + (resetLogs.Count > 0 ? resetLogs[0] : "-"));
+                }
+                finally
+                {
+                    combat.MobDefeated -= onDefeated;
+                    Application.logMessageReceived -= onLog;
+                    _syntheticStatus = ArSessionStatus.SessionTracking;
+                }
 
                 _ar.Hud.ExitButton.onClick.Invoke();
                 yield return WaitUntil(() => ActiveScenePath == ArEncounterScenes.WorldMapScenePath, 10f);

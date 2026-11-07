@@ -185,3 +185,96 @@ sword; there is no tracking of the player's real hands through the AR camera.
   camera / plane / raycast / anchor registrations (QA tests use the real JSON of both APKs as fixtures). Builds run with
   `-buildTarget Android`. The guard and the validator also live on PR #32 (the v0 APK branch); the validator requires
   all 11 `Unity.XR.ARCore` registrations and the build log prints `ARCore registrations 11/11`.
+
+## v0-candidate-1 on A31 (2026-10-21 17:53–18:03 Europe/Warsaw): P0-1 no damage, P0-2 spider "moves with the phone"
+
+Protocol and causes: #31 (session protocol 6320633550, causes 6321030003). Summary:
+
+- **P0-2 is not an anchor or AI bug.** All 265 `[ArAnchor]` lines: `parent=Anchor`, constant `mob=`, `followsCam=0`,
+  `verdict=STAYS`. The mob has no locomotion in v0 (aggro is #74). ARCore reset VIO at 17:55:09 and the session stayed
+  `SessionInitializing` for 8 min 15 s with a **frozen camera pose**; the camera image kept moving while the mob was
+  still drawn with the stale pose, so it looked glued to the screen. Fix: while `Placed` and the session is not
+  `SessionTracking`, the mob and its nameplate are hidden (`ArEncounterMob.SetTrackingVisible`,
+  `[ArEncounter] mob hidden (tracking lost: …)` / `mob shown (tracking)`); pose and anchor are untouched.
+  Not done (product decision): automatic AR session reset after N s without tracking.
+- **P0-1: hits never happened** (0 `[FppCombat] hit`, 0 `[ArDamage] swing=`, 0 `hit ignored`). The literal blade
+  segment was tested against the body box at floor level (mob-local y 0.125–0.595). From a phone held ~1.25 m above the
+  floor at the natural 20–40° pitch the blade passes above the spider at every distance; T10b/T10c passed only because they
+  move the spider into the blade at camera height. Fix: `FppHitGeometry.IntersectsReachColumn`: the body footprint
+  (X/Z unchanged) extruded up to `ReachColumnTopY` = 3.5 (mob-local). Horizontal reach ≈ 1.25–1.4 m camera→spider
+  centre (MOBS_NPC "dystans walki 1,2 m"); no hit from ≥ 3 m (L5). On the device the spider was also placed at 3.82 m
+  (out of reach) and combat is disabled while tracking is lost.
+- Regression: Play Mode `T10d_DeviceGeometry_CameraWalkAndHandheldHit` moves the **camera** (XR Simulation pose
+  provider), not the spider: walk 3.82→2.82→1.82→3.82→4.82→3.82 m at 1.25 m height / 30° pitch (mob world pose
+  unchanged, distance follows), no reach at 3.82 m, approach to 1.0 m + real HUD ATAK must lower HP, and with tracking
+  lost the mob must not be drawn. Engine-free: `FppCombatTests.ReachColumn*`.
+
+### MANAGER DECISION 18:50 (#31): auto-reset, plane height, reach
+
+- **Tracking loss → reset** (`ArTrackingRecovery`, engine-free). While placed and the session is not `SessionTracking`, the
+  mob is hidden and combat is paused at once (`FppCombatController.Ready` also requires `MobUsable`). The HUD shows
+  „Szukam otoczenia…”. After `ArPlacementSettings.trackingLostResetSeconds` (PROTOTYPE 15 s) without tracking,
+  `ARSession.Reset()` runs and logs `[ArSession] reset reason=tracking-lost lostFor=…s limit=…s count=… session=… anchor=…
+  hp=…/… defeated=… t=…`. Before the reset the mob is moved out of its anchor (under `TrackablesParent`), because removed
+  anchors take their children with them. The old anchor is removed, and any anchor request still running is discarded.
+  The same `ArEncounterMob` and the same `EncounterCombatSession` stay alive, so HP and the once-only reward carry over.
+  When tracking returns, the mob is moved to the first suitable target and anchored again (`[ArSession] relocated mob at …
+  planeBelowCam=… d=… anchor=…`). The target must be suitable, ≥ 1.5 m away and pass the plane-height rule. Only then
+  is the mob shown again. If tracking does not return, the reset repeats every 15 s.
+- **Plane height (#31 P1).** The A31 put the spider on a plane 2.91 m below the phone. Targets more than
+  `maxPlaneDropBelowCameraMeters` (PROTOTYPE 2.5 m, 1 cm tolerance) below the camera are not spawn surfaces. The rule
+  applies to both reticle points and the plane-centre fallback, and the place button stays disabled
+  (`PlacementTargetTooLow`). Logs: `[ArEncounter] target plane=… planeBelowCam=… maxBelow=2.50 d=… accepted|rejected`
+  (once per plane/verdict) and `planeBelowCam=` on `[ArEncounter] spawned …`.
+- **Reach versus spawn distance.** This is spec text only; no new numbers were added.
+  - [MOBS_NPC.md §4.2](design/MOBS_NPC.md) has `Spawn` 2.5 m from the camera, then `Approach`, where the mob walks to the
+    1.2 m combat distance.
+  - For v0, [AUDIT_2026-10-21_UPDATE_1.md §2.3 "Nie wchodzi do v0"](audit/AUDIT_2026-10-21_UPDATE_1.md) excludes aggro
+    (#74), §3 says "dla v0 mob nie porusza się wcale", and §8.3 P2 says "v0 = mob stoi, aggro w E4". In v0 the player
+    walks up. This matches [DEVICE-ACCEPTANCE-LOOP-V0.md](qa/DEVICE-ACCEPTANCE-LOOP-V0.md) L4: "stand within sword reach".
+  - The reach column makes that walk-up hit possible (T10d (c)).
+  - No spec text covers a „Podejdź” prompt or a maximum spawn distance. §8.3 P10 leaves the minimum at 1.5 m (code)
+    vs 2.5 m (spec) open until the A31 A4 test. **Neither was added here**; both are reported for a decision.
+
+### Lead decision 18:58 (#31): v0 walk-up, „Podejdź” prompt, spawn range 1.5–3.0 m
+
+This supersedes the "neither was added" note above.
+
+- **v0 mob stands still; the player walks up.** There is no mob movement or aggro (#74 stays in E4/S3).
+- **„Podejdź – x,x m”** (`ArApproachPrompt`, engine-free): this is the HUD status line while the placed mob is usable
+  (tracking, anchored), alive and **out of attack reach**. The distance is the horizontal camera-to-mob distance, with one
+  decimal and a Polish comma.
+  - **Attack reach for the prompt is distance only** (correction 19:00; it does not depend on where the phone aims). In
+    reach means: the horizontal camera-to-hit-footprint distance ≤ the blade's horizontal reach. There is no new constant:
+    - the footprint is `FppHitGeometry.BodyMin`..`ReachColumnMax` in x/z, with the mob scale applied;
+    - `FppCombatController.BladeReachMeters` = `ArApproachPrompt.BladeReach` over the same `FppHandsView.SwordPose`
+      blade base/tip samples across the ATAK hit window as the hit sweep. It is the longest camera-local blade point,
+      the upper bound of horizontal reach for any aim (about 1.21 m by an offline estimate; the Unity value is logged
+      as `bladeReach=`).
+    - Up close but aiming away gives no prompt; far away gives the prompt. The aimed sweep (`SwingWouldHit`) is used
+      for hits only.
+    - Because the bound ignores pitch, there is a band (about 1.4–1.5 m to the spider centre when facing it) with no
+      prompt where a pitched handheld swing may still miss.
+  - The prompt is hidden in reach, after the kill (confirmed by the lead), and while tracking is lost or the mob is waiting for relocation.
+    Priority: „Szukam otoczenia…” > „Podejdź – …” > „… stoi na podłożu.”
+  - Log: `[ArEncounter] approach prompt shown|hidden reason=out-of-reach|in-reach|tracking|defeated d=… toFootprint=…
+    bladeReach=…` on every visibility change.
+- **v0 spawn range** `ArPlacementSettings.minSpawnDistanceMeters` / `maxSpawnDistanceMeters` = **PROTOTYPE 1.5 / 3.0 m**
+  (horizontal, 1 cm tolerance, `ArEncounterFraming.ClassifySpawnDistance`).
+  - **Targets outside it are rejected, not clamped**, in the same way for the reticle points, the plane-centre fallback
+    and post-reset relocation. This is the least invasive option: it reuses the existing too-close path, and clamping
+    could move the spider off the detected plane polygon and away from where the reticle points.
+  - Reticle: a too-far hit falls through to the next, lower viewport point (closer ground). Otherwise the place button
+    stays disabled with `PlacementTargetTooFar` and „Za daleko. Podejdź bliżej albo wyceluj bliżej w podłoże (maks. 3,0 m).”
+  - Relocation waits for in-range ground.
+  - Logs: `d=… range=1.5-3.0` on `[ArEncounter] spawned …`, and `range=` on the target-plane log.
+- **Open until S3, spec unchanged:** [MOBS_NPC.md §4.2](design/MOBS_NPC.md) spawns at 2.5 m and has the mob approach to
+  1.2 m. In v0 the range is 1.5–3.0 m with walk-up, and [AUDIT_2026-10-21_UPDATE_1.md](audit/AUDIT_2026-10-21_UPDATE_1.md)
+  §8.3 P10 (1.5 m vs 2.5 m) stays open.
+- **Tests:**
+  - Box: `ArApproachAndSpawnRangeTests` covers the format, visibility, the 1.5/3.0 m boundaries, 3.82 m (A31) and
+    invalid settings.
+  - Box: blade reach, aim independence, footprint distance, and close-aiming-away / far cases.
+  - Unity: T10e covers the prompt at 2.4 m and 3.82 m, none at 1.0 m in reach, **none at 1.0 m while aiming away** (where
+    a swing cannot hit), **the prompt at 3.82 m while aiming away**, and the tracking-lost priority.
+    T12 covers 3.5 m rejected and 2.95 m accepted. T12b covers relocation at 3.5 m refused.

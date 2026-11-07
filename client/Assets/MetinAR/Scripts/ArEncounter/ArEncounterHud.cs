@@ -189,7 +189,13 @@ namespace MetinAR.ArEncounter
         /// <summary>Updates status / place button / failure panel / radar from the controller state.</summary>
         public const string PlacementTooCloseNotice = "Za blisko. Odsuń się albo wyceluj dalej w podłoże (min. 1,5 m).";
 
-        public void Refresh(ArEncounterState state, ArEncounterStateMachine machine, bool hasPlacementTarget, float notTrackingSeconds, string mobName, Transform mob, Transform viewer, bool targetTooClose = false)
+        /// <summary>Placed, tracking lost or waiting for new ground after an AR session reset (#31 MANAGER DECISION 18:50).</summary>
+        public const string SearchingSurroundingsNotice = "Szukam otoczenia…";
+
+        /// <summary>Ground was found only beyond the v0 maximum spawn distance (#31 decision 18:58, PROTOTYPE 3.0 m).</summary>
+        public const string PlacementTooFarNotice = "Za daleko. Podejdź bliżej albo wyceluj bliżej w podłoże (maks. 3,0 m).";
+
+        public void Refresh(ArEncounterState state, ArEncounterStateMachine machine, bool hasPlacementTarget, float notTrackingSeconds, string mobName, Transform mob, Transform viewer, bool targetTooClose = false, bool mobHidden = false, bool targetTooFar = false, string approachPrompt = null)
         {
             string status;
             switch (state)
@@ -208,11 +214,13 @@ namespace MetinAR.ArEncounter
                 case ArEncounterState.ReadyToPlace:
                     status = hasPlacementTarget
                         ? "Podłoże wykryte. Naciśnij \"Postaw potwora\"."
-                        : targetTooClose ? PlacementTooCloseNotice : "Podłoże wykryte. Wyceluj w podłoże.";
+                        : targetTooClose ? PlacementTooCloseNotice
+                        : targetTooFar ? PlacementTooFarNotice : "Podłoże wykryte. Wyceluj w podłoże.";
                     break;
                 case ArEncounterState.Placed:
-                    status = machine != null && machine.IsTrackingLimited
-                        ? "Śledzenie ograniczone — skieruj aparat na miejsce potwora."
+                    status = mobHidden || (machine != null && machine.IsTrackingLimited)
+                        ? SearchingSurroundingsNotice
+                        : !string.IsNullOrEmpty(approachPrompt) ? approachPrompt
                         : mobName + " stoi na podłożu.";
                     break;
                 default:
