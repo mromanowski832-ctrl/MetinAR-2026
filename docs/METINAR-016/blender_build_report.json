@@ -1,0 +1,93 @@
+{
+  "asset_id": "WanderingMerchant",
+  "triangles": {
+    "SK_Npc_WanderingMerchant_LOD0": 3216,
+    "SK_Npc_WanderingMerchant_LOD1": 1605,
+    "SK_Npc_WanderingMerchant_LOD2": 801
+  },
+  "lod_ratios": {
+    "SK_Npc_WanderingMerchant_LOD0": 1.0,
+    "SK_Npc_WanderingMerchant_LOD1": 0.499,
+    "SK_Npc_WanderingMerchant_LOD2": 0.249
+  },
+  "vertices": {
+    "SK_Npc_WanderingMerchant_LOD0": 1973,
+    "SK_Npc_WanderingMerchant_LOD1": 1106,
+    "SK_Npc_WanderingMerchant_LOD2": 621
+  },
+  "deform_bones": 25,
+  "bone_names": [
+    "Root",
+    "Hips",
+    "Spine",
+    "Chest",
+    "Neck",
+    "Head",
+    "Jaw",
+    "LeftShoulder",
+    "LeftUpperArm",
+    "LeftLowerArm",
+    "LeftHand",
+    "LeftUpperLeg",
+    "LeftLowerLeg",
+    "LeftFoot",
+    "LeftToes",
+    "Backpack",
+    "Lantern",
+    "RightShoulder",
+    "RightUpperArm",
+    "RightLowerArm",
+    "RightHand",
+    "RightUpperLeg",
+    "RightLowerLeg",
+    "RightFoot",
+    "RightToes"
+  ],
+  "materials": 1,
+  "texture_size": 1024,
+  "rest_bounds_m": {
+    "width_x": 1.74,
+    "depth_y": 0.674,
+    "height_z": 1.934,
+    "min_z": 0.0
+  },
+  "walk_speed_mps": 0.733,
+  "clips": {
+    "A_WanderingMerchant_Idle": {
+      "frames": 91,
+      "seconds": 3.0,
+      "loop": true,
+      "min_deformed_z_m": -0.0
+    },
+    "A_WanderingMerchant_Walk": {
+      "frames": 37,
+      "seconds": 1.2,
+      "loop": true,
+      "min_deformed_z_m": -0.0198
+    },
+    "A_WanderingMerchant_TurnLeft": {
+      "frames": 31,
+      "seconds": 1.0,
+      "loop": false,
+      "min_deformed_z_m": -0.0
+    },
+    "A_WanderingMerchant_TurnRight": {
+      "frames": 31,
+      "seconds": 1.0,
+      "loop": false,
+      "min_deformed_z_m": -0.0
+    },
+    "A_WanderingMerchant_Talk": {
+      "frames": 61,
+      "seconds": 2.0,
+      "loop": true,
+      "min_deformed_z_m": -0.0
+    },
+    "A_WanderingMerchant_Interact": {
+      "frames": 61,
+      "seconds": 2.0,
+      "loop": false,
+      "min_deformed_z_m": -0.0
+    }
+  }
+}
