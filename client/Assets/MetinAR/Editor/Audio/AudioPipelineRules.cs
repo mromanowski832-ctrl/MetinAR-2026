@@ -57,7 +57,7 @@ namespace MetinAR.Editor.Audio
         }
 
         /// <summary>Words that must never appear as the source of a MetinAR sound (proprietary game content).</summary>
-        public static readonly string[] ForbiddenSourceWords = { "metin2", "metin 2", "gameforge", "ymir" };
+        public static readonly string[] ForbiddenSourceWords = { "metin2", "metin 2", "gameforge", "webzen", "ymir" };
 
         private const string IdPattern = "[A-Z][A-Za-z0-9]*";
         private static readonly Regex SfxCombatUiRegex = new Regex("^SFX_(Combat|UI|Item|Loot|Status|Stinger)_(" + IdPattern + ")_(\\d{2})\\.wav$");

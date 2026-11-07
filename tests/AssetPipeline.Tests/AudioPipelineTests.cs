@@ -301,6 +301,15 @@ namespace AssetPipeline.Tests
         }
 
         [Fact]
+        public void LedgerRejectsWebzenInSourceOrAuthor()
+        {
+            var bySource = AudioLicenseLedger.Parse(Ledger("SFX/UI/SFX_UI_Click_01.wav", "cc0", "CC0-1.0", "Webzen sound pack https://example.org/a")).Validate();
+            Assert.Contains(bySource, i => i.Message.Contains("proprietary source 'webzen'"));
+            var byAuthor = AudioLicenseLedger.Parse(Ledger("SFX/UI/SFX_UI_Click_01.wav", "cc0", "CC0-1.0", "https://example.org/a", author: "WEBZEN Inc.")).Validate();
+            Assert.Contains(byAuthor, i => i.Message.Contains("proprietary source 'webzen'"));
+        }
+
+        [Fact]
         public void LedgerAcceptsDocumentedCc0AndReportsDuplicatesAndBadSha()
         {
             Assert.Empty(AudioLicenseLedger.Parse(Ledger("SFX/UI/SFX_UI_Click_01.wav", "cc0", "CC0-1.0", "Jane Doe, https://example.org/sound/1")).Validate());

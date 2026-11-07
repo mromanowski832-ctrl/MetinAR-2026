@@ -12,7 +12,7 @@ Rules (see `docs/METINAR-018-AUDIO-PIPELINE.md`, owner decision 2026-10-21 in #4
   - `cc_by` → `CC-BY-x.y` (e.g. `CC-BY-4.0`, `CC-BY-3.0`); `Source` must contain the author and the download URL, and the
     file needs one row in the **CC-BY attribution** table below (all fields required, none empty or `-`).
 - Excluded: any CC licence with NC, ND or SA terms (`CC-BY-NC-*`, `CC-BY-ND-*`, `CC-BY-SA-*` and combinations such as
-  `CC-BY-NC-SA-*`), anything from Metin2 / Gameforge / Ymir, paid sound libraries, ripped game audio, unclear licences.
+  `CC-BY-NC-SA-*`), anything from Metin2 / Gameforge / Webzen / Ymir, paid sound libraries, ripped game audio, unclear licences.
   Any other licence needs an owner decision first.
 - CC-BY rows must later appear on the in-game credits screen (no screen yet: dependency recorded for spec #40).
 - `File` is relative to `client/Assets/MetinAR/Audio`. The SHA-256 is of the file bytes as committed.
