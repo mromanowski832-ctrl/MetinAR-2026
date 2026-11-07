@@ -11,7 +11,7 @@
 
 | Klasa | Rola | Ścieżka A | Ścieżka B | Broń | Druga ręka |
 |---|---|---|---|---|---|
-| Wojownik | wręcz, wytrzymałość | **Bastion** (`bulwark`) — tarcza, blok, kontry | **Rozłam** (`breaker`) — broń dwuręczna, obszar | miecz 1H / miecz lub topór 2H | tarcza (tylko Bastion) |
+| Wojownik | wręcz, wytrzymałość | **Bastion** (`bulwark`) — tarcza, blok, kontry | **Rozłam** (`breaker`) — broń dwuręczna, obszar | miecz 1H / miecz lub topór 2H | puklerz/tarcza od poz. 1 (z mieczem 1H); rozwija Bastion; Rozłam i broń 2H bez tarczy ([D1](DECISIONS_2026-10-23.md)) |
 | Ninja | zwinny zabójca / łucznik | **Cień** (`shade`) — sztylety, krytyki, ukrycie | **Pustułka** (`kestrel`) — łuk, celowanie kamerą, pułapki | para sztyletów / łuk | kołczan (łuk) |
 | Szaman | wsparcie, leczenie, magia | **Korzeń** (`rootward`) — leczenie, osłony, oczyszczanie | **Nawałnica** (`tempest`) — wiatr i pioruny | różdżka runiczna | totem |
 | Slajter | wojownik-mag mroku | **Popiół** (`ashblade`) — zaklęte ostrze, kradzież życia | **Zmierzch** (`duskcaller`) — klątwy, czary z dystansu, przyzwanie | miecz 1H | fokus mroku |
@@ -22,7 +22,8 @@ Razem 14 na klasę, 56 w grze.
 ## 2. Zasady umiejętności
 
 - **Wybór ścieżki:** poziom 10, u NPC-trenera (w prototypie: Wędrowny Handlarz). Zmiana ścieżki: zadanie + opłata
-  (Q11). Po zmianie punkty umiejętności ścieżki wracają do puli.
+  (Q11). Po zmianie punkty umiejętności ścieżki wracają do puli. Wojownik wybierający Rozłam: założony
+  puklerz wraca do ekwipunku ([D1](DECISIONS_2026-10-23.md)).
 - **Punkty umiejętności:** 1 punkt za każdy awans od poziomu 2 (98 punktów do poziomu 99). Punktami rozwija się tylko
   stopień **Wprawa**; dalsze stopnie wymagają przedmiotów i czasu (§2.1). Do Biegłości I potrzeba 15 punktów na
   umiejętność, więc 98 punktów wystarcza na ok. 6 z 8 dostępnych umiejętności (8 × 15 = 120) i gracz wybiera styl.
@@ -96,6 +97,11 @@ Obecne ręce i miecz z #36 pasują do wojownika i Slajtera — patrz plan etapó
 ## Wojownik (`warrior`) — walka wręcz, wytrzymałość
 
 Broń: `sword_1h`, `sword_2h`, `axe_2h`; druga ręka: `shield`. Wybór ścieżki na poziomie 10.
+
+Tarcza (decyzja właściciela 2026-10-23 04:05, [D1](DECISIONS_2026-10-23.md)): Lipowy Puklerz od poziomu 1;
+poziomy 1–9 to miecz 1H + puklerz + podstawowy BLOK; od poziomu 10 Bastion rozwija obronę tarczą, kontry i
+umiejętności defensywne; Rozłam nie korzysta z tarczy (puklerz wraca do ekwipunku); broń 2H zawsze wyklucza tarczę;
+AURA: chwyt miecza obiema dłońmi także z tarczą, bez przenikania modeli.
 
 ### Umiejętności klasowe (wspólne dla obu ścieżek)
 
