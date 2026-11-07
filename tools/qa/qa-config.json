@@ -7,6 +7,7 @@
     "tests/MetinAR.QA.Tests/MetinAR.QA.Tests.csproj",
     "tests/AssetPipeline.Tests/AssetPipeline.Tests.csproj",
     "tests/MetinAR.Gameplay.Tests/MetinAR.Gameplay.Tests.csproj",
+    "tests/MetinAR.Audio.Tests/MetinAR.Audio.Tests.csproj",
     "server/tests/MetinAR.Server.Tests/MetinAR.Server.Tests.csproj"
   ],
   "optionalTestProjectGlobs": [
